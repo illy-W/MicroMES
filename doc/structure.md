@@ -54,6 +54,17 @@ See `AGENTS.md` for the project table and dependency direction.
 - Tree tables (e.g. BOM): same helm table with TanStack row expanding (`rowExpandingFeature`, `createExpandedRowModel`, `getSubRows`), chevron button with `aria-expanded`, indentation by `row.depth`. Reference: `features/bom` (page `/materials/:id/bom`, opened from the Materials row menu; it will become a tab of a material detail page).
 - Reference implementation: `features/materials`.
 
+### Routing editor (`features/routing`)
+
+- Page `/materials/:id/routing`, opened from the Materials row menu. Diagram built with `ng-diagram` (exact version in `package.json`): custom Angular node component (ng-diagram nodes are unstyled), styles imported in `apps/web/src/styles.scss` with the `--ngd-*` variables mapped to the semantic tokens.
+- The whole graph is saved with one `PUT /api/materials/{id}/routing` (steps keyed by `key`, existing steps keep their id). Client-side validation mirrors the backend rules (acyclic, connected, one final step, unique operation numbers); the backend is the authority.
+- Process segments are managed in `features/process-segments` (same structure as `features/materials`).
+
+### Local sample data (Development)
+
+- `DevelopmentDataSeeder` (`libs/api-core/Persistence`) fills an empty database at startup with a small steel and oak furniture workshop: materials, multilevel BOM, process segments and four routings (the chair has parallel branches). It never runs outside Development or when `Materials` already has rows.
+- To reset: stop the dev server, `docker compose down -v`, then `npx nx run Api:db-up` and restart the API.
+
 ### Layouts (`apps/web/src/app/core/layouts`)
 
 - `blank`: only a `router-outlet`, for pages without shell. Currently unused.
