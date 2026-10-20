@@ -34,7 +34,7 @@ Reply in the language of the user's request. Write specs in that language too.
 - Small single-layer tasks: suggest the specialist agent directly instead of the full workflow.
 
 ## Phase 0 - Context
-Read `AGENTS.md`, `doc/product.md` and `doc/structure.md`. Versions come from `package.json`, `global.json`, `.nvmrc` and `.csproj` files.
+Read `AGENTS.md`, `doc/product.md` and `doc/structure.md`. Versions come from `package.json`, `global.json`, `.nvmrc` and `.csproj` files. Also read `doc/glossary.md`; check the ISA-95 vocabulary in specs and add new domain entities to the glossary.
 
 ## Phase 1 - Requirements (STOP for approval)
 Create `doc/specs/<kebab-feature>/requirements.md` using the template in `AGENTS.md`, plus a **Layers impacted** section: Backend / Web / Nx workspace. Present it and wait for explicit approval.

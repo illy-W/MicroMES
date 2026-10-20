@@ -12,6 +12,8 @@ Monorepo Nx (pnpm) con frontend Angular e backend .NET.
 | `libs/api-core` | `ApiCore` | Lib .NET con il core (`MicroMES.ApiCore`) |
 | `libs/ui/*` | `<nome>` (es. `button`) | Componenti spartan helm, generati (alias `@spartan-ng/helm/*`, mai a mano) |
 | `libs/shared/api-client` | `api-client` | Client Angular generato da Orval (`src/generated/**`, mai modificare a mano) |
+| `docker-compose.yml` | - | Database PostgreSQL locale (container `micromes-db`) |
+| `dotnet-tools.json` | - | Tool .NET locali (`dotnet-ef`) |
 | `openapi/Api.json` | - | Contratto OpenAPI generato dall'API |
 | `orval.config.ts` | - | Configurazione Orval (root) |
 
@@ -32,12 +34,16 @@ Node: usa la versione di `.nvmrc`.
 - `dotnet run --project apps/api`: avvia l'API
 - `npx nx run api-client:generate-api`: rigenera `openapi/Api.json` e il client Angular (`generate-api:no-build` salta la build dell'API)
 - `npx nx g @spartan-ng/cli:ui <nome> --no-interactive`: aggiunge un componente spartan in `libs/ui` (poi `npx nx lint <nome> --fix`)
+- `npx nx run Api:db-up` / `npx nx run Api:db-down`: avvia/ferma il database locale
+- Nuova migration: `dotnet tool restore`, poi `dotnet ef migrations add <Nome> --project libs/api-core --startup-project apps/api --output-dir Persistence/Migrations` (applicate all'avvio solo in Development)
 - Nuovi progetti Angular: `npx nx g @nx/angular:...`. I progetti .NET si creano con `dotnet new`, poi si aggiungono alla solution.
 
 ## Convenzioni
 
 - Cartelle in kebab-case, progetti e namespace .NET in PascalCase con prefisso `MicroMES.`.
 - Usa l'agent `@nx-expert` e le skill `nx-workspace`, `nx-generate`, `nx-run-tasks` per le operazioni sul monorepo.
+- Skill `impeccable` (design UI, mode Operate): usa `PRODUCT.md` e `DESIGN.md` in root come pointer a `doc/`; la skill è in `.opencode/skills/impeccable`.
+- Vocabolario di dominio: riferimento ISA-95 in forma ridotta, vedi `doc/glossary.md`. Pattern backend: `doc/structure.md` (sezione "Backend patterns").
 - Non fare commit né push senza richiesta esplicita.
 
 ## Spec-Driven Development

@@ -35,7 +35,7 @@ Reply in the language of the user's request.
 - Add UI components with the generator (`npx nx g @spartan-ng/cli:ui <name> --no-interactive`), never by hand; see `doc/structure.md`.
 - New pages go under a layout (`core/layouts/{full,blank}`) as children of its parent route in `app.routes.ts`; menu items go in `core/layouts/full/sidebar-data.ts`. See "Layouts" in `doc/structure.md`.
 - A Tailwind app needs its own `.postcssrc.json` (`apps/web/.postcssrc.json`).
-- Skills: `angular-developer`, `spartan`, `nx-workspace`, `nx-generate`, `nx-run-tasks`.
+- Skills: `angular-developer`, `spartan`, `impeccable`, `nx-workspace`, `nx-generate`, `nx-run-tasks`.
 
 ## Verification
 - `npx nx build web` and `npx nx lint web`.

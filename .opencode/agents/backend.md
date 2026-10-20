@@ -28,6 +28,9 @@ Reply in the language of the user's request.
 - `ApiCore`: shared infrastructure (persistence, auth, utilities). `ApiFeatures`: business features, one folder per feature. `Api`: composition root, controllers, configuration.
 - Namespaces `MicroMES.<Project>[.<Feature>]`; folders and file names match the namespace.
 - New .NET projects: `dotnet new`, name the `.csproj` without the `MicroMES.` prefix (Nx project name comes from it), set `RootNamespace`/`AssemblyName` to `MicroMES.<Name>`, add to the solution.
+- Follow the "Backend patterns" section of `doc/structure.md` and the ISA-95 vocabulary in `doc/glossary.md`.
+- Persistence: `AppDbContext` only inside repositories; repositories are `IXxxRepository : IGenericRepository<T, int>` registered with `AddRepository`; int primary keys; soft-delete via `IsActive`, never `DeleteAsync`; services return `Result`/`Result<T>` (`Fail()` before `AddError()`); manual mapping, separate request/response models.
+- Schema changes need a migration (`dotnet tool restore`, `dotnet ef migrations add <Name> --project libs/api-core --startup-project apps/api --output-dir Persistence/Migrations`); local DB via `npx nx run Api:db-up` / `Api:db-down`.
 - Read versions from `global.json` and the `.csproj` files. Do not add packages without need.
 - When the API surface changes, the last task is `npx nx run api-client:generate-api` (regenerates `openapi/Api.json` and the Angular client); report the contract changes.
 - Skills: `nx-workspace`, `nx-run-tasks`.
