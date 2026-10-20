@@ -51,6 +51,9 @@
       "executor": "@angular/build:dev-server",
       "defaultConfiguration": "development",
       "dependsOn": ["Api:serve"],
+      "options": {
+        "port": 4300
+      },
       "configurations": {
         "production": {
           "buildTarget": "web:build:production"
