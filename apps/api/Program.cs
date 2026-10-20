@@ -3,6 +3,8 @@ using System.Text.Json.Serialization;
 using MicroMES.ApiCore.Persistence;
 using MicroMES.ApiFeatures.BomFeature;
 using MicroMES.ApiFeatures.MaterialFeature;
+using MicroMES.ApiFeatures.ProcessSegmentFeature;
+using MicroMES.ApiFeatures.RoutingFeature;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -57,6 +59,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddMaterialFeature();
 builder.Services.AddBomFeature();
+builder.Services.AddProcessSegmentFeature();
+builder.Services.AddRoutingFeature();
 
 var app = builder.Build();
 
@@ -64,7 +68,9 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment() && !isOpenApiEnabled)
 {
     using var scope = app.Services.CreateScope();
-    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+    DevelopmentDataSeeder.SeedAsync(db).GetAwaiter().GetResult();
 }
 
 // Configure the HTTP request pipeline.

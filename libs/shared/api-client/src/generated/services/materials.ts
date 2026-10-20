@@ -318,8 +318,3 @@ export class MaterialsService {
   }
 };
 
-export type GetMaterialsClientResult = NonNullable<MaterialModel[]>
-export type CreateMaterialClientResult = NonNullable<MaterialModel>
-export type GetMaterialClientResult = NonNullable<MaterialModel>
-export type UpdateMaterialClientResult = NonNullable<MaterialModel>
-export type DeactivateMaterialClientResult = NonNullable<unknown>

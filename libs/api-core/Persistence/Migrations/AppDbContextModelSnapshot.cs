@@ -115,6 +115,134 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("Materials", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.ProcessSegment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("RunMinutesPerUnit")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("SetupMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("ProcessSegments", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStep", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("OperationNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("PositionX")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("PositionY")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("ProcessSegmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("RunMinutesPerUnit")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)");
+
+                    b.Property<decimal?>("SetupMinutes")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessSegmentId");
+
+                    b.HasIndex("MaterialId", "OperationNumber")
+                        .IsUnique();
+
+                    b.ToTable("RoutingSteps", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStepDependency", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("PredecessorStepId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SuccessorStepId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SuccessorStepId");
+
+                    b.HasIndex("PredecessorStepId", "SuccessorStepId")
+                        .IsUnique();
+
+                    b.ToTable("RoutingStepDependencies", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.BomItem", b =>
                 {
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
@@ -126,6 +254,36 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
                         .WithMany()
                         .HasForeignKey("ParentMaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStep", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.ProcessSegment", null)
+                        .WithMany()
+                        .HasForeignKey("ProcessSegmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStepDependency", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.RoutingStep", null)
+                        .WithMany()
+                        .HasForeignKey("PredecessorStepId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.RoutingStep", null)
+                        .WithMany()
+                        .HasForeignKey("SuccessorStepId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
