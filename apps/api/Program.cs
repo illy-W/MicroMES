@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using MicroMES.ApiCore.Persistence;
+using MicroMES.ApiFeatures.BomFeature;
 using MicroMES.ApiFeatures.MaterialFeature;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -55,6 +56,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         ?? "Host=localhost;Database=micromes"));
 
 builder.Services.AddMaterialFeature();
+builder.Services.AddBomFeature();
 
 var app = builder.Build();
 

@@ -6,6 +6,7 @@ namespace MicroMES.ApiCore.Persistence;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Material> Materials { get; set; } = null!;
+    public DbSet<BomItem> BomItems { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +23,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.VendorMaterialId).HasMaxLength(100);
             entity.Property(x => x.IsActive).HasDefaultValue(true);
             entity.HasIndex(x => x.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<BomItem>(entity =>
+        {
+            entity.ToTable("BomItems");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Quantity).HasPrecision(18, 4);
+            entity.HasIndex(x => new { x.ParentMaterialId, x.ComponentMaterialId }).IsUnique();
+            entity.HasOne<Material>().WithMany().HasForeignKey(x => x.ParentMaterialId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Material>().WithMany().HasForeignKey(x => x.ComponentMaterialId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

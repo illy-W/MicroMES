@@ -22,6 +22,40 @@ namespace MicroMES.ApiCore.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.BomItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ComponentMaterialId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ParentMaterialId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComponentMaterialId");
+
+                    b.HasIndex("ParentMaterialId", "ComponentMaterialId")
+                        .IsUnique();
+
+                    b.ToTable("BomItems", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.Material", b =>
                 {
                     b.Property<int>("Id")
@@ -79,6 +113,21 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Materials", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.BomItem", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
+                        .WithMany()
+                        .HasForeignKey("ComponentMaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
+                        .WithMany()
+                        .HasForeignKey("ParentMaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }
