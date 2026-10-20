@@ -12,6 +12,11 @@ export const appRoutes: Route[] = [
         loadComponent: () =>
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
+      {
+        path: 'materials',
+        loadComponent: () =>
+          import('./features/materials/materials.component').then((m) => m.MaterialsComponent),
+      },
     ],
   },
 ];

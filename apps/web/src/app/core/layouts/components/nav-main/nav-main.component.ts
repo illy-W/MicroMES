@@ -1,14 +1,14 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideHouse } from '@ng-icons/lucide';
+import { lucideHouse, lucidePackage } from '@ng-icons/lucide';
 import { HlmSidebarImports } from '@spartan-ng/helm/sidebar';
 import { NavItem } from '../../models/nav-item.model';
 
 @Component({
   selector: 'app-nav-main',
   imports: [HlmSidebarImports, NgIcon, RouterLink, RouterLinkActive],
-  providers: [provideIcons({ lucideHouse })],
+  providers: [provideIcons({ lucideHouse, lucidePackage })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-sidebar-group>
