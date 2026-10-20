@@ -14,8 +14,21 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "paths": {
-      "@micromes/api-client/models": ["./libs/shared/api-client/src/generated/model/index.ts"],
-      "@micromes/api-client/services/*": ["./libs/shared/api-client/src/generated/services/*"]
+      "@micromes/api-client/models": [
+        "./libs/shared/api-client/src/generated/model/index.ts"
+      ],
+      "@micromes/api-client/services/*": [
+        "./libs/shared/api-client/src/generated/services/*"
+      ],
+      "@spartan-ng/helm/button": ["./libs/ui/button/src/index.ts"],
+      "@spartan-ng/helm/utils": ["./libs/ui/utils/src/index.ts"],
+      "@spartan-ng/helm/sidebar": ["./libs/ui/sidebar/src/index.ts"],
+      "@spartan-ng/helm/input": ["./libs/ui/input/src/index.ts"],
+      "@spartan-ng/helm/separator": ["./libs/ui/separator/src/index.ts"],
+      "@spartan-ng/helm/sheet": ["./libs/ui/sheet/src/index.ts"],
+      "@spartan-ng/helm/skeleton": ["./libs/ui/skeleton/src/index.ts"],
+      "@spartan-ng/helm/tooltip": ["./libs/ui/tooltip/src/index.ts"],
+      "@spartan-ng/helm/empty": ["./libs/ui/empty/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
