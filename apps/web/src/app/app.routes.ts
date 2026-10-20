@@ -13,6 +13,10 @@ export const appRoutes: Route[] = [
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
+        path: 'materials/:id/bom',
+        loadComponent: () => import('./features/bom/bom.component').then((m) => m.BomComponent),
+      },
+      {
         path: 'materials',
         loadComponent: () =>
           import('./features/materials/materials.component').then((m) => m.MaterialsComponent),

@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideEllipsis } from '@ng-icons/lucide';
-import type { MaterialModel } from '@micromes/api-client/models';
+import { MaterialType, type MaterialModel } from '@micromes/api-client/models';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 
@@ -25,6 +26,9 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
     <ng-template #menu>
       <hlm-dropdown-menu>
         <hlm-dropdown-menu-group>
+          @if (hasBom()) {
+            <button hlmDropdownMenuItem (click)="openBom()">Distinta base</button>
+          }
           <button hlmDropdownMenuItem (click)="edit.emit(material())">Modifica</button>
         </hlm-dropdown-menu-group>
         @if (material().isActive) {
@@ -38,7 +42,16 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
   `,
 })
 export class MaterialRowActionsComponent {
+  private readonly router = inject(Router);
   readonly material = input.required<MaterialModel>();
+  protected readonly hasBom = computed(
+    () => this.material().type === MaterialType.Intermediate || this.material().type === MaterialType.FinishedGood,
+  );
+
+  protected openBom(): void {
+    void this.router.navigate(['/materials', this.material().id, 'bom']);
+  }
+
   readonly edit = output<MaterialModel>();
   readonly deactivate = output<MaterialModel>();
 }
