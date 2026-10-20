@@ -28,6 +28,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
         <hlm-dropdown-menu-group>
           @if (hasBom()) {
             <button hlmDropdownMenuItem (click)="openBom()">Distinta base</button>
+            <button hlmDropdownMenuItem (click)="openRouting()">Ciclo di lavoro</button>
           }
           <button hlmDropdownMenuItem (click)="edit.emit(material())">Modifica</button>
         </hlm-dropdown-menu-group>
@@ -50,6 +51,10 @@ export class MaterialRowActionsComponent {
 
   protected openBom(): void {
     void this.router.navigate(['/materials', this.material().id, 'bom']);
+  }
+
+  protected openRouting(): void {
+    void this.router.navigate(['/materials', this.material().id, 'routing']);
   }
 
   readonly edit = output<MaterialModel>();

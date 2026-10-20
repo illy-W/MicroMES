@@ -47,6 +47,9 @@ importers:
       clsx:
         specifier: 2.1.1
         version: 2.1.1
+      ng-diagram:
+        specifier: 1.4.0
+        version: 1.4.0(@angular/common@22.1.8(@angular/core@22.1.8(@angular/compiler@22.1.8)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.1.8(@angular/compiler@22.1.8)(rxjs@7.8.2))
       rxjs:
         specifier: ~7.8.0
         version: 7.8.2
@@ -4113,6 +4116,12 @@ packages:
   negotiator@1.1.0:
     resolution: {integrity: sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==}
     engines: {node: '>=18'}
+
+  ng-diagram@1.4.0:
+    resolution: {integrity: sha512-c3ZFJ6zTTEcKNcMZLJd9CAWMPXByZQIGD+8RBeKnC6L2bDIDXs5maJNmbJ+ld0ChJuinqAAZAAgJOVzF3JlHFA==}
+    peerDependencies:
+      '@angular/common': '>=18.0.0'
+      '@angular/core': '>=18.0.0'
 
   ng-packagr@22.1.1:
     resolution: {integrity: sha512-jZzpQckw2SFvuYI3aWfYMefSVKKG/04E+vrX2KD6coMx7ciLBotVWuLc0331Fjb6XNmAVcsmgQ5NY/Lf+9Himw==}
@@ -9045,6 +9054,12 @@ snapshots:
   negotiator@1.1.0:
     dependencies:
       content-type: 2.1.0
+
+  ng-diagram@1.4.0(@angular/common@22.1.8(@angular/core@22.1.8(@angular/compiler@22.1.8)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.1.8(@angular/compiler@22.1.8)(rxjs@7.8.2)):
+    dependencies:
+      '@angular/common': 22.1.8(@angular/core@22.1.8(@angular/compiler@22.1.8)(rxjs@7.8.2))(rxjs@7.8.2)
+      '@angular/core': 22.1.8(@angular/compiler@22.1.8)(rxjs@7.8.2)
+      tslib: 2.8.1
 
   ng-packagr@22.1.1(@angular/compiler-cli@22.1.8(@angular/compiler@22.1.8)(typescript@6.0.3))(tailwindcss@4.3.3)(tslib@2.8.1)(typescript@6.0.3):
     dependencies:

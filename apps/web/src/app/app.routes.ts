@@ -1,4 +1,5 @@
 import { Route } from '@angular/router';
+import { routingCanDeactivate } from './features/routing/routing-can-deactivate';
 
 export const appRoutes: Route[] = [
   {
@@ -15,6 +16,16 @@ export const appRoutes: Route[] = [
       {
         path: 'materials/:id/bom',
         loadComponent: () => import('./features/bom/bom.component').then((m) => m.BomComponent),
+      },
+      {
+        path: 'materials/:id/routing',
+        loadComponent: () => import('./features/routing/routing.component').then((m) => m.RoutingComponent),
+        canDeactivate: [routingCanDeactivate],
+      },
+      {
+        path: 'process-segments',
+        loadComponent: () =>
+          import('./features/process-segments/process-segments.component').then((m) => m.ProcessSegmentsComponent),
       },
       {
         path: 'materials',

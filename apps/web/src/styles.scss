@@ -5,6 +5,7 @@
 @import 'tailwindcss/utilities.css';
 
 @import '@spartan-ng/brain/hlm-tailwind-preset.css';
+@import 'ng-diagram/styles.css';
 
 :root {
   color-scheme: light;
@@ -114,4 +115,36 @@ table {
   thead {
     @apply bg-muted sticky top-0;
   }
+}
+
+/* ng-diagram: mappa le variabili --ngd-* sui token semantici (tema chiaro/scuro via :root.dark). */
+:root {
+  --ngd-diagram-background-color: var(--background);
+  --ngd-txt-primary-default: var(--foreground);
+  --ngd-node-bg-primary-default: var(--card);
+  --ngd-node-stroke-primary-default: var(--border);
+  --ngd-node-stroke-primary-hover: var(--ring);
+  --ngd-node-port-fill-default: var(--card);
+  --ngd-node-port-fill-active: var(--primary);
+  --ngd-node-port-stroke-default: var(--muted-foreground);
+  --ngd-node-port-stroke-active: var(--card);
+  --ngd-default-edge-stroke: var(--muted-foreground);
+  --ngd-default-edge-stroke-hover: var(--foreground);
+  --ngd-default-edge-stroke-selected: var(--primary);
+  --ngd-default-edge-label-bg-primary-default: var(--card);
+  --ngd-ui-bg-primary-default: var(--card);
+  --ngd-ui-bg-tertiary-default: var(--muted);
+  --ngd-ui-border-color: var(--border);
+  --ngd-background-dot-color: var(--border);
+  --ngd-background-line-minor-color: var(--border);
+  --ngd-background-line-major-color: var(--border);
+  --ngd-focus-ring-node-active: color-mix(in oklch, var(--ring) 40%, transparent);
+  --ngd-edge-handle-fill-default: var(--card);
+  --ngd-edge-handle-fill-hover: var(--card);
+  --ngd-edge-handle-fill-drag: var(--primary);
+  --ngd-edge-handle-stroke-default: var(--primary);
+  --ngd-edge-handle-stroke-hover: var(--primary);
+  --ngd-edge-handle-stroke-drag: var(--primary);
+  --ngd-minimap-bg-primary-default: var(--card);
+  --ngd-minimap-stroke-primary-default: var(--border);
 }
