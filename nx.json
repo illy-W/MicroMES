@@ -1,0 +1,68 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "analytics": false,
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "production": [
+      "default",
+      "!{projectRoot}/eslint.config.mjs",
+      "!{projectRoot}/**/bin/**/*",
+      "!{projectRoot}/**/obj/**/*",
+      "!{projectRoot}/.eslintrc.json"
+    ],
+    "sharedGlobals": []
+  },
+  "targetDefaults": {
+    "@angular/build:application": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"]
+    },
+    "@nx/eslint:lint": {
+      "cache": true,
+      "inputs": ["default", "{workspaceRoot}/eslint.config.mjs"]
+    }
+  },
+  "plugins": [
+    {
+      "plugin": "@nx/eslint/plugin",
+      "options": {
+        "targetName": "lint"
+      }
+    },
+    {
+      "plugin": "@nx/dotnet",
+      "dependsOn": ["^build"],
+      "options": {
+        "build": {
+          "targetName": "build",
+          "configurations": {
+            "production": {
+              "optimization": true
+            }
+          }
+        },
+        "test": {
+          "targetName": "unit-test",
+          "dependsOn": ["build"]
+        },
+        "pack": false
+      }
+    }
+  ],
+  "generators": {
+    "@nx/angular:application": {
+      "e2eTestRunner": "none",
+      "linter": "eslint",
+      "style": "scss",
+      "unitTestRunner": "none"
+    },
+    "@nx/angular:library": {
+      "linter": "eslint",
+      "unitTestRunner": "none"
+    },
+    "@nx/angular:component": {
+      "style": "scss"
+    }
+  }
+}
