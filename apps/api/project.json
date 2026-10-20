@@ -1,0 +1,65 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/api",
+  "tags": [],
+  "targets": {
+    "build:dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "dotnet build -c Development -p:OpenApiGenerateDocuments=false"
+      }
+    },
+    "build:dev:doc": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "dotnet build -c Development -p:OpenApiGenerateDocuments=true"
+      }
+    },
+    "build:release": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "production",
+        "^production"
+      ],
+      "outputs": [
+        "{projectRoot}/bin/Release",
+        "{projectRoot}/obj/Release"
+      ],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "dotnet build -c Release -p:OpenApiGenerateDocuments=false"
+      }
+    },
+    "build:release:doc": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "production",
+        "^production"
+      ],
+      "outputs": [
+        "{projectRoot}/bin/Release",
+        "{projectRoot}/obj/Release"
+      ],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "dotnet build -c Release -p:OpenApiGenerateDocuments=true"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "dotnet watch run"
+      },
+      "dependsOn": [
+        "build:dev"
+      ]
+    }
+  }
+}

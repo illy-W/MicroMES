@@ -1,0 +1,24 @@
+{
+  "name": "api-client",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/api-client/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "generate-api": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx orval --config orval.config.ts",
+        "cwd": "{workspaceRoot}"
+      },
+      "dependsOn": ["Api:build:release:doc"]
+    },
+    "generate-api:no-build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx orval --config orval.config.ts",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}
