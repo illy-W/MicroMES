@@ -1,0 +1,9 @@
+[
+  {
+    "context": ["/api"],
+    "target": "http://localhost:5190/",
+    "secure": false,
+    "logLevel": "debug",
+    "timeout": 600000
+  }
+]
