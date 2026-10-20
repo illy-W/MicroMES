@@ -8,6 +8,8 @@ permission:
     "nx *": allow
     "npx nx *": allow
     "pnpm nx *": allow
+    "pnpm add*": allow
+    "pnpm install*": allow
     "dotnet build*": allow
     "dotnet list*": allow
     "git commit*": deny
