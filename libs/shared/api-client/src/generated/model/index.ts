@@ -4,3 +4,13 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+
+export * from './create-material-request';
+export * from './get-materials-params';
+export * from './material-model';
+export * from './material-type';
+export * from './problem-details';
+export * from './unit-of-measure';
+export * from './update-material-request';
+export * from './validation-problem-details-errors';
+export * from './validation-problem-details';

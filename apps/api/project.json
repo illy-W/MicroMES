@@ -21,14 +21,8 @@
     "build:release": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": [
-        "production",
-        "^production"
-      ],
-      "outputs": [
-        "{projectRoot}/bin/Release",
-        "{projectRoot}/obj/Release"
-      ],
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/bin/Release", "{projectRoot}/obj/Release"],
       "options": {
         "cwd": "{projectRoot}",
         "command": "dotnet build -c Release -p:OpenApiGenerateDocuments=false"
@@ -37,14 +31,8 @@
     "build:release:doc": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": [
-        "production",
-        "^production"
-      ],
-      "outputs": [
-        "{projectRoot}/bin/Release",
-        "{projectRoot}/obj/Release"
-      ],
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/bin/Release", "{projectRoot}/obj/Release"],
       "options": {
         "cwd": "{projectRoot}",
         "command": "dotnet build -c Release -p:OpenApiGenerateDocuments=true"
@@ -57,9 +45,21 @@
         "cwd": "{projectRoot}",
         "command": "dotnet watch run"
       },
-      "dependsOn": [
-        "build:dev"
-      ]
+      "dependsOn": ["build:dev"]
+    },
+    "db-up": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose up -d --wait db"
+      }
+    },
+    "db-down": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker compose down"
+      }
     }
   }
 }
