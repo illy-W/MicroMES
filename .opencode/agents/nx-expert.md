@@ -28,6 +28,7 @@ Reply in the language of the user's request.
 - `apps/api` (`Api`): ASP.NET Core API.
 - `libs/api-features` (`ApiFeatures`) and `libs/api-core` (`ApiCore`): .NET libraries.
 - Backend dependency direction: `Api` -> `ApiFeatures` -> `ApiCore`. Never reverse it.
+- `libs/ui/*`: spartan helm UI components (generated), aliases `@spartan-ng/helm/*`; config in `components.json` (root).
 - Solution: `MicroMES.Backend.sln`. .NET projects are inferred by `@nx/dotnet`; their Nx names come from the `.csproj` file name.
 
 ## Skills
@@ -37,6 +38,7 @@ Load before acting: `nx-workspace` (explore, debug failing tasks), `nx-generate`
 - Use the Nx CLI (`nx show projects`, `nx show project <name>`, `nx graph`, `nx affected`, `nx run-many`) instead of guessing paths or reading config at random.
 - Explore existing conventions before generating; prefer Nx generators for Angular. There is no .NET project generator: use `dotnet new` and add the project to the solution.
 - API client: `npx nx run api-client:generate-api` (builds `Api:build:release:doc` to write `openapi/Api.json`, then runs Orval via `orval.config.ts`); `generate-api:no-build` skips the build.
+- New UI components are generated, never hand-written: `npx nx g @spartan-ng/cli:ui <name> --no-interactive`, then `npx nx lint <name> --fix` (peerDependencies), prettier on the JSON files the generator rewrote (`nx.json`, `tsconfig.base.json`), and check the aliases keep the `./` prefix.
 - Do not commit or push.
 - Read versions from `package.json`, `global.json`, `.nvmrc` and `.csproj` files.
 - After changes, verify with `nx run-many -t build` (or `nx affected`).

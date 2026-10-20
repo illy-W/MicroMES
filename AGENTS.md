@@ -10,6 +10,7 @@ Monorepo Nx (pnpm) con frontend Angular e backend .NET.
 | `apps/api` | `Api` | API ASP.NET Core (`MicroMES.Api`) |
 | `libs/api-features` | `ApiFeatures` | Lib .NET con le feature (`MicroMES.ApiFeatures`) |
 | `libs/api-core` | `ApiCore` | Lib .NET con il core (`MicroMES.ApiCore`) |
+| `libs/ui/*` | `<nome>` (es. `button`) | Componenti spartan helm, generati (alias `@spartan-ng/helm/*`, mai a mano) |
 | `libs/shared/api-client` | `api-client` | Client Angular generato da Orval (`src/generated/**`, mai modificare a mano) |
 | `openapi/Api.json` | - | Contratto OpenAPI generato dall'API |
 | `orval.config.ts` | - | Configurazione Orval (root) |
@@ -30,6 +31,7 @@ Node: usa la versione di `.nvmrc`.
 - `npx nx serve web`: avvia il frontend
 - `dotnet run --project apps/api`: avvia l'API
 - `npx nx run api-client:generate-api`: rigenera `openapi/Api.json` e il client Angular (`generate-api:no-build` salta la build dell'API)
+- `npx nx g @spartan-ng/cli:ui <nome> --no-interactive`: aggiunge un componente spartan in `libs/ui` (poi `npx nx lint <nome> --fix`)
 - Nuovi progetti Angular: `npx nx g @nx/angular:...`. I progetti .NET si creano con `dotnet new`, poi si aggiungono alla solution.
 
 ## Convenzioni
