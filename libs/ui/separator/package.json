@@ -1,0 +1,11 @@
+{
+  "name": "@spartan-ng/helm/separator",
+  "version": "0.0.1",
+  "peerDependencies": {
+    "@angular/core": "^22.1.0",
+    "@spartan-ng/brain": "1.5.0",
+    "@spartan-ng/helm/utils": "0.0.1"
+  },
+  "sideEffects": false,
+  "private": true
+}

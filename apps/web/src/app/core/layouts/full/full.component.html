@@ -1,0 +1,11 @@
+<app-sidebar [items]="items">
+  <main
+    class="bg-background relative flex w-full flex-1 flex-col md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2"
+    hlmSidebarInset
+  >
+    <app-header />
+    <div class="flex flex-1 flex-col gap-4 p-4">
+      <router-outlet />
+    </div>
+  </main>
+</app-sidebar>
