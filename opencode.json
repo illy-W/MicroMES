@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "nx *": "allow",
+      "npx nx *": "allow",
+      "pnpm nx *": "allow",
+      "dotnet build*": "allow",
+      "dotnet list*": "allow",
+      "git commit*": "deny",
+      "git push*": "deny"
+    }
+  }
+}

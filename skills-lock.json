@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "nx-generate": {
+      "source": "nrwl/nx-ai-agents-config",
+      "sourceType": "github",
+      "skillPath": "skills/nx-generate/SKILL.md",
+      "computedHash": "57e0b3c76267650f4815d5554f08d69c97cf485cf93844bbe574bcf09947ab90"
+    },
+    "nx-run-tasks": {
+      "source": "nrwl/nx-ai-agents-config",
+      "sourceType": "github",
+      "skillPath": "skills/nx-run-tasks/SKILL.md",
+      "computedHash": "e42dec15f588268887d88d606187b0fab9cbb3f90fd4ce41d66d2faffc9295c4"
+    },
+    "nx-workspace": {
+      "source": "nrwl/nx-ai-agents-config",
+      "sourceType": "github",
+      "skillPath": "skills/nx-workspace/SKILL.md",
+      "computedHash": "93c1a07cb550b8b85ce62ccd2481073b6ab520be86d1a910686054d8096207a7"
+    }
+  }
+}
