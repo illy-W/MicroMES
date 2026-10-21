@@ -38,7 +38,14 @@ import { HlmProgressImports } from '@spartan-ng/helm/progress';
 import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { HlmTabsImports } from '@spartan-ng/helm/tabs';
-import { map } from 'rxjs';
+import { firstValueFrom, map } from 'rxjs';
+import { PlanningService } from '@micromes/api-client/services/planning';
+import { toast } from '@spartan-ng/brain/sonner';
+import { HlmAlertDialogImports } from '@spartan-ng/helm/alert-dialog';
+import { CalendarsStore } from '../calendars/calendars.store';
+import { PlanPreviewDialogComponent } from '../planning/plan-preview-dialog.component';
+import { PlanStatusBadgeComponent } from '../planning/plan-status-badge.component';
+import { formatDateTime } from '../planning/timeline-time';
 import { unitLabel } from '../materials/material-labels';
 import { toFailure } from '../materials/materials.service';
 import { formatMinutes } from '../routing/routing-metrics';
@@ -71,8 +78,11 @@ const columns = columnHelper.columns([
     HlmEmptyImports,
     HlmProgressImports,
     HlmTabsImports,
+    HlmAlertDialogImports,
     HlmBadge,
     HlmButton,
+    PlanPreviewDialogComponent,
+    PlanStatusBadgeComponent,
     HlmSkeleton,
     NgIcon,
     ProductionOrderFormDialogComponent,
@@ -145,7 +155,24 @@ const columns = columnHelper.columns([
               Priorità {{ o.priority }} · Inizio richiesto {{ date(o.requestedStart) }} · Fine richiesta {{ date(o.requestedEnd) }}
             </p>
             @if (o.estimatedEnd) {
-              <p class="text-sm"><app-estimated-end [estimatedEnd]="o.estimatedEnd" [requestedEnd]="o.requestedEnd" /></p>
+              <p class="text-sm">
+                <app-estimated-end [estimatedEnd]="o.estimatedEnd" [requestedEnd]="o.requestedEnd" [planned]="hasPlan()" />
+              </p>
+            }
+            @if (planBlockVisible()) {
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="plan-block">
+                <span class="text-muted-foreground">Piano</span>
+                @if (hasPlan()) {
+                  <span class="tabular-nums">{{ planDate(o.plannedStart) }} – {{ planDate(o.plannedEnd) }}</span>
+                }
+                <app-plan-status-badge [status]="o.planStatus" />
+                <button hlmBtn size="sm" variant="outline" type="button" (click)="planOpen.set(true)">Pianifica</button>
+                @if (hasPlan()) {
+                  <button hlmBtn size="sm" variant="ghost" type="button" (click)="removeOpen.set(true)">Rimuovi piano</button>
+                }
+              </div>
+            } @else if (o.status === 'Planned') {
+              <p class="text-muted-foreground text-sm">Il piano sarà disponibile dopo il rilascio dell’ordine.</p>
             }
             @if (o.parentOrderId) {
               <p class="text-muted-foreground text-sm">
@@ -172,6 +199,14 @@ const columns = columnHelper.columns([
             }
           </div>
         </div>
+
+        @if (o.planStatus === 'Late' || o.planStatus === 'Stale') {
+          <p class="text-destructive flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm" role="status" data-testid="plan-banner">
+            <ng-icon [name]="o.planStatus === 'Late' ? 'lucideTriangleAlert' : 'lucideClock'" aria-hidden="true" />
+            {{ o.planStatus === 'Late' ? 'Il piano di questo ordine prevede un ritardo rispetto alla data richiesta.' : 'Il piano di questo ordine è obsoleto.' }}
+            <a class="underline" routerLink="/planning">Apri la pianificazione</a>
+          </p>
+        }
 
         <dl class="grid grid-cols-2 gap-x-6 gap-y-4 rounded-md border p-4 md:grid-cols-3 lg:grid-cols-5">
           <div class="flex flex-col gap-1">
@@ -400,13 +435,34 @@ const columns = columnHelper.columns([
               [attr.aria-hidden]="activeTab() === 'overview' ? null : 'true'"
               [attr.inert]="activeTab() === 'overview' ? null : ''"
             >
-              <app-production-order-overview [orderId]="o.id" [refreshKey]="o.status" [requestedEnd]="o.requestedEnd" />
+              <app-production-order-overview [orderId]="o.id" [refreshKey]="o.status + '|' + refreshTick()" [requestedEnd]="o.requestedEnd" [planned]="hasPlan()" />
             </div>
           } @else if (activeTab() === 'overview') {
             <p class="text-muted-foreground pt-4 text-sm">{{ overviewMessage() }}</p>
           }
         </hlm-tabs>
 
+        @if (planOpen()) {
+          <app-plan-preview-dialog scope="Order" [productionOrderId]="o.id" (applied)="planOpen.set(false); reloadAll()" (closed)="planOpen.set(false)" />
+        }
+        @if (removeOpen()) {
+          <hlm-alert-dialog state="open" (closed)="removeOpen.set(false)">
+            <ng-template hlmAlertDialogPortal>
+              <hlm-alert-dialog-content>
+                <hlm-alert-dialog-header>
+                  <h2 hlmAlertDialogTitle>Rimuovere il piano?</h2>
+                  <p hlmAlertDialogDescription>Le date previste dei lavori aperti di {{ o.code }} saranno cancellate.</p>
+                </hlm-alert-dialog-header>
+                <hlm-alert-dialog-footer>
+                  <button hlmAlertDialogCancel>Indietro</button>
+                  <button hlmBtn type="button" variant="destructive" [disabled]="removing()" (click)="removePlan(o.id)">
+                    {{ removing() ? 'Rimozione…' : 'Rimuovi piano' }}
+                  </button>
+                </hlm-alert-dialog-footer>
+              </hlm-alert-dialog-content>
+            </ng-template>
+          </hlm-alert-dialog>
+        }
         @if (formOpen()) {
           <app-production-order-form-dialog [order]="o" (saved)="formOpen.set(false); reload()" (closed)="formOpen.set(false)" />
         }
@@ -435,6 +491,19 @@ export class ProductionOrderDetailComponent {
   protected readonly loadError = signal<string | null>(null);
   protected readonly notFound = signal(false);
   protected readonly formOpen = signal(false);
+  protected readonly planOpen = signal(false);
+  protected readonly removeOpen = signal(false);
+  protected readonly removing = signal(false);
+  /** Incrementato dopo applica/rimuovi piano: ricarica anche la panoramica. */
+  protected readonly refreshTick = signal(0);
+  private readonly calendars = inject(CalendarsStore);
+  private readonly planning = inject(PlanningService);
+  protected readonly hasPlan = computed(() => !!this.order()?.plannedEnd);
+  protected readonly planBlockVisible = computed(() => {
+    const s = this.order()?.status;
+    return s === ProductionOrderStatus.Released || s === ProductionOrderStatus.InProgress;
+  });
+  protected readonly planDate = (iso?: string | null): string => (iso ? formatDateTime(iso, this.calendars.timeZone()) : '—');
   protected readonly confirm = signal<string | null>(null);
   /** Scheda scelta dall'utente; finché è null vale il default (sempre Panoramica). */
   protected readonly userTab = signal<string | null>(null);
@@ -480,6 +549,7 @@ export class ProductionOrderDetailComponent {
   }));
 
   constructor() {
+    void this.calendars.loadTimeZone();
     effect(() => {
       const id = this.orderId();
       untracked(() => {
@@ -506,6 +576,25 @@ export class ProductionOrderDetailComponent {
 
   protected links(items: WorkOrderLinkModel[]): string {
     return items.length ? items.map((i) => i.code).join(', ') : '—';
+  }
+
+  protected reloadAll(): void {
+    this.refreshTick.update((n) => n + 1);
+    this.reload();
+  }
+
+  protected async removePlan(id: number): Promise<void> {
+    this.removing.set(true);
+    try {
+      const r = await firstValueFrom(this.planning.removeOrderPlan(id));
+      toast.success(`Piano rimosso: ${r.clearedWorkOrders} ${r.clearedWorkOrders === 1 ? 'lavoro' : 'lavori'} non più pianificati`);
+      this.removeOpen.set(false);
+      this.reloadAll();
+    } catch (e) {
+      toast.error(toFailure(e).message);
+    } finally {
+      this.removing.set(false);
+    }
   }
 
   protected reload(): void {

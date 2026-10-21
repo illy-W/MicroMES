@@ -24,7 +24,7 @@ import {
   rowPaginationFeature,
   tableFeatures,
 } from '@tanstack/angular-table';
-import type { WorkOrderModel } from '@micromes/api-client/models';
+import type { PlanStatus, WorkOrderModel } from '@micromes/api-client/models';
 import { WorkOrderStatus } from '@micromes/api-client/models';
 import { toast } from '@spartan-ng/brain/sonner';
 import { HlmBadge } from '@spartan-ng/helm/badge';
@@ -32,6 +32,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
+import { HlmSwitch } from '@spartan-ng/helm/switch';
 import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { TablePaginatorComponent } from '../../shared/components/table-paginator.component';
@@ -41,6 +42,9 @@ import { unitLabel } from '../materials/material-labels';
 import { toFailure } from '../materials/materials.service';
 import { formatQty, WORK_STATUS, workStatus } from '../production-orders/production-order-labels';
 import { formatMinutes } from '../routing/routing-metrics';
+import { CalendarsStore } from '../calendars/calendars.store';
+import { PlanStatusBadgeComponent } from '../planning/plan-status-badge.component';
+import { formatDateTime } from '../planning/timeline-time';
 import { WorkOrderAbortDialogComponent } from './work-order-abort-dialog.component';
 import { type CloseMode, WorkOrderCloseDialogComponent } from './work-order-close-dialog.component';
 import { machineUsage, usageText } from './work-order-machines';
@@ -64,6 +68,8 @@ const columns = columnHelper.columns([
   columnHelper.accessor('materialCode', { id: 'material', header: 'Materiale prodotto' }),
   columnHelper.accessor('plannedQuantity', { id: 'planned', header: 'Quantità pianificata' }),
   columnHelper.accessor('status', { id: 'status', header: 'Stato' }),
+  columnHelper.display({ id: 'plannedStart', header: 'Inizio previsto' }),
+  columnHelper.display({ id: 'plannedEnd', header: 'Fine prevista' }),
   columnHelper.accessor('goodQuantity', { id: 'good', header: 'Buono' }),
   columnHelper.accessor('scrapQuantity', { id: 'scrap', header: 'Scarto' }),
   columnHelper.accessor('plannedMinutes', { id: 'plannedTime', header: 'Tempo pianificato' }),
@@ -74,6 +80,7 @@ const columns = columnHelper.columns([
 const ALL = 'all';
 const OPERATIONAL = 'operational';
 const OPERATIONAL_STATUSES: string[] = [WorkOrderStatus.Ready, WorkOrderStatus.Running, WorkOrderStatus.Interrupted];
+const isOpen = (w: WorkOrderModel): boolean => ['Waiting', 'Ready', 'Interrupted', 'Running'].includes(w.status);
 const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'workedTime']);
 
 @Component({
@@ -86,8 +93,10 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
     HlmButton,
     HlmInput,
     HlmSkeleton,
+    HlmSwitch,
     NgIcon,
     TablePaginatorComponent,
+    PlanStatusBadgeComponent,
     WorkOrderRowActionsComponent,
     WorkOrderCloseDialogComponent,
     WorkOrderAbortDialogComponent,
@@ -164,6 +173,20 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
             </button>
           }
         </div>
+        <hlm-select [value]="planFilter()" [itemToString]="planLabel" (valueChange)="planFilter.set($event ?? 'all')">
+          <hlm-select-trigger size="sm" class="w-48" aria-label="Filtra per piano">
+            <hlm-select-value />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            @for (o of planOptions; track o.value) {
+              <hlm-select-item [value]="o.value">{{ o.label }}</hlm-select-item>
+            }
+          </hlm-select-content>
+        </hlm-select>
+        <label class="flex items-center gap-2 text-sm" for="wo-sort-plan">
+          <hlm-switch inputId="wo-sort-plan" [checked]="sortByPlan()" (checkedChange)="sortByPlan.set($event)" />
+          Ordina per inizio previsto
+        </label>
         @if (machineOptions().length) {
           <hlm-select [value]="machineFilter()" [itemToString]="machineFilterLabel" (valueChange)="machineFilter.set($event ?? 'all')">
             <hlm-select-trigger size="sm" class="w-48" aria-label="Filtra per macchina">
@@ -280,6 +303,23 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
                               <div class="text-muted-foreground mt-1 text-xs">Attende: {{ waitingFor(w) }}</div>
                             }
                           }
+                          @case ('plannedStart') {
+                            @if (w.plannedStartAt) {
+                              {{ fmt(w.plannedStartAt) }}
+                            } @else {
+                              <span class="text-muted-foreground" aria-label="Non pianificato">—</span>
+                            }
+                          }
+                          @case ('plannedEnd') {
+                            <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              @if (w.plannedEndAt) {
+                                {{ fmt(w.plannedEndAt) }}
+                              } @else {
+                                <span class="text-muted-foreground" aria-label="Non pianificato">—</span>
+                              }
+                              <app-plan-status-badge [status]="w.planStatus" [hide]="hiddenPlan(w)" />
+                            </span>
+                          }
                           @case ('good') {
                             {{ qty(w.goodQuantity) }}
                           }
@@ -361,6 +401,18 @@ export class WorkOrdersComponent implements OnInit {
     value === ALL ? 'Tutte le macchine' : (this.machineOptions().find((m) => m.id === value)?.label ?? value);
   protected readonly usageText = usageText;
 
+  protected readonly planOptions = [
+    { value: 'all', label: 'Piano: tutti' },
+    { value: 'Unplanned', label: 'Da pianificare' },
+    { value: 'Late', label: 'In ritardo' },
+    { value: 'Stale', label: 'Obsoleto' },
+  ];
+  protected readonly planLabel = (value: string): string => this.planOptions.find((o) => o.value === value)?.label ?? value;
+  protected readonly planFilter = signal<string>(ALL);
+  protected readonly sortByPlan = signal(false);
+  private readonly calendars = inject(CalendarsStore);
+  protected readonly fmt = (iso: string): string => formatDateTime(iso, this.calendars.timeZone());
+
   protected readonly search = signal('');
   protected readonly statusFilter = signal<string>(OPERATIONAL);
   protected readonly orderFilter = signal<string>(ALL);
@@ -403,12 +455,15 @@ export class WorkOrdersComponent implements OnInit {
     const s = this.statusFilter();
     const o = this.orderFilter();
     const m = this.machineFilter();
+    const p = this.planFilter();
+    const byPlan = this.sortByPlan();
     return this.store
       .workOrders()
       .filter(
         (w) =>
           (s === ALL || (s === OPERATIONAL ? OPERATIONAL_STATUSES.includes(w.status) : w.status === s)) &&
           (o === ALL || String(w.productionOrderId) === o) &&
+          (p === ALL || (w.planStatus === p && (p !== 'Unplanned' || isOpen(w)))) &&
           (m === ALL || String(w.assignedEquipment?.id) === m) &&
           (!q ||
             w.code.toLowerCase().includes(q) ||
@@ -416,7 +471,13 @@ export class WorkOrdersComponent implements OnInit {
             w.materialCode.toLowerCase().includes(q) ||
             w.materialName.toLowerCase().includes(q)),
       )
-      .sort((a, b) => a.productionOrderCode.localeCompare(b.productionOrderCode) || a.operationNumber - b.operationNumber);
+      .sort((a, b) =>
+        byPlan
+          ? (a.plannedStartAt ? Date.parse(a.plannedStartAt) : Infinity) - (b.plannedStartAt ? Date.parse(b.plannedStartAt) : Infinity) ||
+            a.productionOrderCode.localeCompare(b.productionOrderCode) ||
+            a.operationNumber - b.operationNumber
+          : a.productionOrderCode.localeCompare(b.productionOrderCode) || a.operationNumber - b.operationNumber,
+      );
   });
 
   private readonly pagination = signal<PaginationState>({ pageIndex: 0, pageSize: 10 });
@@ -439,6 +500,7 @@ export class WorkOrdersComponent implements OnInit {
       this.statusFilter();
       this.orderFilter();
       this.machineFilter();
+      this.planFilter();
       untracked(() => this.table.resetPageIndex());
     });
     // ?order=<id> dalla pagina dell'ordine: mostra tutti i lavori di quell'ordine.
@@ -455,8 +517,14 @@ export class WorkOrdersComponent implements OnInit {
 
   ngOnInit(): void {
     void this.store.load();
+    void this.calendars.loadTimeZone();
     void this.equipmentStore.load();
     void this.segmentsStore.load();
+  }
+
+  /** `Unplanned` si segnala solo per i lavori aperti. */
+  protected hiddenPlan(w: WorkOrderModel): readonly PlanStatus[] {
+    return isOpen(w) ? ['Planned'] : ['Planned', 'Unplanned'];
   }
 
   protected hasMachines(w: WorkOrderModel): boolean {
@@ -490,6 +558,7 @@ export class WorkOrdersComponent implements OnInit {
     this.search.set('');
     this.statusFilter.set(OPERATIONAL);
     this.machineFilter.set(ALL);
+    this.planFilter.set(ALL);
     this.clearOrderFilter();
   }
 

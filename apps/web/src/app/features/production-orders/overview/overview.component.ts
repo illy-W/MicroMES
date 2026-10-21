@@ -161,7 +161,7 @@ type DiagramModel = ReturnType<typeof initializeModel>;
               </div>
               @if (ov.summary.estimatedEnd) {
                 <div class="text-sm">
-                  <app-estimated-end [estimatedEnd]="ov.summary.estimatedEnd" [requestedEnd]="requestedEnd()" />
+                  <app-estimated-end [estimatedEnd]="ov.summary.estimatedEnd" [requestedEnd]="requestedEnd()" [planned]="planned()" />
                 </div>
               }
             </dl>
@@ -248,6 +248,7 @@ export class ProductionOrderOverviewComponent {
   readonly refreshKey = input<string>('');
   /** Data di fine richiesta dell'ordine (per segnalare una stima oltre la scadenza). */
   readonly requestedEnd = input<string | null | undefined>(null);
+  readonly planned = input<boolean>(false);
 
   protected readonly overview = signal<ProductionOrderOverviewModel | null>(null);
   protected readonly model = signal<DiagramModel | null>(null);

@@ -28,6 +28,7 @@ export interface WorkNodeData {
   plannedMinutes: number;
   workedMinutes: number;
   critical: boolean;
+  planStatus?: string;
   /** Macchina da mostrare: quella in uso se `Running`, altrimenti l'assegnata (assente se la fase non ne ha). */
   equipmentCode?: string;
   equipmentName?: string;
@@ -139,6 +140,7 @@ export function buildOverviewGraph(overview: ProductionOrderOverviewModel, rootO
       plannedMinutes: w.plannedMinutes,
       workedMinutes: w.workedMinutes,
       critical: critical.has(w.id),
+      planStatus: w.planStatus,
       ...equipmentData(w),
     },
   }));

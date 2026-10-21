@@ -56,7 +56,7 @@ public static class PlanAlertsCalculator
     }
 
     private static string Local(WorkingTimeCalculator calc, DateTime utc)
-        => TimeZoneInfo.ConvertTimeFromUtc(utc, calc.Zone).ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
+        => PlanningDateFormat.Local(calc.Zone, utc);
 
     private static void AddLate(List<PlanAlertModel> alerts, IReadOnlyList<AlertWorkOrder> workOrders, WorkingTimeCalculator calc)
     {

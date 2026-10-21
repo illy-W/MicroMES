@@ -42,7 +42,7 @@ public class PlanningService(
 {
     private IWorkOrderRepository WorkOrders => unitOfWork.GetRepository<IWorkOrderRepository>();
 
-    private sealed record Run(ProductionData Data, PlanningBuild Build, PlanningResult Result, DateTime Now);
+    private sealed record Run(ProductionData Data, PlanningBuild Build, PlanningResult Result, DateTime Now, TimeZoneInfo Zone);
 
     private static string StatusLabel(ProductionOrderStatus s) => s switch
     {
@@ -81,7 +81,7 @@ public class PlanningService(
         var build = PlanningInputBuilder.Build(data, catalog, directory, request.Scope,
             request.Scope == PlanningScope.Order ? request.ProductionOrderId : null, now);
         var planned = engine.Plan(build.Input);
-        return ProductionOrderResult<Run>.Ok(new Run(data, build, planned, now));
+        return ProductionOrderResult<Run>.Ok(new Run(data, build, planned, now, directory.Calculator.Zone));
     }
 
     private static ProductionOrderResult<T> Forward<T>(ProductionOrderResult<Run> failed)
@@ -253,7 +253,7 @@ public class PlanningService(
                 LateDays = late ? (int)Math.Ceiling((p.End - order.RequestedEnd!.Value).TotalDays) : 0,
                 Reasons = p.Reasons.Select(r => new PlanningReasonModel
                 {
-                    Code = r.Code, Message = r.Message, Until = r.Until, RelatedWorkOrderId = r.RelatedWorkOrderId, RelatedEquipmentId = r.RelatedEquipmentId
+                    Code = r.Code, Message = PlanningDateFormat.Resolve(r.Message, r.Until, run.Zone), Until = r.Until, RelatedWorkOrderId = r.RelatedWorkOrderId, RelatedEquipmentId = r.RelatedEquipmentId
                 }).ToList()
             });
         }

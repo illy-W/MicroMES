@@ -271,22 +271,22 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
             var source = best.Machine?.Availability ?? _input.DefaultAvailability;
             if (bindingPred is { } bp && predEnd > afterRequested)
                 reasons.Add(new PlanningReason(PlanningReasonCode.WaitsForPredecessor,
-                    $"Aspetta il lavoro {Label(bp)}, che finisce alle {predEnd:u}.", predEnd, bp));
+                    $"Aspetta il lavoro {Label(bp)}, che finisce il {PlanningDateFormat.UntilToken}.", predEnd, bp));
             else if (predEnd > afterRequested)
                 reasons.Add(new PlanningReason(PlanningReasonCode.WaitsForPredecessor,
-                    $"Aspetta i lavori precedenti, che finiscono alle {predEnd:u}.", predEnd));
+                    $"Aspetta i lavori precedenti, che finiscono il {PlanningDateFormat.UntilToken}.", predEnd));
             else if (afterRequested > _now)
                 reasons.Add(new PlanningReason(PlanningReasonCode.WaitsForRequestedStart,
-                    $"Aspetta l'inizio richiesto dell'ordine ({afterRequested:u}).", afterRequested));
+                    $"Aspetta l'inizio richiesto dell'ordine, il {PlanningDateFormat.UntilToken}.", afterRequested));
             var first = _calc.NextWorkingInstant(source, ready);
             var firstWorking = first.IsSuccess ? first.Value : ready;
             if (firstWorking > ready)
                 reasons.Add(new PlanningReason(PlanningReasonCode.CalendarClosed,
-                    $"Il calendario{(best.Machine is null ? "" : $" di {best.Machine.Code}")} è chiuso fino alle {firstWorking:u}.",
+                    $"Il calendario{(best.Machine is null ? "" : $" di {best.Machine.Code}")} è chiuso fino al {PlanningDateFormat.UntilToken}.",
                     firstWorking, null, best.Machine?.Id));
             if (best.Start > firstWorking && best.Machine is not null)
                 reasons.Add(new PlanningReason(PlanningReasonCode.MachineBusy,
-                    $"La macchina {best.Machine.Code} è occupata fino alle {best.Start:u}.", best.Start, null, best.Machine.Id));
+                    $"La macchina {best.Machine.Code} è occupata fino al {PlanningDateFormat.UntilToken}.", best.Start, null, best.Machine.Id));
 
             if (best.Machine is not null && best.End > best.Start) _busy[best.Machine.Id].Add(new PlanningInterval(best.Start, best.End));
             _end[job.WorkOrderId] = best.End;

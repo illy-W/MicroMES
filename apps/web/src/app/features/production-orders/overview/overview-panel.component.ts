@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -13,6 +13,7 @@ import {
   lucideSend,
 } from '@ng-icons/lucide';
 import type {
+  PlanStatus,
   ProductionOrderOverviewModel,
   ProductionOrderOverviewOrderModel,
   ProductionOrderOverviewWorkOrderModel,
@@ -21,6 +22,9 @@ import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmProgressImports } from '@spartan-ng/helm/progress';
+import { CalendarsStore } from '../../calendars/calendars.store';
+import { PlanStatusBadgeComponent } from '../../planning/plan-status-badge.component';
+import { formatDateTime } from '../../planning/timeline-time';
 import { unitLabel } from '../../materials/material-labels';
 import { formatMinutes } from '../../routing/routing-metrics';
 import { formatQty } from '../production-order-labels';
@@ -43,7 +47,7 @@ interface LinkedWork {
  */
 @Component({
   selector: 'app-overview-panel',
-  imports: [RouterLink, NgIcon, HlmBadge, HlmButton, HlmCardImports, HlmProgressImports],
+  imports: [RouterLink, PlanStatusBadgeComponent, NgIcon, HlmBadge, HlmButton, HlmCardImports, HlmProgressImports],
   providers: [
     provideIcons({
       lucideCalendarClock,
@@ -94,6 +98,15 @@ interface LinkedWork {
                 </dd>
               }
             }
+            <dt class="text-muted-foreground">Piano</dt>
+            <dd class="flex flex-wrap items-center gap-x-2 gap-y-1">
+              @if (w.plannedStartAt && w.plannedEndAt) {
+                <span class="tabular-nums">{{ fmt(w.plannedStartAt) }} – {{ fmt(w.plannedEndAt) }}</span>
+              } @else {
+                <span class="text-muted-foreground">—</span>
+              }
+              <app-plan-status-badge [status]="w.planStatus" [hide]="hiddenPlan(w)" />
+            </dd>
             <dt class="text-muted-foreground">Pianificato</dt>
             <dd class="tabular-nums">{{ qty(w.plannedQuantity) }} {{ unit(workOrder()?.unitOfMeasure) }}</dd>
             <dt class="text-muted-foreground">Buoni</dt>
@@ -214,6 +227,14 @@ export class OverviewPanelComponent {
   readonly rootOrderId = input.required<number>();
   readonly selection = input<OverviewSelection | null>(null);
 
+  constructor() {
+    void inject(CalendarsStore).loadTimeZone();
+  }
+
+  private readonly calendars = inject(CalendarsStore);
+  protected readonly fmt = (iso: string): string => formatDateTime(iso, this.calendars.timeZone());
+  protected readonly hiddenPlan = (w: ProductionOrderOverviewWorkOrderModel): readonly PlanStatus[] =>
+    ['Waiting', 'Ready', 'Interrupted', 'Running'].includes(w.status) ? ['Planned'] : ['Planned', 'Unplanned'];
   protected readonly qty = formatQty;
   protected readonly minutes = formatMinutes;
   protected readonly unit = (u?: string): string => (u ? unitLabel(u) : '');

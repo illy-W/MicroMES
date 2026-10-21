@@ -11,6 +11,7 @@ export const sidebarSections: NavSection[] = [
     items: [
       { id: 'production-orders', displayName: 'Ordini di produzione', iconName: 'lucideClipboardList', route: '/production-orders' },
       { id: 'work-orders', displayName: 'Ordini di lavoro', iconName: 'lucideListChecks', route: '/work-orders' },
+      { id: 'planning', displayName: 'Pianificazione', iconName: 'lucideGanttChart', route: '/planning' },
       { id: 'scrap', displayName: 'Scarti', iconName: 'lucideChartNoAxesColumn', route: '/scrap' },
     ],
   },

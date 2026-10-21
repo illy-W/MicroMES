@@ -11,6 +11,7 @@ import {
   lucidePause,
   lucidePlay,
   lucideSend,
+  lucideTriangleAlert,
 } from '@ng-icons/lucide';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmProgressImports } from '@spartan-ng/helm/progress';
@@ -46,6 +47,7 @@ import { OverviewViewState } from './overview-view-state';
       lucidePause,
       lucidePlay,
       lucideSend,
+      lucideTriangleAlert,
     }),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -75,6 +77,11 @@ import { OverviewViewState } from './overview-view-state';
         <span class="flex min-w-0 items-baseline gap-2 text-xs">
           <span class="font-semibold tabular-nums">Op. {{ node().data.operationNumber }}</span>
           <span class="text-muted-foreground truncate">{{ node().data.code }}</span>
+          @if (planMarker(); as m) {
+            <span class="text-destructive flex shrink-0 items-center gap-0.5 font-medium" [attr.title]="m">
+              <ng-icon name="lucideTriangleAlert" size="12" aria-hidden="true" /> {{ m }}
+            </span>
+          }
         </span>
         <span hlmBadge variant="outline" class="shrink-0 px-1.5" [class]="style().tone">
           <ng-icon [name]="style().icon" aria-hidden="true" /> {{ style().label }}
@@ -119,7 +126,11 @@ export class OverviewWorkNodeComponent implements NgDiagramNodeTemplate<WorkNode
   protected readonly ariaLabel = computed(() => {
     const d = this.node().data;
     const machine = d.equipmentCode ? `, ${d.equipmentInUse ? 'macchina in uso' : 'macchina assegnata'} ${d.equipmentCode}` : '';
-    return `Lavoro ${d.code}, fase ${d.phaseName}, stato ${this.style().label}${machine}${this.highlighted() ? ', sul percorso più lungo' : ''}`;
+    return `Lavoro ${d.code}, fase ${d.phaseName}, stato ${this.style().label}${this.planMarker() ? ', piano ' + this.planMarker() : ''}${machine}${this.highlighted() ? ', sul percorso più lungo' : ''}`;
+  });
+  protected readonly planMarker = computed(() => {
+    const p = this.node().data.planStatus;
+    return p === 'Late' ? 'ritardo' : p === 'Stale' ? 'obsoleto' : null;
   });
   protected readonly machineTitle = computed(() => {
     const d = this.node().data;
