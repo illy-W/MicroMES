@@ -406,7 +406,7 @@ export class ProductionOrderDetailComponent {
   protected readonly notFound = signal(false);
   protected readonly formOpen = signal(false);
   protected readonly confirm = signal<string | null>(null);
-  /** Scheda scelta dall'utente; finché è null vale il default (Panoramica se c'è qualcosa da mostrare). */
+  /** Scheda scelta dall'utente; finché è null vale il default (sempre Panoramica). */
   protected readonly userTab = signal<string | null>(null);
 
   /** La panoramica ha senso dal rilascio in poi; un ordine annullato senza lavori non ne ha. */
@@ -414,7 +414,7 @@ export class ProductionOrderDetailComponent {
     const o = this.order();
     return !!o && o.status !== ProductionOrderStatus.Planned && !(o.status === ProductionOrderStatus.Cancelled && !o.workOrders.length);
   });
-  protected readonly activeTab = computed(() => this.userTab() ?? (this.showOverview() ? 'overview' : 'work'));
+  protected readonly activeTab = computed(() => this.userTab() ?? 'overview');
   protected readonly overviewMessage = computed(() =>
     this.order()?.status === ProductionOrderStatus.Cancelled
       ? 'L’ordine è stato annullato prima del rilascio: non ci sono lavori da mostrare.'

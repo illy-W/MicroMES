@@ -97,6 +97,28 @@ public class ProductionOrderDevelopmentSeeder(
             clock.Set(today.AddDays(-1).AddHours(16));
             var next = today.AddDays(30);
             await CreateAsync(tavolino, 10, 3, next, next.AddDays(14), "Da rilasciare dopo la consegna della commessa bar");
+
+            // 6. Coffee tables x8, released: the oak top milling was paused (work order Interrupted).
+            d = today.AddDays(-2);
+            clock.Set(d.AddHours(8));
+            var paused = await CreateAsync(tavolino, 8, 4, d, today.AddDays(9), "Fresatura piani sospesa: manca la fresa da 12 mm");
+            clock.Set(d.AddHours(8).AddMinutes(10));
+            await ReleaseAsync(paused.Id);
+            var milling = await FindAsync(paused.Id, "SL-TAV-PIA", 10);
+            clock.Set(d.AddHours(9));
+            Unwrap(await WorkOrders(w => w.StartAsync(milling)));
+            clock.Set(d.AddHours(9).AddMinutes(50));
+            Unwrap(await WorkOrders(w => w.PauseAsync(milling, new CloseSessionRequest { GoodQuantity = 3, ScrapQuantity = 0, Notes = "Fresa da sostituire" })));
+
+            // 7. Chairs x2, aborted after the first cut (order and work orders Aborted).
+            d = today.AddDays(-1);
+            clock.Set(d.AddHours(8));
+            var aborted = await CreateAsync(sedia, 2, 1, d, today.AddDays(5), "Abortito: tubolare non conforme");
+            clock.Set(d.AddHours(8).AddMinutes(10));
+            await ReleaseAsync(aborted.Id);
+            await RunAsync(aborted.Id, "PF-SED-01", 10, d.AddHours(9), [new S(10, 1, 1, "Lotto di tubolare fuori tolleranza")]);
+            clock.Set(d.AddHours(11));
+            Unwrap(await Orders(o => o.AbortAsync(aborted.Id, "Materiale non conforme")));
         }
         finally
         {

@@ -44,5 +44,5 @@
 
 - [x] 3.1 [Lead] `doc/structure.md`: sezione "Order overview" (endpoint, gruppi, layout ELK, sola lettura, montaggio del diagramma, skill `ng-diagram-*`), eventuale termine d'interfaccia "panoramica" nel glossario.
   _Satisfies: REQ-7_
-- [ ] 3.2 [Lead] `npx nx affected -t lint build`, test, controllo dei criteri di accettazione di ogni REQ, verifica del DOM, e verifica visiva con l'utente (screenshot): ordine tavolini in corso con due figli, ordine sedie con rami paralleli, ordine concluso, ordine annullato, ordine pianificato.
+- [x] 3.2 [Lead] `npx nx affected -t lint build`, test, controllo dei criteri di accettazione di ogni REQ, verifica del DOM, e verifica visiva con l'utente (screenshot): ordine tavolini in corso con due figli, ordine sedie con rami paralleli, ordine concluso, ordine annullato, ordine pianificato.
   _Satisfies: REQ-1, REQ-2, REQ-3, REQ-4, REQ-5, REQ-6, REQ-7_
