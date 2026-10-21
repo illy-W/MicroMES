@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { NgDiagramPortComponent, type NgDiagramNodeTemplate, type Node } from 'ng-diagram';
 import { HlmBadge } from '@spartan-ng/helm/badge';
+import { RoutingViewState } from './routing-view-state';
 
 export interface StepNodeData {
   stepId: number | null;
@@ -31,7 +32,8 @@ const fmt = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
       class="bg-card text-card-foreground flex w-56 flex-col gap-1.5 rounded-lg border p-3 shadow-sm"
       [class.ring-ring]="node().selected"
       [class.ring-2]="node().selected"
-      [class.border-primary]="node().selected"
+      [class.border-primary]="node().selected || critical()"
+      [class.bg-accent]="critical()"
     >
       <div class="flex items-center justify-between gap-2">
         <span hlmBadge variant="secondary" class="tabular-nums">Op. {{ node().data.operationNumber ?? '—' }}</span>
@@ -45,12 +47,16 @@ const fmt = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
         }
       </span>
     </div>
-    <ng-diagram-port id="in" side="left" type="target" />
-    <ng-diagram-port id="out" side="right" type="source" />
+    <ng-diagram-port id="in" side="left" type="target" [class.pointer-events-none]="!view.editing()" />
+    <ng-diagram-port id="out" side="right" type="source" [class.pointer-events-none]="!view.editing()" />
   `,
 })
 export class RoutingNodeComponent implements NgDiagramNodeTemplate<StepNodeData> {
+  protected readonly view = inject(RoutingViewState);
   readonly node = input.required<Node<StepNodeData>>();
+
+  /** Sul percorso più lungo, solo in lettura. */
+  protected readonly critical = computed(() => !this.view.editing() && this.view.criticalNodeIds().has(this.node().id));
 
   protected setup(): number {
     const d = this.node().data;

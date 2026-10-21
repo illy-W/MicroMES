@@ -1,0 +1,18 @@
+{
+  "name": "@spartan-ng/helm/tabs",
+  "version": "0.0.1",
+  "peerDependencies": {
+    "@angular/core": "^22.1.0",
+    "@spartan-ng/brain": "1.5.0",
+    "@spartan-ng/helm/utils": "0.0.1",
+    "class-variance-authority": "0.7.0",
+    "@angular/cdk": "22.2.0",
+    "@ng-icons/core": "33.2.2",
+    "@ng-icons/lucide": "33.2.2",
+    "@spartan-ng/helm/button": "0.0.1",
+    "clsx": "2.1.1",
+    "rxjs": "~7.8.0"
+  },
+  "sideEffects": false,
+  "private": true
+}

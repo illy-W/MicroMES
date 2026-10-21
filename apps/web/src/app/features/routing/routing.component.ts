@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inj
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucidePlus, lucideTriangleAlert, lucideWorkflow } from '@ng-icons/lucide';
+import { lucideListOrdered, lucidePencil, lucidePlus, lucideTriangleAlert, lucideWorkflow } from '@ng-icons/lucide';
 import type {
   MaterialModel,
   ProcessSegmentModel,
@@ -12,36 +12,64 @@ import type {
 import { MaterialsService } from '@micromes/api-client/services/materials';
 import { ProcessSegmentsService } from '@micromes/api-client/services/process-segments';
 import { RoutingService } from '@micromes/api-client/services/routing';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmAlertDialogImports } from '@spartan-ng/helm/alert-dialog';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
 import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
 import { HlmTableImports } from '@spartan-ng/helm/table';
+import { HlmTabsImports } from '@spartan-ng/helm/tabs';
 import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import {
   initializeModel,
   NgDiagramBackgroundComponent,
   NgDiagramComponent,
+  NgDiagramEdgeTemplateMap,
   NgDiagramMinimapComponent,
   NgDiagramModelService,
   NgDiagramNodeTemplateMap,
   NgDiagramSelectionService,
+  NgDiagramService,
   NgDiagramViewportService,
   provideNgDiagram,
   type Edge,
+  type Middleware,
   type Node,
   type SelectionChangedEvent,
 } from 'ng-diagram';
 import { firstValueFrom, map } from 'rxjs';
 import { toFailure } from '../materials/materials.service';
+import { RoutingEdgeComponent } from './routing-edge.component';
 import { layeredLayout, ROW_SPACING } from './routing-layout';
+import { computeMetrics, formatMinutes } from './routing-metrics';
 import { RoutingNodeComponent, type StepNodeData } from './routing-node.component';
+import { numbersOutOfFlow, proposeNumber, renumber } from './routing-numbering';
+import { RoutingViewState } from './routing-view-state';
 import { validateRouting } from './routing-validation';
 
 type StepNode = Node<StepNodeData>;
+
+/** Azioni del diagramma che in lettura vengono bloccate dal middleware (modifiche a nodi, archi e posizioni). */
+const READ_ONLY_BLOCKED = new Set<string>([
+  'deleteSelection',
+  'deleteNodes',
+  'deleteEdges',
+  'deleteElements',
+  'startLinking',
+  'startLinkingFromPosition',
+  'finishLinking',
+  'startRelinking',
+  'finishRelinking',
+  'moveNodes',
+  'moveNodesBy',
+  'moveNodesStart',
+  'paste',
+  'paletteDropNode',
+]);
 
 function toNumberOrNull(v: string): number | null {
   if (v.trim() === '') return null;
@@ -56,18 +84,25 @@ function toNumberOrNull(v: string): number | null {
     NgDiagramComponent,
     NgDiagramBackgroundComponent,
     NgDiagramMinimapComponent,
+    HlmAlertImports,
     HlmAlertDialogImports,
     HlmBadge,
     HlmButton,
+    HlmCardImports,
     HlmEmptyImports,
     HlmInput,
     HlmLabel,
     HlmSkeleton,
     HlmTableImports,
+    HlmTabsImports,
     HlmTextarea,
     NgIcon,
   ],
-  providers: [provideNgDiagram(), provideIcons({ lucidePlus, lucideTriangleAlert, lucideWorkflow })],
+  providers: [
+    provideNgDiagram(),
+    RoutingViewState,
+    provideIcons({ lucideListOrdered, lucidePencil, lucidePlus, lucideTriangleAlert, lucideWorkflow }),
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host {
@@ -85,18 +120,26 @@ function toNumberOrNull(v: string): number | null {
               <span class="text-muted-foreground font-normal">· {{ m.code }} — {{ m.name }}</span>
             }
           </h1>
-          <p class="text-muted-foreground text-sm">Passi di produzione e dipendenze: collega le porte da destra a sinistra.</p>
+          <p class="text-muted-foreground text-sm">
+            @if (editing()) {
+              Passi di produzione e dipendenze: collega le porte da destra a sinistra.
+            } @else {
+              Passi di produzione e dipendenze, in sola lettura.
+            }
+          </p>
         </div>
         <div class="flex items-center gap-2">
-          @if (dirty()) {
-            <span hlmBadge variant="outline" role="status">Modifiche non salvate</span>
+          @if (editing()) {
+            @if (dirty()) {
+              <span hlmBadge variant="outline" role="status">Modifiche non salvate</span>
+            }
+            <button hlmBtn variant="outline" size="sm" type="button" [disabled]="saving()" (click)="cancelEdit()">Annulla</button>
+            <button hlmBtn size="sm" type="button" [disabled]="!dirty() || saving() || loading()" (click)="save()">Salva</button>
+          } @else {
+            <button hlmBtn size="sm" type="button" [disabled]="loading() || !!loadError()" (click)="startEdit()">
+              <ng-icon name="lucidePencil" /> Modifica ciclo
+            </button>
           }
-          <button hlmBtn variant="outline" size="sm" type="button" [disabled]="!dirty() || saving()" (click)="discard()">
-            Annulla modifiche
-          </button>
-          <button hlmBtn size="sm" type="button" [disabled]="!dirty() || saving() || loading()" (click)="save()">
-            Salva
-          </button>
         </div>
       </div>
 
@@ -118,142 +161,238 @@ function toNumberOrNull(v: string): number | null {
         </hlm-empty>
       } @else {
         @if (saveError()) {
-          <div class="text-destructive border-destructive/40 rounded-md border px-3 py-2 text-sm" role="alert">
-            {{ saveError() }}
+          <div hlmAlert variant="destructive">
+            <ng-icon name="lucideTriangleAlert" aria-hidden="true" />
+            <div hlmAlertTitle>Salvataggio non riuscito</div>
+            <div hlmAlertDescription>{{ saveError() }}</div>
           </div>
         }
-        @if (validationErrors().length) {
-          <div class="text-destructive border-destructive/40 rounded-md border px-3 py-2 text-sm" role="alert">
-            <p class="font-medium">Correggi prima di salvare:</p>
-            <ul class="list-disc pl-5">
-              @for (e of validationErrors(); track e) {
-                <li>{{ e }}</li>
-              }
-            </ul>
+        @if (editing() && validationErrors().length) {
+          <div hlmAlert variant="destructive">
+            <ng-icon name="lucideTriangleAlert" aria-hidden="true" />
+            <div hlmAlertTitle>Correggi prima di salvare</div>
+            <div hlmAlertDescription>
+              <ul class="list-disc pl-5">
+                @for (e of validationErrors(); track e) {
+                  <li>{{ e }}</li>
+                }
+              </ul>
+            </div>
+          </div>
+        }
+        @if (editing() && outOfFlow()) {
+          <div hlmAlert>
+            <ng-icon name="lucideListOrdered" aria-hidden="true" />
+            <div hlmAlertTitle>I numeri non seguono il flusso</div>
+            <div hlmAlertDescription>Un passo ha un numero uguale o maggiore di quello di un suo successore. Il salvataggio resta possibile.</div>
+            <div hlmAlertAction>
+              <button hlmBtn variant="outline" size="sm" type="button" (click)="renumberSteps()">Rinumera</button>
+            </div>
           </div>
         }
 
-        <div class="flex items-center gap-2" role="group" aria-label="Vista del ciclo">
-          <button hlmBtn size="sm" type="button" [variant]="view() === 'diagram' ? 'default' : 'outline'"
-            [attr.aria-pressed]="view() === 'diagram'" (click)="view.set('diagram')">Diagramma</button>
-          <button hlmBtn size="sm" type="button" [variant]="view() === 'list' ? 'default' : 'outline'"
-            [attr.aria-pressed]="view() === 'list'" (click)="view.set('list')">Elenco</button>
+        <div class="bg-card flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-lg border px-4 py-3" role="group" aria-label="Riepilogo del ciclo">
+          <dl class="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+            <div class="flex items-baseline gap-1.5">
+              <dt class="text-muted-foreground">Passi</dt>
+              <dd class="font-semibold tabular-nums">{{ metrics().stepCount }}</dd>
+            </div>
+            <div class="flex items-baseline gap-1.5">
+              <dt class="text-muted-foreground">Contenuto di lavoro</dt>
+              <dd class="font-semibold tabular-nums">{{ fmtMinutes(metrics().workContent) }}</dd>
+            </div>
+            <div class="flex items-baseline gap-1.5">
+              <dt class="text-muted-foreground">Percorso più lungo</dt>
+              <dd class="font-semibold tabular-nums">{{ fmtMinutes(metrics().longestPath) }}</dd>
+            </div>
+          </dl>
+          <div class="flex items-center gap-4">
+            @if (!editing() && metrics().criticalNodeIds.size) {
+              <span class="text-muted-foreground flex items-center gap-1.5 text-xs">
+                <span class="border-primary bg-accent inline-block size-3 rounded-sm border-2" aria-hidden="true"></span>
+                Percorso più lungo
+              </span>
+            }
+            @if (editing()) {
+              <button hlmBtn variant="outline" size="sm" type="button" [disabled]="!steps().length" (click)="renumberSteps()">
+                <ng-icon name="lucideListOrdered" /> Rinumera
+              </button>
+            }
+          </div>
         </div>
+        <p class="text-muted-foreground -mt-2 text-xs">Tempi per 1 unità: attrezzaggio più lavorazione, valori effettivi.</p>
 
-        <div class="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div class="min-w-0">
-            @if (view() === 'diagram') {
-              <div class="relative h-[calc(100vh-18rem)] min-h-96 overflow-hidden rounded-md border">
-                <ng-diagram
-                  [model]="model"
-                  [nodeTemplateMap]="nodeTemplateMap"
-                  [config]="config"
-                  (diagramInit)="onInit()"
-                  (edgeDrawn)="touch()"
-                  (selectionMoved)="touch()"
-                  (selectionRemoved)="onRemoved()"
-                  (selectionChanged)="onSelection($event)"
-                >
-                  <ng-diagram-background />
-                  <ng-diagram-minimap position="bottom-right" />
-                </ng-diagram>
-                @if (!steps().length) {
-                  <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div class="bg-card flex max-w-sm flex-col items-center gap-2 rounded-lg border p-6 text-center shadow-sm">
-                      <ng-icon name="lucideWorkflow" size="24" />
-                      <p class="font-medium">Nessun passo nel ciclo</p>
-                      <p class="text-muted-foreground text-sm">Aggiungi la prima fase dall'elenco a destra.</p>
+        <hlm-tabs [tab]="view()" (tabActivated)="view.set($any($event))">
+          <hlm-tabs-list aria-label="Vista del ciclo">
+            <button hlmTabsTrigger="diagram" type="button">Diagramma</button>
+            <button hlmTabsTrigger="list" type="button">Elenco</button>
+          </hlm-tabs-list>
+
+          <div class="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div class="min-w-0">
+              <div hlmTabsContent="diagram">
+                @if (view() === 'diagram') {
+                  <div class="relative h-[calc(100vh-22rem)] min-h-96 overflow-hidden rounded-md border">
+                    <ng-diagram
+                      [model]="model"
+                      [nodeTemplateMap]="nodeTemplateMap"
+                      [edgeTemplateMap]="edgeTemplateMap"
+                      [config]="config"
+                      (diagramInit)="onInit()"
+                      (edgeDrawn)="touch()"
+                      (selectionMoved)="touch()"
+                      (selectionRemoved)="onRemoved()"
+                      (selectionChanged)="onSelection($event)"
+                    >
+                      <ng-diagram-background />
+                      <ng-diagram-minimap position="bottom-right" />
+                    </ng-diagram>
+                    @if (!steps().length) {
+                      <div class="absolute inset-0 flex items-center justify-center" [class.pointer-events-none]="editing()">
+                        <div class="bg-card flex max-w-sm flex-col items-center gap-2 rounded-lg border p-6 text-center shadow-sm">
+                          <ng-icon name="lucideWorkflow" size="24" aria-hidden="true" />
+                          <p class="font-medium">Nessun passo nel ciclo</p>
+                          @if (editing()) {
+                            <p class="text-muted-foreground text-sm">Aggiungi la prima fase dall'elenco a destra.</p>
+                          } @else {
+                            <p class="text-muted-foreground text-sm">Questo materiale non ha ancora un ciclo di lavoro.</p>
+                            <button hlmBtn size="sm" type="button" (click)="startEdit()">Crea il ciclo</button>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+              <div hlmTabsContent="list">
+                @if (view() === 'list') {
+                  <div class="overflow-auto rounded-md border">
+                    <div hlmTableContainer>
+                      <table hlmTable>
+                        <caption class="sr-only">Passi del ciclo con predecessori e successori (sola lettura)</caption>
+                        <thead hlmTHead class="bg-muted">
+                          <tr hlmTr>
+                            <th hlmTh>Op.</th>
+                            <th hlmTh>Fase</th>
+                            <th hlmTh class="text-right">Attrezzaggio (min)</th>
+                            <th hlmTh class="text-right">Per unità (min)</th>
+                            <th hlmTh>Predecessori</th>
+                            <th hlmTh>Successori</th>
+                          </tr>
+                        </thead>
+                        <tbody hlmTBody>
+                          @for (r of rows(); track r.id) {
+                            <tr hlmTr>
+                              <td hlmTd class="tabular-nums">{{ r.op }}</td>
+                              <td hlmTd><span class="font-medium">{{ r.code }}</span> <span class="text-muted-foreground">{{ r.name }}</span></td>
+                              <td hlmTd class="text-right tabular-nums">{{ r.setup }}</td>
+                              <td hlmTd class="text-right tabular-nums">{{ r.run }}</td>
+                              <td hlmTd>{{ r.preds || '—' }}</td>
+                              <td hlmTd>{{ r.succs || '—' }}</td>
+                            </tr>
+                          } @empty {
+                            <tr hlmTr><td hlmTd colspan="6" class="text-muted-foreground text-center">Nessun passo nel ciclo.</td></tr>
+                          }
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 }
               </div>
-            } @else {
-              <div class="overflow-auto rounded-md border">
-                <div hlmTableContainer>
-                  <table hlmTable>
-                    <caption class="sr-only">Passi del ciclo con predecessori e successori (sola lettura)</caption>
-                    <thead hlmTHead class="bg-muted">
-                      <tr hlmTr>
-                        <th hlmTh>Op.</th>
-                        <th hlmTh>Fase</th>
-                        <th hlmTh class="text-right">Attrezzaggio (min)</th>
-                        <th hlmTh class="text-right">Per unità (min)</th>
-                        <th hlmTh>Predecessori</th>
-                        <th hlmTh>Successori</th>
-                      </tr>
-                    </thead>
-                    <tbody hlmTBody>
-                      @for (r of rows(); track r.id) {
-                        <tr hlmTr>
-                          <td hlmTd class="tabular-nums">{{ r.op }}</td>
-                          <td hlmTd><span class="font-medium">{{ r.code }}</span> <span class="text-muted-foreground">{{ r.name }}</span></td>
-                          <td hlmTd class="text-right tabular-nums">{{ r.setup }}</td>
-                          <td hlmTd class="text-right tabular-nums">{{ r.run }}</td>
-                          <td hlmTd>{{ r.preds || '—' }}</td>
-                          <td hlmTd>{{ r.succs || '—' }}</td>
-                        </tr>
-                      } @empty {
-                        <tr hlmTr><td hlmTd colspan="6" class="text-muted-foreground text-center">Nessun passo nel ciclo.</td></tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            }
-          </div>
+            </div>
 
-          <div class="flex flex-col gap-4">
-            @if (selected(); as s) {
-              <section class="bg-card flex flex-col gap-3 rounded-lg border p-4" aria-labelledby="step-panel-title">
-                <h2 id="step-panel-title" class="text-sm font-semibold">Passo {{ s.data.code }}</h2>
-                <div class="flex flex-col gap-1.5">
-                  <label hlmLabel for="st-op">Numero operazione</label>
-                  <input hlmInput id="st-op" type="number" min="1" step="1" [value]="s.data.operationNumber ?? ''"
-                    (input)="patch(s.id, { operationNumber: num($event) })" />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <label hlmLabel for="st-setup">Attrezzaggio (min)</label>
-                  <input hlmInput id="st-setup" type="number" min="0" step="any" [value]="s.data.setupMinutes ?? ''"
-                    [placeholder]="'Standard: ' + s.data.standardSetup" (input)="patch(s.id, { setupMinutes: num($event) })" />
-                  <p class="text-muted-foreground text-xs">Vuoto = valore standard della fase ({{ s.data.standardSetup }}).</p>
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <label hlmLabel for="st-run">Tempo per unità (min)</label>
-                  <input hlmInput id="st-run" type="number" min="0" step="any" [value]="s.data.runMinutesPerUnit ?? ''"
-                    [placeholder]="'Standard: ' + s.data.standardRun" (input)="patch(s.id, { runMinutesPerUnit: num($event) })" />
-                  <p class="text-muted-foreground text-xs">Vuoto = valore standard della fase ({{ s.data.standardRun }}).</p>
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <label hlmLabel for="st-notes">Note</label>
-                  <textarea hlmTextarea id="st-notes" maxlength="1000" [value]="s.data.notes ?? ''"
-                    (input)="patch(s.id, { notes: text($event) })"></textarea>
-                </div>
-              </section>
-            }
-
-            <section class="bg-card flex flex-col gap-2 rounded-lg border p-4" aria-labelledby="palette-title">
-              <h2 id="palette-title" class="text-sm font-semibold">Fasi disponibili</h2>
-              @if (segments().length) {
-                <ul class="flex max-h-80 flex-col gap-1 overflow-auto">
-                  @for (seg of segments(); track seg.id) {
-                    <li class="flex items-center justify-between gap-2">
-                      <span class="min-w-0 text-sm">
-                        <span class="font-medium">{{ seg.code }}</span>
-                        <span class="text-muted-foreground block truncate text-xs">{{ seg.name }}</span>
-                      </span>
-                      <button hlmBtn variant="outline" size="sm" type="button" [attr.aria-label]="'Aggiungi ' + seg.code"
-                        (click)="addStep(seg)">
-                        <ng-icon name="lucidePlus" /> Aggiungi
-                      </button>
-                    </li>
-                  }
-                </ul>
-              } @else {
-                <p class="text-muted-foreground text-sm">Nessuna fase attiva. Creane una in "Fasi di processo".</p>
+            <div class="flex flex-col gap-4">
+              @if (selected(); as s) {
+                @if (editing()) {
+                  <section hlmCard aria-labelledby="step-panel-title">
+                    <div hlmCardHeader>
+                      <h2 hlmCardTitle id="step-panel-title">Passo {{ s.data.code }}</h2>
+                    </div>
+                    <div hlmCardContent class="flex flex-col gap-3">
+                      <div class="flex flex-col gap-1.5">
+                        <span hlmLabel id="st-op-label">Numero operazione</span>
+                        <p class="text-sm tabular-nums" aria-labelledby="st-op-label">{{ s.data.operationNumber ?? '—' }}</p>
+                        <p class="text-muted-foreground text-xs">Assegnato dal sistema. Usa "Rinumera" per riallinearlo al flusso.</p>
+                      </div>
+                      <div class="flex flex-col gap-1.5">
+                        <label hlmLabel for="st-setup">Attrezzaggio (min)</label>
+                        <input hlmInput id="st-setup" type="number" min="0" step="any" [value]="s.data.setupMinutes ?? ''"
+                          [placeholder]="'Standard: ' + s.data.standardSetup" (input)="patch(s.id, { setupMinutes: num($event) })" />
+                        <p class="text-muted-foreground text-xs">Vuoto = valore standard della fase ({{ s.data.standardSetup }}).</p>
+                      </div>
+                      <div class="flex flex-col gap-1.5">
+                        <label hlmLabel for="st-run">Tempo per unità (min)</label>
+                        <input hlmInput id="st-run" type="number" min="0" step="any" [value]="s.data.runMinutesPerUnit ?? ''"
+                          [placeholder]="'Standard: ' + s.data.standardRun" (input)="patch(s.id, { runMinutesPerUnit: num($event) })" />
+                        <p class="text-muted-foreground text-xs">Vuoto = valore standard della fase ({{ s.data.standardRun }}).</p>
+                      </div>
+                      <div class="flex flex-col gap-1.5">
+                        <label hlmLabel for="st-notes">Note</label>
+                        <textarea hlmTextarea id="st-notes" maxlength="1000" [value]="s.data.notes ?? ''"
+                          (input)="patch(s.id, { notes: text($event) })"></textarea>
+                      </div>
+                    </div>
+                  </section>
+                } @else {
+                  <section hlmCard aria-labelledby="step-detail-title">
+                    <div hlmCardHeader>
+                      <h2 hlmCardTitle id="step-detail-title">Passo {{ s.data.code }}</h2>
+                      <p hlmCardDescription>{{ s.data.name }}</p>
+                    </div>
+                    <div hlmCardContent>
+                      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                        <dt class="text-muted-foreground">Numero operazione</dt>
+                        <dd class="tabular-nums">{{ s.data.operationNumber ?? '—' }}</dd>
+                        <dt class="text-muted-foreground">Attrezzaggio</dt>
+                        <dd class="tabular-nums">
+                          {{ fmtMinutes(s.data.setupMinutes ?? s.data.standardSetup) }}
+                          <span class="text-muted-foreground block text-xs">Standard: {{ fmtMinutes(s.data.standardSetup) }}</span>
+                        </dd>
+                        <dt class="text-muted-foreground">Tempo per unità</dt>
+                        <dd class="tabular-nums">
+                          {{ fmtMinutes(s.data.runMinutesPerUnit ?? s.data.standardRun) }}
+                          <span class="text-muted-foreground block text-xs">Standard: {{ fmtMinutes(s.data.standardRun) }}</span>
+                        </dd>
+                        <dt class="text-muted-foreground">Note</dt>
+                        <dd class="whitespace-pre-wrap">{{ s.data.notes || '—' }}</dd>
+                      </dl>
+                    </div>
+                  </section>
+                }
+              } @else if (!editing()) {
+                <p class="text-muted-foreground text-sm">Seleziona un passo per vederne i dettagli.</p>
               }
-            </section>
+
+              @if (editing()) {
+                <section hlmCard aria-labelledby="palette-title">
+                  <div hlmCardHeader>
+                    <h2 hlmCardTitle id="palette-title">Fasi disponibili</h2>
+                  </div>
+                  <div hlmCardContent>
+                    @if (segments().length) {
+                      <ul class="flex max-h-80 flex-col gap-1 overflow-auto">
+                        @for (seg of segments(); track seg.id) {
+                          <li class="flex items-center justify-between gap-2">
+                            <span class="min-w-0 text-sm">
+                              <span class="font-medium">{{ seg.code }}</span>
+                              <span class="text-muted-foreground block truncate text-xs">{{ seg.name }}</span>
+                            </span>
+                            <button hlmBtn variant="outline" size="sm" type="button" [attr.aria-label]="'Aggiungi ' + seg.code"
+                              (click)="addStep(seg)">
+                              <ng-icon name="lucidePlus" /> Aggiungi
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    } @else {
+                      <p class="text-muted-foreground text-sm">Nessuna fase attiva. Creane una in "Fasi di processo".</p>
+                    }
+                  </div>
+                </section>
+              }
+            </div>
           </div>
-        </div>
+        </hlm-tabs>
       }
     </div>
 
@@ -273,6 +412,23 @@ function toNumberOrNull(v: string): number | null {
         </ng-template>
       </hlm-alert-dialog>
     }
+
+    @if (discardOpen()) {
+      <hlm-alert-dialog state="open" (closed)="discardOpen.set(false)">
+        <ng-template hlmAlertDialogPortal>
+          <hlm-alert-dialog-content>
+            <hlm-alert-dialog-header>
+              <h2 hlmAlertDialogTitle>Scartare le modifiche?</h2>
+              <p hlmAlertDialogDescription>Le modifiche al ciclo di lavoro non salvate andranno perse.</p>
+            </hlm-alert-dialog-header>
+            <hlm-alert-dialog-footer>
+              <button hlmAlertDialogCancel>Continua a modificare</button>
+              <button hlmBtn type="button" variant="destructive" (click)="confirmDiscard()">Scarta modifiche</button>
+            </hlm-alert-dialog-footer>
+          </hlm-alert-dialog-content>
+        </ng-template>
+      </hlm-alert-dialog>
+    }
   `,
 })
 export class RoutingComponent {
@@ -282,6 +438,8 @@ export class RoutingComponent {
   private readonly modelService = inject(NgDiagramModelService);
   private readonly viewport = inject(NgDiagramViewportService);
   private readonly selection = inject(NgDiagramSelectionService);
+  private readonly diagramService = inject(NgDiagramService);
+  private readonly viewState = inject(RoutingViewState);
 
   private readonly materialId = toSignal(
     inject(ActivatedRoute).paramMap.pipe(map((p) => Number(p.get('id')))),
@@ -297,21 +455,38 @@ export class RoutingComponent {
   protected readonly validationErrors = signal<string[]>([]);
   protected readonly dirty = signal(false);
   protected readonly view = signal<'diagram' | 'list'>('diagram');
+  /** Lettura di default; la modifica si attiva esplicitamente. */
+  protected readonly editing = signal(false);
+  protected readonly discardOpen = signal(false);
   protected readonly leaveResolver = signal<((v: boolean) => void) | null>(null);
 
   private readonly version = signal(0);
   private readonly selectedId = signal<string | null>(null);
   private serverRouting: RoutingModel | null = null;
+  private unregisterGate: (() => void) | null = null;
   private newCounter = 0;
 
   protected readonly nodeTemplateMap = new NgDiagramNodeTemplateMap([['step', RoutingNodeComponent]]);
+  protected readonly edgeTemplateMap = new NgDiagramEdgeTemplateMap([['dep', RoutingEdgeComponent]]);
   protected readonly model = initializeModel({ nodes: [], edges: [] });
+
+  /** Middleware che in lettura blocca cancellazioni, collegamenti e spostamenti, senza toccare il modello. */
+  private readonly readOnlyGate: Middleware = {
+    name: 'routing-read-only',
+    execute: (context, next, cancel) => {
+      if (!this.editing() && context.modelActionTypes.some((a) => READ_ONLY_BLOCKED.has(a))) {
+        cancel();
+        return;
+      }
+      void next();
+    },
+  };
 
   /** Impedisce archi che chiudono un ciclo, anelli e duplicati già durante il collegamento. */
   protected readonly config = {
     linking: {
       validateConnection: (source: Node | null, _sp: unknown, target: Node | null): boolean => {
-        if (!source || !target || source.id === target.id) return false;
+        if (!this.editing() || !source || !target || source.id === target.id) return false;
         const edges = this.model.getEdges();
         if (edges.some((e) => e.source === source.id && e.target === target.id)) return false;
         // il nuovo arco source→target chiude un ciclo se source è raggiungibile da target
@@ -335,6 +510,28 @@ export class RoutingComponent {
   protected readonly steps = computed<StepNode[]>(() => {
     this.version();
     return this.model.getNodes() as StepNode[];
+  });
+
+  protected readonly metrics = computed(() => {
+    this.version();
+    const nodes = this.model.getNodes() as StepNode[];
+    return computeMetrics(
+      nodes.map((n) => ({
+        id: n.id,
+        setup: n.data.setupMinutes ?? n.data.standardSetup,
+        run: n.data.runMinutesPerUnit ?? n.data.standardRun,
+      })),
+      this.model.getEdges(),
+    );
+  });
+
+  protected readonly outOfFlow = computed(() => {
+    this.version();
+    const nodes = this.model.getNodes() as StepNode[];
+    return numbersOutOfFlow(
+      nodes.map((n) => ({ id: n.id, operationNumber: n.data.operationNumber })),
+      this.model.getEdges(),
+    );
   });
 
   protected readonly selected = computed(() => {
@@ -371,15 +568,29 @@ export class RoutingComponent {
         if (id) void this.load();
       });
     });
+    // I template di nodo e arco leggono lo stato di vista da qui.
+    effect(() => {
+      this.viewState.editing.set(this.editing());
+      const m = this.metrics();
+      this.viewState.criticalNodeIds.set(m.criticalNodeIds);
+      this.viewState.criticalEdgeKeys.set(m.criticalEdgeKeys);
+    });
+    // Trascinamento dei nodi attivo solo in modifica.
+    effect(() => {
+      const edit = this.editing();
+      if (this.diagramService.isInitialized()) {
+        untracked(() => this.diagramService.updateConfig({ nodeDraggingEnabled: edit }));
+      }
+    });
   }
 
   @HostListener('window:beforeunload', ['$event'])
   protected onBeforeUnload(e: BeforeUnloadEvent): void {
-    if (this.dirty()) e.preventDefault();
+    if (this.editing() && this.dirty()) e.preventDefault();
   }
 
   confirmLeave(): Promise<boolean> {
-    if (!this.dirty()) return Promise.resolve(true);
+    if (!this.editing() || !this.dirty()) return Promise.resolve(true);
     return new Promise((resolve) => this.leaveResolver.set(resolve));
   }
 
@@ -445,6 +656,7 @@ export class RoutingComponent {
     }));
     const modelEdges: Edge[] = routing.dependencies.map((d) => ({
       id: `e-${d.id}`,
+      type: 'dep',
       source: key(d.predecessorStepId),
       sourcePort: 'out',
       target: key(d.successorStepId),
@@ -461,7 +673,50 @@ export class RoutingComponent {
   }
 
   protected onInit(): void {
+    this.unregisterGate?.();
+    this.unregisterGate = this.diagramService.registerMiddleware(this.readOnlyGate) as (() => void) | null;
+    this.diagramService.updateConfig({ nodeDraggingEnabled: this.editing() });
     void this.viewport.zoomToFit();
+  }
+
+  protected fmtMinutes(v: number | null): string {
+    return formatMinutes(v);
+  }
+
+  protected startEdit(): void {
+    this.editing.set(true);
+    this.view.set('diagram');
+  }
+
+  protected cancelEdit(): void {
+    if (this.dirty()) {
+      this.discardOpen.set(true);
+      return;
+    }
+    this.exitEdit();
+  }
+
+  protected confirmDiscard(): void {
+    this.discardOpen.set(false);
+    this.exitEdit();
+  }
+
+  /** Torna in lettura scartando la bozza (ricostruisce il modello dal ciclo salvato). */
+  private exitEdit(): void {
+    if (this.serverRouting) this.applyRouting(this.serverRouting);
+    this.editing.set(false);
+  }
+
+  protected async renumberSteps(): Promise<void> {
+    const nodes = this.model.getNodes() as StepNode[];
+    const numbers = renumber(
+      nodes.map((n) => ({ id: n.id, operationNumber: n.data.operationNumber, positionY: n.position.y })),
+      this.model.getEdges(),
+    );
+    await Promise.all(
+      nodes.map((n) => this.modelService.updateNodeData(n.id, { ...n.data, operationNumber: numbers.get(n.id) ?? n.data.operationNumber })),
+    );
+    this.touch();
   }
 
   protected touch(): void {
@@ -496,8 +751,7 @@ export class RoutingComponent {
 
   protected addStep(seg: ProcessSegmentModel): void {
     const nodes = this.model.getNodes() as StepNode[];
-    const maxOp = Math.max(0, ...nodes.map((n) => n.data.operationNumber ?? 0));
-    const operationNumber = (Math.floor(maxOp / 10) + 1) * 10;
+    const operationNumber = proposeNumber(nodes.map((n) => n.data.operationNumber));
     const maxY = nodes.length ? Math.max(...nodes.map((n) => n.position.y)) : -ROW_SPACING + 60;
     const id = `new-${++this.newCounter}`;
     this.modelService.addNodes([
@@ -521,10 +775,6 @@ export class RoutingComponent {
     ]);
     this.touch();
     void this.selection.select([id]);
-  }
-
-  protected discard(): void {
-    if (this.serverRouting) this.applyRouting(this.serverRouting);
   }
 
   protected async save(): Promise<void> {
@@ -556,6 +806,7 @@ export class RoutingComponent {
     try {
       const saved = await firstValueFrom(this.routingApi.updateRouting(this.materialId(), request));
       this.applyRouting(saved);
+      this.editing.set(false);
     } catch (e) {
       const f = toFailure(e);
       const fields = Object.values(f.fieldErrors);
