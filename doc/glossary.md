@@ -18,6 +18,8 @@ Every feature spec that adds or renames a domain entity updates this file.
 | `ScrapReason` | *(none: disposition/reason is left to the implementation)* | Motivo di scarto | Catalog entry: `Code` (unique, uppercase), `Name`, `Description`, `IsActive` (soft-delete). Linked to zero or more `ProcessSegment` (none = valid for every phase). | `specs/scrap-management` |
 | `WorkOrderResponseScrap` | Job Response (material produced actual, scrapped quantity) | Riga di scarto | Row of a work session: reason (nullable = *senza motivo*), snapshot of reason code/name, quantity. `WorkOrderResponse.ScrapQuantity` is their sum. | `specs/scrap-management` |
 | `WorkOrderResponseCorrection` | - | Correzione | Trace of a correction of a closed session: previous and new values, mandatory note, date. Not allowed when the production order is `Completed`/`Cancelled`. | `specs/scrap-management` |
+| `Equipment` | Equipment (role-based, simplified) | Macchina / postazione | Machine or work station where a phase is performed. `Code` (unique, uppercase), `Name`, `Description`, `IsActive` (soft-delete). No hierarchy, class, capacity or calendar yet. | `specs/equipment` |
+| `EquipmentProcessSegment` | Process Segment Equipment Specification | Fasi eseguibili | Link machine <-> process segment ("where a phase can be done"). A segment without linked machines has no constraint. Links are kept when either side is deactivated. | `specs/equipment` |
 
 ## Planned (not adopted yet)
 
@@ -26,7 +28,7 @@ Every feature spec that adds or renames a domain entity updates this file.
 | Material Class | Grouping of materials with common properties. |
 | Material Lot / Sublot | Traceable physical instance of a material. |
 | Product Definition | How a material is produced. BOM adopted as `BomItem`, routing as `RoutingStep`/`RoutingStepDependency` with `ProcessSegment`; the BOM-step link is adopted as `BomItem.ConsumedInStepId`; resources still planned. |
-| Equipment, Personnel | Resources. |
+| Equipment hierarchy/classes, capacity, calendar; Personnel | Machines adopted as `Equipment`; assignment to work orders, capacity, calendars, downtime and people still planned. |
 | Equipment/Personnel requirements, lots, parameters | Resource requirements and actuals of work orders; material actuals (consumption), lots and traceability. |
 
 ### State mapping to ISA-95 Part 4 (OPC UA job order states)
@@ -57,3 +59,5 @@ Record here every further deliberate difference from the standard, with the reas
 - `BomItem.ConsumedInStepId`: material consumption is declared on the BOM line, not as a separate *Material Specification* of the segment; only use `Consumed`; a component can be consumed in one step only (split not supported; extend the unique index to parent+component+step if needed).
 
 - Scrap: a catalog of reasons linked to process segments and per-session scrap rows with a snapshot of the reason; no *disposition* (rework, repair), lots or scrapped raw material; corrections are separate trace rows, not a new Job Response; the operator who corrected is not tracked yet (needs operator identity).
+
+- Equipment: no `Work Center`/`Work Unit` hierarchy and no `Equipment Class`; the link to the process segment is direct (per machine, not per class) and has no use/quantity attribute; no machine assignment on routing steps or work orders yet.

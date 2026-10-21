@@ -4,6 +4,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideChartNoAxesColumn,
   lucideClipboardList,
+  lucideCog,
   lucideHouse,
   lucideListChecks,
   lucidePackage,
@@ -20,6 +21,7 @@ import { NavSection } from '../../models/nav-item.model';
     provideIcons({
       lucideChartNoAxesColumn,
       lucideClipboardList,
+      lucideCog,
       lucideHouse,
       lucideListChecks,
       lucidePackage,

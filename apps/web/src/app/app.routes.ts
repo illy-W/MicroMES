@@ -28,6 +28,10 @@ export const appRoutes: Route[] = [
           import('./features/process-segments/process-segments.component').then((m) => m.ProcessSegmentsComponent),
       },
       {
+        path: 'equipment',
+        loadComponent: () => import('./features/equipment/equipment.component').then((m) => m.EquipmentComponent),
+      },
+      {
         path: 'scrap-reasons',
         loadComponent: () =>
           import('./features/scrap-reasons/scrap-reasons.component').then((m) => m.ScrapReasonsComponent),

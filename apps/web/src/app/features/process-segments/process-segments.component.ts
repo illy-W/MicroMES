@@ -47,6 +47,7 @@ const columnHelper = createColumnHelper<typeof features, ProcessSegmentModel>();
 const columns = columnHelper.columns([
   columnHelper.accessor('code', { id: 'code', header: 'Codice' }),
   columnHelper.accessor('name', { id: 'name', header: 'Nome' }),
+  columnHelper.display({ id: 'equipment', header: 'Macchine' }),
   columnHelper.accessor('setupMinutes', { id: 'setupMinutes', header: 'Attrezzaggio (min)' }),
   columnHelper.accessor('runMinutesPerUnit', { id: 'runMinutesPerUnit', header: 'Tempo per unità (min)' }),
   columnHelper.accessor('isActive', { id: 'status', header: 'Stato' }),
@@ -179,6 +180,17 @@ const columns = columnHelper.columns([
                           }
                           @case ('runMinutesPerUnit') {
                             {{ minutes(row.original.runMinutesPerUnit, 4) }}
+                          }
+                          @case ('equipment') {
+                            @if (row.original.equipment.length) {
+                              <span class="flex flex-wrap gap-1">
+                                @for (e of row.original.equipment; track e.id) {
+                                  <span hlmBadge variant="secondary">{{ e.code }}</span>
+                                }
+                              </span>
+                            } @else {
+                              <span class="text-muted-foreground">Nessun vincolo</span>
+                            }
                           }
                           @case ('status') {
                             <span hlmBadge variant="outline" class="text-muted-foreground px-1.5">

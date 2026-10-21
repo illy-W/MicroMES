@@ -94,6 +94,11 @@ See `AGENTS.md` for the project table and dependency direction.
 - `ScrapFeature`: catalog (`/api/scrap-reasons`, soft-delete, optional phase filter) and report (`GET /api/scrap/report?from&to`, aggregations on the backend, always with a *Senza motivo* row). Closing a session (`scrapEntries`, optional) and corrections (`POST /api/work-orders/{id}/responses/{responseId}/corrections`) live in `ProductionOrderFeature`, one transaction, shared validation (sum = scrap, active reason valid for the phase).
 - Menu: sidebar sections (`sidebarSections`): Dashboard, *Produzione* (orders, work orders, scrap), *Anagrafiche* (materials, process segments, scrap reasons). BOM and routing stay under the material page.
 
+### Equipment
+
+- `EquipmentFeature`: `/api/equipment` (soft-delete, filters `includeInactive`, `search`, `processSegmentId`). The machine <-> process segment link is edited from both sides with the same linker (`EquipmentSegmentLinker`): machine `processSegmentIds` always replaces the set; segment `equipmentIds` replaces it only when present (omitted = unchanged). Only active items can be newly linked; existing links to deactivated items are kept. `AddEquipmentFeature()` must be registered together with `AddProcessSegmentFeature()`.
+- Web: `features/equipment`, shared `LinkedItemsPickerComponent` (checkboxes with search) also used in the process segment dialog; menu section *Anagrafiche*.
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.

@@ -7,12 +7,14 @@ import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
 import { HlmSwitch } from '@spartan-ng/helm/switch';
 import { HlmTextarea } from '@spartan-ng/helm/textarea';
+import { LinkedItemsPickerComponent } from '../../shared/components/linked-items-picker.component';
+import { EquipmentStore } from '../equipment/equipment.store';
 import { toFailure } from '../materials/materials.service';
 import { ProcessSegmentsStore } from './process-segments.store';
 
 @Component({
   selector: 'app-process-segment-form-dialog',
-  imports: [ReactiveFormsModule, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSwitch, HlmTextarea],
+  imports: [ReactiveFormsModule, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSwitch, HlmTextarea, LinkedItemsPickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-dialog state="open" (closed)="closed.emit()">
@@ -73,6 +75,20 @@ import { ProcessSegmentsStore } from './process-segments.store';
               </div>
             </fieldset>
 
+            <app-linked-items-picker
+              legend="Macchine e postazioni"
+              hint="Nessuna macchina collegata = la fase si può eseguire ovunque."
+              searchLabel="Cerca macchina o postazione"
+              emptyText="Nessuna macchina trovata."
+              idPrefix="ps-eq"
+              [items]="equipmentStore.items()"
+              [loadError]="equipmentStore.loadError()"
+              [(selected)]="selectedEquipment"
+            />
+            @if (fieldError('equipmentIds'); as e) {
+              <p class="text-destructive text-xs" role="alert">{{ e }}</p>
+            }
+
             @if (segment()) {
               <div class="flex items-center gap-2">
                 <hlm-switch inputId="ps-active" formControlName="isActive" />
@@ -95,6 +111,7 @@ import { ProcessSegmentsStore } from './process-segments.store';
 export class ProcessSegmentFormDialogComponent implements OnInit {
   private readonly fb = inject(FormBuilder).nonNullable;
   private readonly store = inject(ProcessSegmentsStore);
+  protected readonly equipmentStore = inject(EquipmentStore);
 
   readonly segment = input<ProcessSegmentModel | null>(null);
   readonly saved = output<void>();
@@ -103,6 +120,7 @@ export class ProcessSegmentFormDialogComponent implements OnInit {
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
   private readonly serverErrors = signal<Record<string, string>>({});
+  protected readonly selectedEquipment = signal<ReadonlySet<number>>(new Set());
 
   protected readonly form = this.fb.group({
     code: ['', [Validators.required, Validators.maxLength(50)]],
@@ -114,6 +132,7 @@ export class ProcessSegmentFormDialogComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    void this.equipmentStore.load();
     const s = this.segment();
     if (s) {
       this.form.patchValue({
@@ -124,6 +143,7 @@ export class ProcessSegmentFormDialogComponent implements OnInit {
         runMinutesPerUnit: s.runMinutesPerUnit,
         isActive: s.isActive,
       });
+      this.selectedEquipment.set(new Set(s.equipment.map((e) => e.id)));
     }
   }
 
@@ -149,6 +169,7 @@ export class ProcessSegmentFormDialogComponent implements OnInit {
       description: v.description.trim() || null,
       setupMinutes: v.setupMinutes ?? 0,
       runMinutesPerUnit: v.runMinutesPerUnit ?? 0,
+      equipmentIds: [...this.selectedEquipment()],
     };
     this.saving.set(true);
     this.formError.set(null);

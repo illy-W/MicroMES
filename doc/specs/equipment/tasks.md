@@ -20,11 +20,11 @@
 
 ## Frontend
 
-- [ ] 2.1 [Frontend] Pagina «Macchine e postazioni» (`features/equipment`): lista (codice, nome, fasi collegate, stato), ricerca, filtro attive/disattivate, crea e modifica in dialog con scelta delle fasi (checkbox con ricerca e hint «nessuna = nessun vincolo»), attiva/disattiva con conferma, errori 409/422 con il testo del backend; voce nel gruppo **Anagrafiche** del menu e rotta. Schema di `features/scrap-reasons`. _Satisfies: REQ-1, REQ-2_
-- [ ] 2.2 [Frontend] Pagina «Fasi di processo»: colonna delle macchine abilitate e scelta delle macchine (solo attive) nel dialog di creazione/modifica, con lo stesso hint; nessuna regressione sugli altri campi. _Satisfies: REQ-2_
-- [ ] 2.3 [Frontend] `npx nx lint web` e `npx nx build web`; riportare cosa non è verificato a runtime. _Satisfies: REQ-1..REQ-3_
+- [x] 2.1 [Frontend] Pagina «Macchine e postazioni» (`features/equipment`): lista (codice, nome, fasi collegate, stato), ricerca, filtro attive/disattivate, crea e modifica in dialog con scelta delle fasi (checkbox con ricerca e hint «nessuna = nessun vincolo»), attiva/disattiva con conferma, errori 409/422 con il testo del backend; voce nel gruppo **Anagrafiche** del menu e rotta. Schema di `features/scrap-reasons`. _Satisfies: REQ-1, REQ-2_
+- [x] 2.2 [Frontend] Pagina «Fasi di processo»: colonna delle macchine abilitate e scelta delle macchine (solo attive) nel dialog di creazione/modifica, con lo stesso hint; nessuna regressione sugli altri campi. _Satisfies: REQ-2_
+- [x] 2.3 [Frontend] `npx nx lint web` e `npx nx build web`; riportare cosa non è verificato a runtime. _Satisfies: REQ-1..REQ-3_
 
 ## Lead
 
-- [ ] 3.1 [Lead] Aggiornare `doc/glossary.md` (`Equipment`, `EquipmentProcessSegment`, deviazioni da ISA-95, voce «Equipment» dalla tabella Planned) e `doc/structure.md` (feature, collegamento, menu). _Satisfies: tutti_
-- [ ] 3.2 [Lead] Verifica: `npx nx run-many -t lint build`, test unitari e di integrazione, DB di sviluppo ripristinato con il seed, controllo DOM nel browser (menu, pagina macchine, scheda fase), verifica dei criteri di accettazione. _Satisfies: tutti_
+- [x] 3.1 [Lead] Aggiornare `doc/glossary.md` (`Equipment`, `EquipmentProcessSegment`, deviazioni da ISA-95, voce «Equipment» dalla tabella Planned) e `doc/structure.md` (feature, collegamento, menu). _Satisfies: tutti_
+- [x] 3.2 [Lead] Verifica: `npx nx run-many -t lint build`, test unitari e di integrazione, DB di sviluppo ripristinato con il seed, controllo DOM nel browser (menu, pagina macchine, scheda fase), verifica dei criteri di accettazione. _Satisfies: tutti_
