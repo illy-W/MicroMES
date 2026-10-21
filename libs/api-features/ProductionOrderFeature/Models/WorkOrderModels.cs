@@ -20,6 +20,36 @@ public class WorkOrderSessionModel
     public string? Notes { get; set; }
     /// <summary>Minutes of the session; null while it is still open.</summary>
     public decimal? Minutes { get; set; }
+    /// <summary>Scrap by reason (a row with null reason = "no reason"); the quantities add up to ScrapQuantity.</summary>
+    public required List<WorkOrderScrapEntryModel> ScrapEntries { get; set; }
+    /// <summary>True when the session was corrected at least once.</summary>
+    public required bool IsCorrected { get; set; }
+    /// <summary>Oldest first.</summary>
+    public required List<WorkOrderCorrectionModel> Corrections { get; set; }
+}
+
+public class WorkOrderScrapEntryModel
+{
+    public required int Id { get; set; }
+    public int? ScrapReasonId { get; set; }
+    /// <summary>Snapshot taken when the row was written; null = no reason.</summary>
+    public string? ReasonCode { get; set; }
+    public string? ReasonName { get; set; }
+    public required decimal Quantity { get; set; }
+}
+
+public class WorkOrderCorrectionModel
+{
+    public required int Id { get; set; }
+    public required DateTime CorrectedAt { get; set; }
+    public required string Notes { get; set; }
+    public required decimal PreviousGoodQuantity { get; set; }
+    public required decimal PreviousScrapQuantity { get; set; }
+    /// <summary>Readable text, e.g. "Graffio: 2; Senza motivo: 1".</summary>
+    public string? PreviousScrapDetail { get; set; }
+    public required decimal NewGoodQuantity { get; set; }
+    public required decimal NewScrapQuantity { get; set; }
+    public string? NewScrapDetail { get; set; }
 }
 
 /// <summary>Work order as listed (also the header of the detail).</summary>
@@ -48,6 +78,8 @@ public class WorkOrderModel
     public required decimal WorkedMinutes { get; set; }
     public required decimal GoodQuantity { get; set; }
     public required decimal ScrapQuantity { get; set; }
+    /// <summary>Planned minus good pieces when the work order is Ended and the good pieces fall short; otherwise 0.</summary>
+    public required decimal ShortfallQuantity { get; set; }
     public string? Notes { get; set; }
     public required WorkOrderStatus Status { get; set; }
     public DateTime? StartedAt { get; set; }

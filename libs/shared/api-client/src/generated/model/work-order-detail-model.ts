@@ -34,6 +34,7 @@ export interface WorkOrderDetailModel {
   workedMinutes: number;
   goodQuantity: number;
   scrapQuantity: number;
+  shortfallQuantity: number;
   /** @nullable */
   notes?: string | null;
   status: WorkOrderStatus;

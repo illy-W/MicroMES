@@ -15,6 +15,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<WorkOrderDependency> WorkOrderDependencies { get; set; } = null!;
     public DbSet<WorkOrderMaterial> WorkOrderMaterials { get; set; } = null!;
     public DbSet<WorkOrderResponse> WorkOrderResponses { get; set; } = null!;
+    public DbSet<ScrapReason> ScrapReasons { get; set; } = null!;
+    public DbSet<ScrapReasonProcessSegment> ScrapReasonProcessSegments { get; set; } = null!;
+    public DbSet<WorkOrderResponseScrap> WorkOrderResponseScraps { get; set; } = null!;
+    public DbSet<WorkOrderResponseCorrection> WorkOrderResponseCorrections { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -135,6 +139,53 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.ScrapQuantity).HasPrecision(18, 4);
             entity.Property(x => x.Notes).HasMaxLength(1000);
             entity.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ScrapReason>(entity =>
+        {
+            entity.ToTable("ScrapReasons");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.HasIndex(x => x.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<ScrapReasonProcessSegment>(entity =>
+        {
+            entity.ToTable("ScrapReasonProcessSegments");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.ScrapReasonId, x.ProcessSegmentId }).IsUnique();
+            entity.HasOne<ScrapReason>().WithMany().HasForeignKey(x => x.ScrapReasonId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ProcessSegment>().WithMany().HasForeignKey(x => x.ProcessSegmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkOrderResponseScrap>(entity =>
+        {
+            entity.ToTable("WorkOrderResponseScraps");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ReasonCode).HasMaxLength(50);
+            entity.Property(x => x.ReasonName).HasMaxLength(200);
+            entity.Property(x => x.Quantity).HasPrecision(18, 4);
+            entity.HasIndex(x => x.WorkOrderResponseId);
+            entity.HasOne<WorkOrderResponse>().WithMany().HasForeignKey(x => x.WorkOrderResponseId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ScrapReason>().WithMany().HasForeignKey(x => x.ScrapReasonId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<WorkOrderResponseCorrection>(entity =>
+        {
+            entity.ToTable("WorkOrderResponseCorrections");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Notes).IsRequired().HasMaxLength(1000);
+            entity.Property(x => x.PreviousGoodQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.PreviousScrapQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.PreviousScrapDetail).HasMaxLength(1000);
+            entity.Property(x => x.NewGoodQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.NewScrapQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.NewScrapDetail).HasMaxLength(1000);
+            entity.HasIndex(x => x.WorkOrderResponseId);
+            entity.HasOne<WorkOrderResponse>().WithMany().HasForeignKey(x => x.WorkOrderResponseId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

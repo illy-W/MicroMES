@@ -4,6 +4,7 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { ScrapEntryRequest } from './scrap-entry-request';
 
 export interface CloseSessionRequest {
   /**
@@ -22,4 +23,6 @@ export interface CloseSessionRequest {
      * @nullable
      */
   notes?: string | null;
+  /** @nullable */
+  scrapEntries?: ScrapEntryRequest[] | null;
 }

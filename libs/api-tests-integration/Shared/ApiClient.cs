@@ -8,6 +8,7 @@ using MicroMES.ApiFeatures.MaterialFeature.Models;
 using MicroMES.ApiFeatures.ProcessSegmentFeature.Models;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 using MicroMES.ApiFeatures.RoutingFeature.Models;
+using MicroMES.ApiFeatures.ScrapFeature.Models;
 
 namespace MicroMES.ApiTests.Integration.Shared;
 
@@ -128,4 +129,24 @@ public sealed class ApiClient(HttpClient http)
     public Task<ApiResult<WorkOrderDetailModel>> StopAsync(int workOrderId, decimal good = 0, decimal scrap = 0, string? notes = null)
         => PostAsync<WorkOrderDetailModel>($"/api/work-orders/{workOrderId}/stop",
             new CloseSessionRequest { GoodQuantity = good, ScrapQuantity = scrap, Notes = notes });
+
+    // ---- scrap ---------------------------------------------------------------------------------------
+
+    public Task<ApiResult<ScrapReasonModel>> CreateScrapReasonRawAsync(string code, params int[] segmentIds)
+        => PostAsync<ScrapReasonModel>("/api/scrap-reasons",
+            new CreateScrapReasonRequest { Code = code, Name = $"Motivo {code}", ProcessSegmentIds = segmentIds.ToList() });
+
+    public async Task<ScrapReasonModel> CreateScrapReasonAsync(string code, params int[] segmentIds)
+        => (await CreateScrapReasonRawAsync(code, segmentIds)).Ok;
+
+    public Task<ApiResult<WorkOrderDetailModel>> StopWithScrapAsync(int workOrderId, decimal good, decimal scrap, params ScrapEntryRequest[] entries)
+        => PostAsync<WorkOrderDetailModel>($"/api/work-orders/{workOrderId}/stop",
+            new CloseSessionRequest { GoodQuantity = good, ScrapQuantity = scrap, ScrapEntries = entries.ToList() });
+
+    public Task<ApiResult<WorkOrderDetailModel>> CorrectAsync(int workOrderId, int sessionId, decimal good, decimal scrap, string notes, params ScrapEntryRequest[] entries)
+        => PostAsync<WorkOrderDetailModel>($"/api/work-orders/{workOrderId}/responses/{sessionId}/corrections",
+            new CorrectSessionRequest { GoodQuantity = good, ScrapQuantity = scrap, Notes = notes, ScrapEntries = entries.ToList() });
+
+    public Task<ApiResult<ScrapReportModel>> GetScrapReportAsync(string query = "")
+        => GetAsync<ScrapReportModel>("/api/scrap/report" + query);
 }

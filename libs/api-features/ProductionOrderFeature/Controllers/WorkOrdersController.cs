@@ -64,6 +64,15 @@ public class WorkOrdersController(WorkOrderService service) : ControllerBase
     public async Task<IActionResult> AbortWorkOrder(int id, [FromBody] AbortRequest? request)
         => ToResponse(await service.AbortAsync(id, request?.Notes));
 
+    /// <summary>Corrects a closed session (new values, mandatory note). 409 when the order is Completed/Cancelled or the session is open.</summary>
+    [HttpPost("{id:int}/responses/{responseId:int}/corrections", Name = "CorrectWorkOrderSession")]
+    [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> CorrectWorkOrderSession(int id, int responseId, [FromBody] CorrectSessionRequest request)
+        => ToResponse(await service.CorrectSessionAsync(id, responseId, request));
+
     private IActionResult ToResponse<T>(ProductionOrderResult<T> result)
     {
         if (result.IsSuccessful) return Ok(result.Data);

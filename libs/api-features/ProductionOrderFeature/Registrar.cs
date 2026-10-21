@@ -18,6 +18,8 @@ public static class Registrar
         services.AddRepository<IWorkOrderDependencyRepository, WorkOrderDependencyRepository>();
         services.AddRepository<IWorkOrderMaterialRepository, WorkOrderMaterialRepository>();
         services.AddRepository<IWorkOrderResponseRepository, WorkOrderResponseRepository>();
+        services.AddRepository<IWorkOrderResponseScrapRepository, WorkOrderResponseScrapRepository>();
+        services.AddRepository<IWorkOrderResponseCorrectionRepository, WorkOrderResponseCorrectionRepository>();
         // IUnitOfWork is shared with RoutingFeature: register it only if nobody did yet.
         if (!services.Any(d => d.ServiceType == typeof(IUnitOfWork)))
             services.AddUnitOfWork<AppDbContext>();
@@ -27,6 +29,7 @@ public static class Registrar
         services.AddScoped<ProductionOrderDevelopmentSeeder>();
         services.AddScoped<ProductionDataLoader>();
         services.AddScoped<ProductionOrderStatusUpdater>();
+        services.AddScoped<ScrapEntryResolver>();
         services.AddScoped<WorkOrderService>();
         services.AddScoped<ProductionOrderService>();
         services.AddScoped<ProductionOrderOverviewService>();

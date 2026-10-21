@@ -25,6 +25,7 @@ import type {
 import type {
   AbortRequest,
   CloseSessionRequest,
+  CorrectSessionRequest,
   GetWorkOrdersParams,
   WorkOrderDetailModel,
   WorkOrderModel
@@ -389,6 +390,47 @@ export class WorkOrdersService {
     return this.http.post<TData>(
       `/api/work-orders/${id}/abort`,
       nullAbortRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+      }
+    );
+  }
+ correctWorkOrderSession<TData = WorkOrderDetailModel>(id: number,
+    responseId: number,
+    correctSessionRequest: CorrectSessionRequest, options?: HttpClientBodyOptions): Observable<TData>;
+ correctWorkOrderSession<TData = WorkOrderDetailModel>(id: number,
+    responseId: number,
+    correctSessionRequest: CorrectSessionRequest, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ correctWorkOrderSession<TData = WorkOrderDetailModel>(id: number,
+    responseId: number,
+    correctSessionRequest: CorrectSessionRequest, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  correctWorkOrderSession<TData = WorkOrderDetailModel>(
+    id: number,
+    responseId: number,
+    correctSessionRequest: CorrectSessionRequest, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    if (options?.observe === 'events') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/responses/${responseId}/corrections`,
+      correctSessionRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+      }
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/responses/${responseId}/corrections`,
+      correctSessionRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+      }
+    );
+    }
+
+    return this.http.post<TData>(
+      `/api/work-orders/${id}/responses/${responseId}/corrections`,
+      correctSessionRequest,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'body',
       }

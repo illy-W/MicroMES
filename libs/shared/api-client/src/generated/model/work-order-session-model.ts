@@ -4,6 +4,8 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { WorkOrderCorrectionModel } from './work-order-correction-model';
+import type { WorkOrderScrapEntryModel } from './work-order-scrap-entry-model';
 
 export interface WorkOrderSessionModel {
   id: number;
@@ -16,4 +18,7 @@ export interface WorkOrderSessionModel {
   notes?: string | null;
   /** @nullable */
   minutes?: number | null;
+  scrapEntries: WorkOrderScrapEntryModel[];
+  isCorrected: boolean;
+  corrections: WorkOrderCorrectionModel[];
 }

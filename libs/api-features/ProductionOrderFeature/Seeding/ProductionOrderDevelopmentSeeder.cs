@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using MicroMES.ApiFeatures.MaterialFeature.Repositories;
+using MicroMES.ApiFeatures.ScrapFeature.Repositories;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Services;
 using MicroMES.ApiCore.Persistence.Entities;
@@ -49,12 +50,12 @@ public class ProductionOrderDevelopmentSeeder(
             clock.Set(d.AddHours(7).AddMinutes(30));
             await ReleaseAsync(done.Id);
             var t = d.AddHours(8);
-            t = await RunAsync(done.Id, "PF-SED-01", 10, t, [new S(24, 4, 0)]);
-            t = await RunAsync(done.Id, "PF-SED-01", 20, t, [new S(46, 4, 1, "Una piastra tagliata fuori squadra, rifatta")]);
-            t = await RunAsync(done.Id, "PF-SED-01", 30, t.AddMinutes(10), [new S(44, 0, 0, "Pausa pranzo"), new S(38, 4, 0)]);
+            t = await RunAsync(done.Id, "PF-SED-01", 10, t, [new S(24, 4, 2, null, [new E("MISURA", 1), new E("MAT-DIF", 1)])]);
+            t = await RunAsync(done.Id, "PF-SED-01", 20, t, [new S(46, 4, 1, "Una piastra tagliata fuori squadra, rifatta", [new E("FUORI-SQ", 1)])]);
+            t = await RunAsync(done.Id, "PF-SED-01", 30, t.AddMinutes(10), [new S(44, 0, 0, "Pausa pranzo"), new S(38, 4, 1, null, [new E("SAL-INC", 1)])]);
             t = await RunAsync(done.Id, "PF-SED-01", 40, t, [new S(18, 4, 0)]);
-            t = await RunAsync(done.Id, "PF-SED-01", 50, t.AddDays(1).Date.AddHours(8), [new S(58, 4, 0)]);
-            t = await RunAsync(done.Id, "PF-SED-01", 60, t, [new S(52, 4, 0)]);
+            t = await RunAsync(done.Id, "PF-SED-01", 50, t.AddDays(1).Date.AddHours(8), [new S(58, 4, 1, null, [new E("VER-DIF", 1)])]);
+            t = await RunAsync(done.Id, "PF-SED-01", 60, t, [new S(52, 4, 1)]);
             t = await RunAsync(done.Id, "PF-SED-01", 70, t, [new S(14, 4, 0)]);
             await RunAsync(done.Id, "PF-SED-01", 80, t, [new S(17, 4, 0)]);
 
@@ -75,9 +76,9 @@ public class ProductionOrderDevelopmentSeeder(
             await ReleaseAsync(tav.Id);
             var day = today.AddDays(-5).AddHours(7).AddMinutes(30);
             // Frame (SL-TAV-STR): cutting 70 min with a pause, welding with lunch break, deburring.
-            var s = await RunAsync(tav.Id, "SL-TAV-STR", 10, day, [new S(35, 9, 0), new S(38, 11, 1, "Un taglio fuori misura")]);
-            s = await RunAsync(tav.Id, "SL-TAV-STR", 20, s.AddMinutes(15), [new S(150, 12, 0, "Pausa pranzo"), new S(112, 8, 0)]);
-            s = await RunAsync(tav.Id, "SL-TAV-STR", 30, today.AddDays(-4).AddHours(7).AddMinutes(30), [new S(68, 20, 0)]);
+            var s = await RunAsync(tav.Id, "SL-TAV-STR", 10, day, [new S(35, 9, 0), new S(38, 11, 1, "Un taglio fuori misura", [new E("MISURA", 1)])]);
+            s = await RunAsync(tav.Id, "SL-TAV-STR", 20, s.AddMinutes(15), [new S(150, 12, 0, "Pausa pranzo"), new S(112, 8, 1, null, [new E("SAL-INC", 1)])]);
+            s = await RunAsync(tav.Id, "SL-TAV-STR", 30, today.AddDays(-4).AddHours(7).AddMinutes(30), [new S(68, 20, 2, null, [new E("GRAFFIO", 2)])]);
             // Powder coating (op 40) is running now.
             clock.Set(now.AddMinutes(-95));
             var coating = await FindAsync(tav.Id, "SL-TAV-STR", 40);
@@ -89,7 +90,7 @@ public class ProductionOrderDevelopmentSeeder(
             var sed = await CreateAsync(sedia, 12, 5, d, today.AddDays(7), "Ordine ristorante, finitura nera");
             clock.Set(d.AddHours(8).AddMinutes(15));
             await ReleaseAsync(sed.Id);
-            await RunAsync(sed.Id, "PF-SED-01", 10, d.AddHours(9), [new S(55, 12, 0)]);
+            await RunAsync(sed.Id, "PF-SED-01", 10, d.AddHours(9), [new S(55, 12, 1, null, [new E("MAT-DIF", 1)])]);
             clock.Set(now.AddMinutes(-40));
             var chairCut = await FindAsync(sed.Id, "PF-SED-01", 20);
             Unwrap(await WorkOrders(w => w.StartAsync(chairCut)));
@@ -117,7 +118,7 @@ public class ProductionOrderDevelopmentSeeder(
             var aborted = await CreateAsync(sedia, 2, 1, d, today.AddDays(5), "Abortito: tubolare non conforme");
             clock.Set(d.AddHours(8).AddMinutes(10));
             await ReleaseAsync(aborted.Id);
-            await RunAsync(aborted.Id, "PF-SED-01", 10, d.AddHours(9), [new S(10, 1, 1, "Lotto di tubolare fuori tolleranza")]);
+            await RunAsync(aborted.Id, "PF-SED-01", 10, d.AddHours(9), [new S(10, 1, 1, "Lotto di tubolare fuori tolleranza", [new E("MAT-DIF", 1)])]);
             clock.Set(d.AddHours(11));
             Unwrap(await Orders(o => o.AbortAsync(aborted.Id, "Materiale non conforme")));
 
@@ -128,13 +129,26 @@ public class ProductionOrderDevelopmentSeeder(
             var shelves = await CreateAsync(libreria, 6, 2, d, today.AddDays(8), "Librerie per ufficio: le fiancate servono solo al montaggio");
             clock.Set(d.AddHours(13).AddMinutes(10));
             await ReleaseAsync(shelves.Id);
-            await RunAsync(shelves.Id, "PF-LIB-01", 10, d.AddHours(14), [new S(44, 6, 0)]);
-            await RunAsync(shelves.Id, "SL-LIB-FIA", 10, d.AddHours(15), [new S(30, 6, 0)]);
+            await RunAsync(shelves.Id, "PF-LIB-01", 10, d.AddHours(14), [new S(44, 6, 1, null, [new E("MISURA", 1)])]);
+            await RunAsync(shelves.Id, "SL-LIB-FIA", 10, d.AddHours(15), [new S(30, 6, 1, null, [new E("GRAFFIO", 1)])]);
             clock.Set(now.AddMinutes(-25));
             var shelfFinish = await FindAsync(shelves.Id, "PF-LIB-01", 20);
             Unwrap(await WorkOrders(w => w.StartAsync(shelfFinish)));
             var panelWeld = await FindAsync(shelves.Id, "SL-LIB-FIA", 20);
             Unwrap(await WorkOrders(w => w.StartAsync(panelWeld)));
+
+            // Example correction on an open order: the shelf milling count was redone at the end of the shift.
+            clock.Set(now.AddMinutes(-10));
+            var shelfMilling = await FindAsync(shelves.Id, "PF-LIB-01", 10);
+            var millingSession = Unwrap(await WorkOrders(w => w.GetAsync(shelfMilling))).Sessions.Single();
+            var misura = await ReasonIdAsync("MISURA");
+            var graffio = await ReasonIdAsync("GRAFFIO");
+            Unwrap(await WorkOrders(w => w.CorrectSessionAsync(shelfMilling, millingSession.Id, new CorrectSessionRequest
+            {
+                GoodQuantity = 5, ScrapQuantity = 2, Notes = "Riconteggio a fine turno: un ripiano graffiato non era stato registrato",
+                ScrapEntries = [new ScrapEntryRequest { ScrapReasonId = misura, Quantity = 1 },
+                                new ScrapEntryRequest { ScrapReasonId = graffio, Quantity = 1 }]
+            })));
         }
         finally
         {
@@ -142,7 +156,10 @@ public class ProductionOrderDevelopmentSeeder(
         }
     }
 
-    private sealed record S(int Min, decimal Good, decimal Scrap, string? Notes = null);
+    /// <summary>Session to close: minutes, good, scrap, notes and scrap split by reason code (none = "no reason").</summary>
+    private sealed record S(int Min, decimal Good, decimal Scrap, string? Notes = null, E[]? Entries = null);
+
+    private sealed record E(string ReasonCode, decimal Quantity);
 
     // ---- helpers ------------------------------------------------------------------------------------
 
@@ -165,6 +182,12 @@ public class ProductionOrderDevelopmentSeeder(
             {
                 GoodQuantity = sessions[i].Good, ScrapQuantity = sessions[i].Scrap, Notes = sessions[i].Notes
             };
+            if (sessions[i].Entries is { } entries)
+            {
+                close.ScrapEntries = [];
+                foreach (var e in entries)
+                    close.ScrapEntries.Add(new ScrapEntryRequest { ScrapReasonId = await ReasonIdAsync(e.ReasonCode), Quantity = e.Quantity });
+            }
             Unwrap(i == sessions.Length - 1
                 ? await WorkOrders(w => w.StopAsync(id, close))
                 : await WorkOrders(w => w.PauseAsync(id, close)));
@@ -206,6 +229,14 @@ public class ProductionOrderDevelopmentSeeder(
         })));
 
     private async Task ReleaseAsync(int id) => Unwrap(await Orders(o => o.ReleaseAsync(id)));
+
+    private async Task<int> ReasonIdAsync(string code)
+    {
+        using var scope = scopes.CreateScope();
+        var reasons = scope.ServiceProvider.GetRequiredService<IScrapReasonRepository>();
+        await foreach (var r in reasons.FetchAsync(x => x.Code == code)) return r.Id;
+        throw new InvalidOperationException($"Motivo di scarto {code} non trovato: eseguire prima il seeder dei dati anagrafici.");
+    }
 
     private async Task<int> MaterialIdAsync(string code)
     {

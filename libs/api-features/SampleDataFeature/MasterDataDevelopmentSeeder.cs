@@ -5,6 +5,7 @@ using MicroMES.ApiFeatures.BomFeature.Repositories;
 using MicroMES.ApiFeatures.MaterialFeature.Repositories;
 using MicroMES.ApiFeatures.ProcessSegmentFeature.Repositories;
 using MicroMES.ApiFeatures.RoutingFeature.Repositories;
+using MicroMES.ApiFeatures.ScrapFeature.Repositories;
 
 namespace MicroMES.ApiFeatures.SampleDataFeature;
 
@@ -113,6 +114,31 @@ public class MasterDataDevelopmentSeeder(IUnitOfWork unitOfWork)
 
         var segments = new[] { tagTub, tagLam, sal, sba, verPolSeg, freLeg, lev, finLeg, ass, col, imbSeg };
         foreach (var segment in segments) await Save(segmentRepo.AddAsync(segment));
+
+        // ---- Scrap reasons ----------------------------------------------------------------------------
+        // No linked segment = valid for every segment.
+        var reasonRepo = unitOfWork.GetRepository<IScrapReasonRepository>();
+        var reasonLinkRepo = unitOfWork.GetRepository<IScrapReasonProcessSegmentRepository>();
+
+        async Task Reason(string code, string name, string? description, bool active, params ProcessSegment[] linked)
+        {
+            var reason = await Save(reasonRepo.AddAsync(new ScrapReason
+            {
+                Code = code, Name = name, Description = description, IsActive = active, CreatedAt = now, UpdatedAt = now
+            }));
+            foreach (var segment in linked)
+                await Save(reasonLinkRepo.AddAsync(new ScrapReasonProcessSegment { ScrapReasonId = reason.Id, ProcessSegmentId = segment.Id }));
+        }
+
+        await Reason("GRAFFIO", "Graffio", "Segni o graffi sulla superficie", true);
+        await Reason("MAT-DIF", "Materiale difettoso", "Difetto del materiale ricevuto", true);
+        await Reason("MISURA", "Misura errata", "Fuori tolleranza dimensionale", true, tagTub, tagLam, freLeg, ass);
+        await Reason("FUORI-SQ", "Taglio fuori squadra", null, true, tagTub, tagLam);
+        await Reason("SAL-INC", "Saldatura incompleta", "Cordone non completo o con porosità", true, sal);
+        await Reason("VER-DIF", "Verniciatura difettosa", "Colature, bolle o copertura insufficiente", true, verPolSeg, finLeg);
+        await Reason("ERR-MON", "Errore di montaggio", null, true, ass, col);
+        await Reason("DANN-IMB", "Danneggiato nell'imballo", null, true, imbSeg);
+        await Reason("ROT-UT", "Rottura utensile", "Non più usato: sostituito da «Misura errata»", false, freLeg);
 
         // ---- BOM -------------------------------------------------------------------------------------
         // The BOM rows are saved before the routings exist: the step links (operation numbers) are applied afterwards.

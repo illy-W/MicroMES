@@ -150,5 +150,3 @@ export class RoutingService {
   }
 };
 
-export type GetRoutingClientResult = NonNullable<RoutingModel>
-export type UpdateRoutingClientResult = NonNullable<RoutingModel>

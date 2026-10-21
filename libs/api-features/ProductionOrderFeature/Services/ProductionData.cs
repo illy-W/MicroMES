@@ -16,6 +16,8 @@ public class ProductionData(TimeProvider timeProvider)
     public List<WorkOrderDependency> Dependencies { get; } = [];
     public List<WorkOrderResponse> Sessions { get; } = [];
     public List<WorkOrderMaterial> Lines { get; } = [];
+    public List<WorkOrderResponseScrap> Scraps { get; } = [];
+    public List<WorkOrderResponseCorrection> Corrections { get; } = [];
     public Dictionary<int, Material> Materials { get; } = [];
 
     public TimeProvider TimeProvider => timeProvider;
@@ -150,6 +152,8 @@ public class ProductionData(TimeProvider timeProvider)
             WorkedMinutes = WorkedMinutes(wo.Id),
             GoodQuantity = sessions.Sum(s => s.GoodQuantity),
             ScrapQuantity = sessions.Sum(s => s.ScrapQuantity),
+            ShortfallQuantity = wo.Status == WorkOrderStatus.Ended
+                ? Math.Max(0m, wo.PlannedQuantity - sessions.Sum(s => s.GoodQuantity)) : 0m,
             Notes = wo.Notes,
             Status = wo.Status,
             StartedAt = wo.StartedAt,
@@ -177,7 +181,8 @@ public class ProductionData(TimeProvider timeProvider)
             ProcessSegmentId = m.ProcessSegmentId, ProcessSegmentCode = m.ProcessSegmentCode,
             ProcessSegmentName = m.ProcessSegmentName, SetupMinutes = m.SetupMinutes, RunMinutesPerUnit = m.RunMinutesPerUnit,
             PlannedQuantity = m.PlannedQuantity, PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes,
-            GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity, Notes = m.Notes, Status = m.Status,
+            GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity, ShortfallQuantity = m.ShortfallQuantity,
+            Notes = m.Notes, Status = m.Status,
             StartedAt = m.StartedAt, EndedAt = m.EndedAt, Predecessors = m.Predecessors, Successors = m.Successors,
             AllowedActions = m.AllowedActions,
             Sessions = SessionsOf(wo.Id).Select(s => new WorkOrderSessionModel
@@ -188,7 +193,22 @@ public class ProductionData(TimeProvider timeProvider)
                 GoodQuantity = s.GoodQuantity,
                 ScrapQuantity = s.ScrapQuantity,
                 Notes = s.Notes,
-                Minutes = s.EndedAt is null ? null : Minutes(s)
+                Minutes = s.EndedAt is null ? null : Minutes(s),
+                ScrapEntries = Scraps.Where(e => e.WorkOrderResponseId == s.Id).OrderBy(e => e.Id)
+                    .Select(e => new WorkOrderScrapEntryModel
+                    {
+                        Id = e.Id, ScrapReasonId = e.ScrapReasonId, ReasonCode = e.ReasonCode,
+                        ReasonName = e.ReasonName, Quantity = e.Quantity
+                    }).ToList(),
+                IsCorrected = Corrections.Any(c => c.WorkOrderResponseId == s.Id),
+                Corrections = Corrections.Where(c => c.WorkOrderResponseId == s.Id).OrderBy(c => c.CorrectedAt).ThenBy(c => c.Id)
+                    .Select(c => new WorkOrderCorrectionModel
+                    {
+                        Id = c.Id, CorrectedAt = c.CorrectedAt, Notes = c.Notes,
+                        PreviousGoodQuantity = c.PreviousGoodQuantity, PreviousScrapQuantity = c.PreviousScrapQuantity,
+                        PreviousScrapDetail = c.PreviousScrapDetail, NewGoodQuantity = c.NewGoodQuantity,
+                        NewScrapQuantity = c.NewScrapQuantity, NewScrapDetail = c.NewScrapDetail
+                    }).ToList()
             }).ToList(),
             Materials = Lines.Where(l => l.WorkOrderId == wo.Id).OrderBy(l => l.Id).Select(ToMaterialModel).ToList()
         };

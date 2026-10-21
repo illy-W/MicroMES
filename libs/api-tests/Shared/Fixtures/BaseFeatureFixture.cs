@@ -3,6 +3,8 @@ using MicroMES.ApiCore.Persistence.Entities;
 using MicroMES.ApiFeatures.BomFeature;
 using MicroMES.ApiFeatures.MaterialFeature;
 using MicroMES.ApiFeatures.ProcessSegmentFeature;
+using MicroMES.ApiFeatures.ProductionOrderFeature;
+using MicroMES.ApiFeatures.ScrapFeature;
 using MicroMES.ApiFeatures.RoutingFeature;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +36,8 @@ public abstract class BaseFeatureFixture : IDisposable
         services.AddBomFeature();
         services.AddProcessSegmentFeature();
         services.AddRoutingFeature();
+        services.AddScrapFeature();
+        services.AddProductionOrderFeature();
         _provider = services.BuildServiceProvider();
 
         using var scope = _provider.CreateScope();
@@ -112,6 +116,16 @@ public abstract class BaseFeatureFixture : IDisposable
             db.SaveChanges();
         }
         return step.Id;
+    }
+
+    /// <summary>Arranges data directly through the DbContext (fresh scope, saved at the end).</summary>
+    protected void Arrange(Action<AppDbContext> action)
+    {
+        DisposeScopes();
+        using var scope = _provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        action(db);
+        db.SaveChanges();
     }
 
     private void DisposeScopes()

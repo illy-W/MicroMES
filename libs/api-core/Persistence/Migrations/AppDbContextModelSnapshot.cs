@@ -318,6 +318,71 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("RoutingStepDependencies", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.ScrapReason", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("ScrapReasons", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.ScrapReasonProcessSegment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ProcessSegmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ScrapReasonId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessSegmentId");
+
+                    b.HasIndex("ScrapReasonId", "ProcessSegmentId")
+                        .IsUnique();
+
+                    b.ToTable("ScrapReasonProcessSegments", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrder", b =>
                 {
                     b.Property<int>("Id")
@@ -480,6 +545,91 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("WorkOrderResponses", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderResponseCorrection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CorrectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("NewGoodQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("NewScrapDetail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("NewScrapQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("PreviousGoodQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("PreviousScrapDetail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("PreviousScrapQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("WorkOrderResponseId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkOrderResponseId");
+
+                    b.ToTable("WorkOrderResponseCorrections", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderResponseScrap", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ReasonName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("ScrapReasonId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("WorkOrderResponseId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScrapReasonId");
+
+                    b.HasIndex("WorkOrderResponseId");
+
+                    b.ToTable("WorkOrderResponseScraps", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.BomItem", b =>
                 {
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
@@ -544,6 +694,21 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.ScrapReasonProcessSegment", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.ProcessSegment", null)
+                        .WithMany()
+                        .HasForeignKey("ProcessSegmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.ScrapReason", null)
+                        .WithMany()
+                        .HasForeignKey("ScrapReasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrder", b =>
                 {
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.ProcessSegment", null)
@@ -599,6 +764,29 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrder", null)
                         .WithMany()
                         .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderResponseCorrection", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrderResponse", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderResponseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderResponseScrap", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.ScrapReason", null)
+                        .WithMany()
+                        .HasForeignKey("ScrapReasonId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrderResponse", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderResponseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
