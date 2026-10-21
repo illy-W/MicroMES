@@ -49,6 +49,7 @@ Node: usa la versione di `.nvmrc`.
 - Vocabolario di dominio: riferimento ISA-95 in forma ridotta, vedi `doc/glossary.md`. Pattern backend: `doc/structure.md` (sezione "Backend patterns").
 - Backend: mai `DbContext` nel codice di prodotto (solo repository o `IUnitOfWork`; con la UoW i repository si ottengono da `uow.GetRepository<>()`; interfacce repository vuote; seeder/codice con repository in ApiFeatures o Api, non in ApiCore).
 - Dipendenze con `pnpm add -w` / `pnpm install`; comandi Nx con `npx nx`.
+- Skill ngDiagram (`ng-diagram-*`) disponibili in `.agents/skills`: il frontend le consulta per ogni lavoro sui diagrammi.
 - Non fare commit né push senza richiesta esplicita.
 
 ## Spec-Driven Development

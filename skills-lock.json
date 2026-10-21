@@ -7,6 +7,97 @@
       "skillPath": "angular-developer/SKILL.md",
       "computedHash": "cef5f1739f4a7158f20230f7e5a03c9b4b150b77174f22938512dcc49e270b91"
     },
+    "ng-diagram-auto-layout": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-auto-layout/SKILL.md",
+      "computedHash": "1262e9005a9ddb0444130e7a0986c62fc084f504afb3e668c323a095981d3b55"
+    },
+    "ng-diagram-custom-nodes": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-custom-nodes/SKILL.md",
+      "computedHash": "e3b28679c7dbdd4440a4adec4c5ec0ab0f655d6b765f722515cd02b8a1bff5d8"
+    },
+    "ng-diagram-edge-routing": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-edge-routing/SKILL.md",
+      "computedHash": "fd5326322274ac70a2945a378cac36d1b3df1d9ea5d600973d795a72fb511482"
+    },
+    "ng-diagram-fundamentals": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-fundamentals/SKILL.md",
+      "computedHash": "90a3788c14bcb301b972365f0ebcbd6c1b1f2e3fbb6a2bcf2ef027e09a3027db"
+    },
+    "ng-diagram-groups": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-groups/SKILL.md",
+      "computedHash": "a69709da893f54e344f1bb51781ad3fe851fb464edc9bc3bca956526146107e5"
+    },
+    "ng-diagram-middleware": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-middleware/SKILL.md",
+      "computedHash": "71d6de3c36fd89a372c98c25e6b0100c58d653f671f1d98a8e8435e972eb061b"
+    },
+    "ng-diagram-minimap": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-minimap/SKILL.md",
+      "computedHash": "6c46518eb68ebfc421f41f57564fffbf008ee9a3471e524679e989ecb8fa2524"
+    },
+    "ng-diagram-model-init": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-model-init/SKILL.md",
+      "computedHash": "5570eb0dd492d7e14dbccfb2c21c379a8037368d5fc65eb591d83fa491be8985"
+    },
+    "ng-diagram-state-updates": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-state-updates/SKILL.md",
+      "computedHash": "5c5b3ad99c233b237f251a9a2cc3d2b2d88c99cccc45e4bbfe7444a6db221352"
+    },
+    "ng-diagram-styling": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-styling/SKILL.md",
+      "computedHash": "7b6102a9da6898598a606d7144f95434aa5e3a59c1a36218030b8af740a7edc5"
+    },
+    "ng-diagram-troubleshooting": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-troubleshooting/SKILL.md",
+      "computedHash": "27a37f033b278914b28e5a3b65a13fbfb8f09c2c006f732bbb62b2a69534d5c5"
+    },
+    "ng-diagram-viewport": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-viewport/SKILL.md",
+      "computedHash": "133550eb8f403ab6c0b21d1ea9e0af73a0b1c6a017fa5657a6a194014a7fd88b"
+    },
+    "ng-diagram-visibility": {
+      "source": "synergycodes/ng-diagram",
+      "ref": "release",
+      "sourceType": "github",
+      "skillPath": "skills/ng-diagram-visibility/SKILL.md",
+      "computedHash": "c30eaf936bcc39cd9598c04cf5410dbc2ebf0a70377c78a304e6de0cb82c001a"
+    },
     "nx-generate": {
       "source": "nrwl/nx-ai-agents-config",
       "sourceType": "github",

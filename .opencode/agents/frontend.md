@@ -36,6 +36,7 @@ Reply in the language of the user's request.
 - New pages go under a layout (`core/layouts/{full,blank}`) as children of its parent route in `app.routes.ts`; menu items go in `core/layouts/full/sidebar-data.ts`. See "Layouts" in `doc/structure.md`.
 - A Tailwind app needs its own `.postcssrc.json` (`apps/web/.postcssrc.json`).
 - Skills: `angular-developer`, `spartan`, `impeccable`, `nx-workspace`, `nx-generate`, `nx-run-tasks`.
+- Diagram work (ng-diagram): load the relevant `ng-diagram-*` skill and confirm API names in `node_modules/ng-diagram/ng-diagram.d.ts` before writing code.
 
 ## Verification
 - `npx nx build web` and `npx nx lint web`.
