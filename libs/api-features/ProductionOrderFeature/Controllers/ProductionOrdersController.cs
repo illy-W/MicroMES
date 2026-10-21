@@ -30,6 +30,7 @@ public class ProductionOrdersController(ProductionOrderService service) : Contro
     [HttpPost(Name = "CreateProductionOrder")]
     [ProducesResponseType<ProductionOrderDetailModel>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> CreateProductionOrder([FromBody] CreateProductionOrderRequest request)
         => ToResponse(await service.CreateAsync(request),

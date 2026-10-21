@@ -76,6 +76,13 @@ See `AGENTS.md` for the project table and dependency direction.
 - Frontend: `features/production-orders` (list, detail with children tree) and `features/work-orders` (operational list and commands). Pages show only the actions in `allowedActions`.
 - Sample data: `ProductionOrderDevelopmentSeeder` (Development only, empty `ProductionOrders` table, uses the services). To recreate: stop the dev server, truncate the order tables (`ProductionOrders` with `restart identity cascade`) or reset the DB (see "Local sample data") and restart the API.
 
+### Constraint violations (409)
+
+- PostgreSQL unique (23505) and foreign-key (23503) violations never surface as 500. illyW's `GenericRepository` swallows the `SaveChanges` exception into a failed `Result`, so a `SaveChangesInterceptor` records the violation in a per-request `ConstraintViolationTracker`; a global result filter turns a 500 with a recorded violation into a 409 `ProblemDetails` (Italian message from the constraint-name map in `ConstraintViolation.Message`; the constraint name only goes to the logs). An `IExceptionHandler` is the safety net for violations that escape as exceptions.
+- Service-level checks (explicit 409 before saving) stay; the mechanism is for races and inconsistent data. New unique indexes need an entry in the message map.
+- Top-level order codes retry up to 5 times on collision; a child order code collision at release is a 409 (rollback complete).
+- `IProductionOrderRepository.DiscardPendingChanges()` is the one deliberate exception to "repositories add no methods" (needed to retry after a failed save).
+
 ### Backend tests
 
 - `libs/api-tests` (`ApiTests`, xUnit + FluentAssertions 7 + NSubstitute): fast unit tests (~1 s). Pure logic (Stateless machines, `ProductionOrderPlanner`) and services on in-memory SQLite (`BaseFeatureFixture`, foreign keys on). Folders per feature, files named `<Subject>Fixture.cs`, test names `Subject_Scenario_Expected`.

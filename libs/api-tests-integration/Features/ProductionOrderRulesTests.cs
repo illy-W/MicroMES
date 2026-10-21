@@ -1,6 +1,7 @@
 using System.Net;
 using FluentAssertions;
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 using MicroMES.ApiTests.Integration.Shared;
 using Microsoft.EntityFrameworkCore;
 
@@ -100,7 +101,7 @@ public class ProductionOrderRulesTests(ApiFixture fixture) : IntegrationTest(fix
     }
 
     [Fact]
-    public async Task Release_FailureAfterSomeRowsWereWritten_Failure_TransactionRollsEverythingBack()
+    public async Task Release_ChildCodeAlreadyTaken_Failure_409AndTransactionRollsEverythingBack()
     {
         var product = await ProductWithChildAsync();
         var order = await Api.CreateOrderAsync(product, 1);
@@ -119,13 +120,30 @@ public class ProductionOrderRulesTests(ApiFixture fixture) : IntegrationTest(fix
 
         var release = await Api.ReleaseAsync(order.Id);
 
-        release.Status.Should().Be(HttpStatusCode.InternalServerError);
-        release.Raw.Should().Contain("Impossibile rilasciare");
+        release.Status.Should().Be(HttpStatusCode.Conflict);
+        release.Raw.Should().Contain("Esiste già un ordine di produzione con questo codice")
+            .And.NotContain("IX_", "the constraint name stays in the logs");
         (await Api.GetOrderAsync(order.Id)).Ok.Status.Should().Be(ProductionOrderStatus.Planned);
         (await Api.GetWorkOrdersAsync()).Ok.Should().BeEmpty("the work orders inserted before the failure were rolled back");
         (await Api.GetOrdersAsync()).Ok.Should().HaveCount(2, "root and sabotage only: no child order survived");
         var leftovers = await Fixture.WithDbAsync(async db =>
             await db.WorkOrderDependencies.CountAsync() + await db.WorkOrderMaterials.CountAsync());
         leftovers.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Create_ParallelRequests_Success_RetryGivesDistinctCodesOrCleanConflicts()
+    {
+        var product = await ProductWithChildAsync();
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 6)
+            .Select(_ => Api.PostAsync<ProductionOrderDetailModel>("/api/production-orders",
+                new { materialId = product, quantity = 1 })));
+
+        results.Should().OnlyContain(r => r.Status == HttpStatusCode.Created || r.Status == HttpStatusCode.Conflict,
+            "a lost race on the order code is retried or answered 409, never 500");
+        var codes = results.Where(r => r.IsSuccess).Select(r => r.Body!.Code).ToList();
+        codes.Should().OnlyHaveUniqueItems().And.NotBeEmpty();
+        (await Api.GetOrdersAsync()).Ok.Should().HaveCount(codes.Count);
     }
 }

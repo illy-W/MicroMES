@@ -27,6 +27,7 @@ public class ProductionOrderService(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
+    private const int MaxCodeAttempts = 5;
     private const string NotFoundMessage = "Ordine di produzione non trovato.";
 
     // ---- queries ------------------------------------------------------------------------------------
@@ -74,31 +75,50 @@ public class ProductionOrderService(
         if (start is not null && end is not null && end < start)
             return ProductionOrderResult<ProductionOrderDetailModel>.Invalid("La fine richiesta non può precedere l'inizio richiesto.");
 
-        ProductionOrder order;
-        try
+        // The code is max+1: two concurrent creations can pick the same one and the unique index rejects the
+        // loser. A fresh attempt re-reads the max (now including the winner), so retry a bounded number of times.
+        ProductionOrder? order = null;
+        string? lastError = null;
+        var codeTaken = false;
+        for (var attempt = 1; attempt <= MaxCodeAttempts && order is null; attempt++)
         {
-            unitOfWork.BeginTransaction();
-            var now = Now();
-            order = Persist.Ensure(await orders.AddAsync(new ProductionOrder
+            string? code = null;
+            try
             {
-                Code = await NextCodeAsync(),
-                MaterialId = material.Id,
-                Quantity = request.Quantity!.Value,
-                Status = ProductionOrderStatus.Planned,
-                Priority = request.Priority,
-                RequestedStart = start,
-                RequestedEnd = end,
-                Notes = request.Notes,
-                CreatedAt = now,
-                UpdatedAt = now
-            }), "Impossibile creare l'ordine di produzione.");
-            unitOfWork.Commit();
+                unitOfWork.BeginTransaction();
+                var now = Now();
+                code = await NextCodeAsync();
+                order = Persist.Ensure(await orders.AddAsync(new ProductionOrder
+                {
+                    Code = code,
+                    MaterialId = material.Id,
+                    Quantity = request.Quantity!.Value,
+                    Status = ProductionOrderStatus.Planned,
+                    Priority = request.Priority,
+                    RequestedStart = start,
+                    RequestedEnd = end,
+                    Notes = request.Notes,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                }), "Impossibile creare l'ordine di produzione.");
+                unitOfWork.Commit();
+            }
+            catch (Exception ex)
+            {
+                order = null;
+                try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
+                orders.DiscardPendingChanges();
+                lastError = ex.Message;
+                // Retry only when the attempted code was taken meanwhile; any other failure is final.
+                codeTaken = code is not null && await CodeExistsAsync(code);
+                if (!codeTaken) break;
+            }
         }
-        catch (Exception ex)
-        {
-            try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
-            return ProductionOrderResult<ProductionOrderDetailModel>.Failed(ProductionOrderFailure.None, ex.Message);
-        }
+
+        if (order is null)
+            return codeTaken
+                ? ProductionOrderResult<ProductionOrderDetailModel>.Conflict("Impossibile assegnare un codice univoco all'ordine: riprovare.")
+                : ProductionOrderResult<ProductionOrderDetailModel>.Failed(ProductionOrderFailure.None, lastError ?? "Impossibile creare l'ordine di produzione.");
 
         return await GetAsync(order.Id);
     }
@@ -406,6 +426,12 @@ public class ProductionOrderService(
             if (match.Success && int.TryParse(match.Groups[1].Value, out var n) && n > max) max = n;
         }
         return $"{prefix}{max + 1:D4}";
+    }
+
+    private async Task<bool> CodeExistsAsync(string code)
+    {
+        await foreach (var _ in orders.FetchAsync(x => x.Code == code)) return true;
+        return false;
     }
 
     private DateTime Now() => timeProvider.GetUtcNow().UtcDateTime;

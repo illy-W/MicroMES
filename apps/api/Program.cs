@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
+using MicroMES.Api;
 using MicroMES.ApiCore.Persistence;
+using MicroMES.ApiCore.Persistence.Violations;
 using MicroMES.ApiFeatures.BomFeature;
 using MicroMES.ApiFeatures.MaterialFeature;
 using MicroMES.ApiFeatures.ProcessSegmentFeature;
@@ -23,7 +25,7 @@ var isOpenApiEnabled = string.Equals(
 // Add services to the container.
 
 builder.Services
-    .AddControllers()
+    .AddControllers(o => o.Filters.Add<ConstraintViolationResultFilter>())
     .AddJsonOptions(o =>
     {
         o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -55,9 +57,15 @@ builder.Services.AddOpenApi();
 
 // The connection string is only needed at runtime: the lazy provider config lets the OpenAPI
 // document generation start without a database.
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddConstraintViolationTracking();
+builder.Services.AddDbContext<AppDbContext>((sp, options) =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")
-        ?? "Host=localhost;Database=micromes"));
+            ?? "Host=localhost;Database=micromes")
+        .UseConstraintViolationTracking(sp));
+
+// Unique/foreign-key violations that escape as exceptions answer 409 (see ConstraintViolationHandling).
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ConstraintViolationExceptionHandler>();
 
 builder.Services.AddMaterialFeature();
 builder.Services.AddBomFeature();
@@ -78,6 +86,28 @@ if (app.Environment.IsDevelopment() && !isOpenApiEnabled)
 }
 
 // Configure the HTTP request pipeline.
+
+// Outside Development the exception handler middleware answers ProblemDetails (violations -> 409).
+// In Development it is not installed so the developer exception page keeps showing every other exception;
+// the same handler still maps violations to 409 through a thin middleware.
+if (app.Environment.IsDevelopment())
+{
+    app.Use(async (context, next) =>
+    {
+        try { await next(); }
+        catch (Exception ex) when (!context.Response.HasStarted && ConstraintViolation.From(ex) is not null)
+        {
+            context.Response.Clear();
+            var handler = context.RequestServices.GetServices<Microsoft.AspNetCore.Diagnostics.IExceptionHandler>()
+                .OfType<ConstraintViolationExceptionHandler>().First();
+            await handler.TryHandleAsync(context, ex, context.RequestAborted);
+        }
+    });
+}
+else
+{
+    app.UseExceptionHandler();
+}
 
 if (app.Environment.IsDevelopment() || isOpenApiEnabled)
 {

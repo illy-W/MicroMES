@@ -62,7 +62,8 @@ public class MaterialApiTests(ApiFixture fixture) : IntegrationTest(fixture)
         var results = await Task.WhenAll(calls);
 
         results.Count(r => r.Status == HttpStatusCode.Created).Should().Be(1);
-        results.Where(r => r.Status != HttpStatusCode.Created).Should().OnlyContain(r => !r.IsSuccess);
+        results.Where(r => r.Status != HttpStatusCode.Created).Should().OnlyContain(r => r.Status == HttpStatusCode.Conflict,
+            "a lost race is a clean 409, never a 500");
         var rows = await Fixture.WithDbAsync(db => db.Materials.CountAsync(m => m.Code == "RACE"));
         rows.Should().Be(1, "the unique index is the last line of defence against the check-then-insert race");
     }
