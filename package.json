@@ -38,7 +38,8 @@
     "prettier-plugin-tailwindcss": "0.8.1",
     "tslib": "^2.3.0",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.58.0"
+    "typescript-eslint": "^8.58.0",
+    "vitest": "4.1.12"
   },
   "dependencies": {
     "@angular/cdk": "22.2.0",

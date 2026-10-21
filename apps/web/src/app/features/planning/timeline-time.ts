@@ -86,3 +86,15 @@ export function formatMonthTitle(ms: number, tz: string): string {
 export function hourLabel(ms: number, tz: string): string {
   return String(hms(ms, tz).h).padStart(2, '0');
 }
+
+/** Durata leggibile: `45 min`, `1 h 30 min`, `2 g 3 h`. */
+export function formatDuration(ms: number): string {
+  const min = Math.max(0, Math.round(ms / 60_000));
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h < 24) return m ? `${h} h ${m} min` : `${h} h`;
+  const d = Math.floor(h / 24);
+  const rh = h % 24;
+  return rh ? `${d} g ${rh} h` : `${d} g`;
+}

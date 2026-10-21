@@ -14,6 +14,12 @@ export class PlanningStore {
   readonly warningCount = signal(0);
   readonly loading = signal(false);
   readonly loadError = signal<string | null>(null);
+  /** Richiesta di mostrare un lavoro nella timeline (`n` cambia a ogni richiesta). */
+  readonly focusRequest = signal<{ workOrderId: number | null; productionOrderId: number | null; n: number } | null>(null);
+
+  showInPlan(workOrderId: number | null | undefined, productionOrderId?: number | null): void {
+    this.focusRequest.set({ workOrderId: workOrderId ?? null, productionOrderId: productionOrderId ?? null, n: (this.focusRequest()?.n ?? 0) + 1 });
+  }
 
   async loadAlerts(): Promise<void> {
     this.loading.set(true);

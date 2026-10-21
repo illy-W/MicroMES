@@ -37,6 +37,15 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Identità ordini (timeline): 8 tonalità distinguibili, leggibili su bianco. Testo sempre su tinta chiara con --foreground. */
+  --chart-1: oklch(0.55 0.19 255);
+  --chart-2: oklch(0.66 0.17 55);
+  --chart-3: oklch(0.58 0.15 150);
+  --chart-4: oklch(0.56 0.2 330);
+  --chart-5: oklch(0.6 0.12 205);
+  --chart-6: oklch(0.52 0.2 290);
+  --chart-7: oklch(0.72 0.15 95);
+  --chart-8: oklch(0.6 0.17 355);
 }
 
 :root.dark {
@@ -68,6 +77,25 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.68 0.17 255);
+  --chart-2: oklch(0.76 0.15 55);
+  --chart-3: oklch(0.72 0.15 150);
+  --chart-4: oklch(0.7 0.18 330);
+  --chart-5: oklch(0.74 0.11 205);
+  --chart-6: oklch(0.68 0.17 290);
+  --chart-7: oklch(0.82 0.14 95);
+  --chart-8: oklch(0.72 0.16 355);
+}
+
+@theme inline {
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
 }
 
 @layer base {
@@ -147,4 +175,34 @@ table {
   --ngd-edge-handle-stroke-drag: var(--primary);
   --ngd-minimap-bg-primary-default: var(--card);
   --ngd-minimap-stroke-primary-default: var(--border);
+}
+
+/* Timeline: striscia diagonale sulle fasi in esecuzione (statica con prefers-reduced-motion). */
+.tl-running::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--foreground) 7%, transparent) 25%,
+    transparent 25%,
+    transparent 50%,
+    color-mix(in oklch, var(--foreground) 7%, transparent) 50%,
+    color-mix(in oklch, var(--foreground) 7%, transparent) 75%,
+    transparent 75%
+  );
+  background-size: 20px 20px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tl-running::after {
+    animation: tl-stripes 1.4s linear infinite;
+  }
+}
+
+@keyframes tl-stripes {
+  to {
+    background-position: 20px 0;
+  }
 }

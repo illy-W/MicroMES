@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideX } from '@ng-icons/lucide';
-import type { TimelineWorkOrderModel, WorkOrderDetailModel } from '@micromes/api-client/models';
+import type { TimelineWorkOrderModel, WorkOrderDetailModel, WorkOrderStatus } from '@micromes/api-client/models';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
@@ -13,23 +14,59 @@ import { WorkOrdersStore } from '../work-orders/work-orders.store';
 import { PlanningStore } from './planning.store';
 import { formatDateTime } from './timeline-time';
 
+/** Collegamento di dipendenza mostrato nel pannello. */
+export interface DepLink {
+  id: number;
+  code: string;
+  status: WorkOrderStatus | null;
+  /** Nome della fase (se noto). */
+  phase: string | null;
+  /** Inizio/fine del lavoro collegato (effettivi se in corso o terminato, altrimenti pianificati). */
+  startMs: number | null;
+  endMs: number | null;
+  /** Quando finisce chi precede (predecessore: la sua fine; successore: la fine di questo lavoro). */
+  fromMs: number | null;
+  /** Quando inizia chi segue (predecessore: l'inizio di questo lavoro; successore: il suo inizio). */
+  toMs: number | null;
+  /** Minuti di sovrapposizione se chi segue inizia prima della fine di chi precede. */
+  conflictMin: number | null;
+}
+export interface DepLinks {
+  preds: DepLink[];
+  succs: DepLink[];
+  up: number;
+  down: number;
+}
+
+/** Intervallo di un lavoro: effettivo se in corso o terminato, altrimenti pianificato. */
+function rangeOf(status: WorkOrderStatus, ps?: string | null, pe?: string | null, as?: string | null, ae?: string | null): { s: number; e: number } | null {
+  const running = status === 'Running' || status === 'Ended';
+  const s0 = (running && as) || ps;
+  if (!s0) return null;
+  const s = new Date(s0).getTime();
+  const e0 = (status === 'Ended' && ae) || pe || ae;
+  const e = e0 ? new Date(e0).getTime() : s + 30 * 60_000;
+  return { s, e: Math.max(e, s + 60_000) };
+}
+
 const PLAN_LABEL: Record<string, string> = { Unplanned: 'Non pianificato', Planned: 'Pianificato', Late: 'In ritardo', Stale: 'Piano obsoleto' };
 const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
 
 /** Pannello laterale con il dettaglio di un lavoro selezionato in timeline. */
 @Component({
   selector: 'app-planning-work-panel',
-  imports: [HlmBadge, HlmButton, HlmSkeleton, NgIcon, RouterLink, WorkOrderMachineDialogComponent],
+  imports: [HlmBadge, HlmButton, HlmSkeleton, NgIcon, NgTemplateOutlet, RouterLink, WorkOrderMachineDialogComponent],
   providers: [provideIcons({ lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideX })],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
   template: `
-    <aside class="flex flex-col gap-3 rounded-md border p-3 text-sm" aria-labelledby="wo-panel-title">
+    <aside class="flex flex-col gap-4 p-3 text-sm" aria-labelledby="wo-panel-title">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
-          <h3 id="wo-panel-title" class="truncate text-base font-semibold">{{ item().code }}</h3>
+          <p id="wo-panel-title" class="truncate text-base leading-6 font-medium">{{ item().code }}</p>
           <p class="text-muted-foreground truncate">{{ item().processSegmentName }} · {{ item().materialName }}</p>
         </div>
-        <button hlmBtn type="button" variant="ghost" size="icon" aria-label="Chiudi dettaglio" (click)="closed.emit()">
+        <button hlmBtn type="button" variant="ghost" size="icon-sm" aria-label="Chiudi dettaglio" (click)="closed.emit()">
           <ng-icon name="lucideX" aria-hidden="true" />
         </button>
       </div>
@@ -67,31 +104,52 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
         }
       </dl>
 
-      @if (loading()) {
-        <hlm-skeleton class="h-10 w-full" aria-busy="true" aria-label="Caricamento dettaglio" />
-      } @else if (error()) {
-        <p class="text-destructive" role="alert">{{ error() }}</p>
-      } @else if (detail(); as d) {
-        <div class="flex flex-col gap-1">
-          <h4 class="font-medium">Predecessori</h4>
-          @if (d.predecessors.length) {
-            <ul class="flex flex-col gap-0.5">
-              @for (p of d.predecessors; track p.id) {
-                @let ps = status(p.status);
-                <li class="flex items-center gap-2">
-                  <ng-icon [name]="ps.icon" size="14" [class]="ps.tone" aria-hidden="true" />
-                  <span>{{ p.code }}</span><span class="text-muted-foreground">· {{ ps.label }}</span>
-                </li>
-              }
-            </ul>
-          } @else {
-            <p class="text-muted-foreground">Nessuno</p>
-          }
-        </div>
-      }
+      <section class="flex flex-col gap-1.5" aria-label="Dipendenze">
+        <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Dipendenze</p>
+        @if (links(); as l) {
+          <p class="text-muted-foreground text-xs">
+            Prima: {{ l.up }} {{ l.up === 1 ? 'precedente' : 'precedenti' }} → <span class="text-foreground font-medium">{{ item().code }}</span> → Dopo: {{ l.down }} {{ l.down === 1 ? 'successivo' : 'successivi' }}
+          </p>
+        }
+        <p class="text-sm font-medium">Predecessori</p>
+        @if (preds().length) {
+          <ul class="flex flex-col gap-0.5">
+            @for (p of preds(); track p.id) {
+              <li>
+                <button type="button" class="hover:bg-muted focus-visible:ring-ring flex w-full flex-col rounded px-1 py-1 text-left focus-visible:ring-2 focus-visible:outline-none" (click)="selectLink.emit(p.id)">
+                  <ng-container *ngTemplateOutlet="linkRow; context: { $implicit: p, kind: 'pred' }" />
+                </button>
+              </li>
+            }
+          </ul>
+        } @else if (loading()) {
+          <hlm-skeleton class="h-6 w-full" aria-busy="true" aria-label="Caricamento dettaglio" />
+        } @else {
+          <p class="text-muted-foreground">Nessuno</p>
+        }
+        <p class="mt-1 text-sm font-medium">Successori</p>
+        @if (succs().length) {
+          <ul class="flex flex-col gap-0.5">
+            @for (p of succs(); track p.id) {
+              <li>
+                <button type="button" class="hover:bg-muted focus-visible:ring-ring flex w-full flex-col rounded px-1 py-1 text-left focus-visible:ring-2 focus-visible:outline-none" (click)="selectLink.emit(p.id)">
+                  <ng-container *ngTemplateOutlet="linkRow; context: { $implicit: p, kind: 'succ' }" />
+                </button>
+              </li>
+            }
+          </ul>
+        } @else if (loading()) {
+          <hlm-skeleton class="h-6 w-full" aria-busy="true" aria-label="Caricamento dettaglio" />
+        } @else {
+          <p class="text-muted-foreground">Nessuno</p>
+        }
+        @if (error()) {
+          <p class="text-destructive" role="alert">{{ error() }}</p>
+        }
+      </section>
 
-      <div class="flex flex-col gap-1">
-        <h4 class="font-medium">Segnalazioni</h4>
+      <section class="flex flex-col gap-1.5" aria-label="Segnalazioni">
+        <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Segnalazioni</p>
         @if (alerts().length) {
           <ul class="flex flex-col gap-1">
             @for (a of alerts(); track $index) {
@@ -104,7 +162,7 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
         } @else {
           <p class="text-muted-foreground">Nessuna segnalazione</p>
         }
-      </div>
+      </section>
 
       <div class="flex flex-wrap gap-2">
         @if (canAssign()) {
@@ -114,6 +172,25 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
         <a hlmBtn variant="outline" size="sm" routerLink="/work-orders" [queryParams]="{ order: item().productionOrderId }">Apri in Ordini di lavoro</a>
       </div>
     </aside>
+
+    <ng-template #linkRow let-p let-kind="kind">
+      <span class="flex items-center gap-2">
+        @if (p.status; as s) {
+          @let ps = status(s);
+          <ng-icon [name]="ps.icon" size="14" [class]="ps.tone" aria-hidden="true" />
+          <span class="font-medium">{{ p.code }}</span><span class="text-muted-foreground truncate">· {{ ps.label }}</span>
+        } @else {
+          <span class="font-medium">{{ p.code }}</span>
+        }
+      </span>
+      @if (p.phase) {
+        <span class="text-muted-foreground truncate text-xs">{{ p.phase }}</span>
+      }
+      <span class="text-muted-foreground text-xs">{{ datesText(p) }}</span>
+      @if (gapText(p, kind); as g) {
+        <span class="text-xs" [class.text-destructive]="p.conflictMin" [class.text-muted-foreground]="!p.conflictMin">{{ g }}</span>
+      }
+    </ng-template>
 
     @if (assigning() && detail(); as d) {
       <app-work-order-machine-dialog [work]="d" mode="Assign" (done)="assigning.set(false); onAssigned()" (closed)="assigning.set(false)" />
@@ -127,6 +204,8 @@ export class PlanningWorkPanelComponent {
   readonly item = input.required<TimelineWorkOrderModel>();
   readonly timeZone = input.required<string>();
   readonly machineLabels = input.required<ReadonlyMap<number, string>>();
+  readonly links = input<DepLinks | null>(null);
+  readonly selectLink = output<number>();
   readonly closed = output<void>();
   readonly changed = output<void>();
 
@@ -142,6 +221,39 @@ export class PlanningWorkPanelComponent {
     const id = this.item().equipmentId;
     return id == null ? 'Nessuna macchina' : (this.machineLabels().get(id) ?? `#${id}`);
   });
+  /** Dettagli dei lavori collegati non presenti nella finestra caricata (cache per id). */
+  private readonly linked = signal<ReadonlyMap<number, WorkOrderDetailModel>>(new Map());
+  private readonly requested = new Set<number>();
+  private readonly me = computed(() => {
+    const w = this.item();
+    return rangeOf(w.status, w.plannedStartAt, w.plannedEndAt, w.actualStartAt, w.actualEndAt);
+  });
+
+  private readonly baseLinks = computed(() => {
+    const d = this.detail();
+    const blank = (l: { id: number; code: string; status: WorkOrderStatus }): DepLink => ({ id: l.id, code: l.code, status: l.status, phase: null, startMs: null, endMs: null, fromMs: null, toMs: null, conflictMin: null });
+    const merge = (known: DepLink[], extra: { id: number; code: string; status: WorkOrderStatus }[]): DepLink[] => [
+      ...known.map((k) => (k.status ? k : { ...k, status: extra.find((p) => p.id === k.id)?.status ?? null })),
+      ...extra.filter((p) => !known.some((k) => k.id === p.id)).map(blank),
+    ];
+    return { preds: merge(this.links()?.preds ?? [], d?.predecessors ?? []), succs: merge(this.links()?.succs ?? [], d?.successors ?? []) };
+  });
+
+  /** Completa i collegamenti fuori finestra con il dettaglio caricato (codice, fase, stato, date). */
+  private enrich(l: DepLink, kind: 'pred' | 'succ'): DepLink {
+    if (l.startMs != null || l.endMs != null) return l;
+    const d = this.linked().get(l.id);
+    if (!d) return l;
+    const r = rangeOf(d.status, d.plannedStartAt, d.plannedEndAt, d.startedAt, d.endedAt);
+    const me = this.me();
+    const from = kind === 'pred' ? (r?.e ?? null) : (me?.e ?? null);
+    const to = kind === 'pred' ? (me?.s ?? null) : (r?.s ?? null);
+    const gap = from != null && to != null ? Math.round((from - to) / 60_000) : 0;
+    return { ...l, code: d.code, status: d.status, phase: d.processSegmentName || d.processSegmentCode, startMs: r?.s ?? null, endMs: r?.e ?? null, fromMs: from, toMs: to, conflictMin: gap > 0 ? gap : null };
+  }
+  protected readonly preds = computed(() => this.baseLinks().preds.map((l) => this.enrich(l, 'pred')));
+  protected readonly succs = computed(() => this.baseLinks().succs.map((l) => this.enrich(l, 'succ')));
+
   protected readonly alerts = computed(() => {
     const w = this.item();
     return this.planning.alerts().filter((a) => a.workOrderId === w.id || (a.workOrderId == null && a.productionOrderId === w.productionOrderId));
@@ -159,6 +271,30 @@ export class PlanningWorkPanelComponent {
         void this.loadDetail(id);
       }
     });
+    effect(() => {
+      const b = this.baseLinks();
+      const missing = [...b.preds, ...b.succs].filter((l) => l.startMs == null && l.endMs == null && !this.requested.has(l.id));
+      untracked(() => {
+        for (const l of missing) void this.loadLinked(l.id);
+      });
+    });
+  }
+
+  /** Date del lavoro collegato: pianificate, oppure effettive se in corso/terminato. */
+  protected datesText(l: DepLink): string {
+    if (l.startMs == null || l.endMs == null) return this.requested.has(l.id) && !this.linked().has(l.id) ? 'Caricamento date…' : 'Date non pianificate';
+    const tz = this.timeZone();
+    if (l.status === 'Ended') return `Terminato il ${formatDateTime(l.endMs, tz)}`;
+    if (l.status === 'Running') return `Iniziato il ${formatDateTime(l.startMs, tz)}, in corso`;
+    return `${formatDateTime(l.startMs, tz)} → ${formatDateTime(l.endMs, tz)}`;
+  }
+
+  protected gapText(l: DepLink, kind: 'pred' | 'succ'): string {
+    if (l.fromMs == null || l.toMs == null) return '';
+    if (l.conflictMin) return `In conflitto di ${l.conflictMin} min`;
+    return kind === 'pred'
+      ? `Finisce ${formatDateTime(l.fromMs, this.timeZone())} → questo inizia ${formatDateTime(l.toMs, this.timeZone())}`
+      : `Questo finisce ${formatDateTime(l.fromMs, this.timeZone())} → inizia ${formatDateTime(l.toMs, this.timeZone())}`;
   }
 
   protected fmt(v?: string | null): string {
@@ -182,6 +318,16 @@ export class PlanningWorkPanelComponent {
       if (n === this.seq) this.error.set(toFailure(e).message);
     } finally {
       if (n === this.seq) this.loading.set(false);
+    }
+  }
+
+  private async loadLinked(id: number): Promise<void> {
+    this.requested.add(id);
+    try {
+      const d = await this.orders.getDetail(id);
+      this.linked.update((m) => new Map(m).set(id, d));
+    } catch {
+      /* resta "Date non pianificate": il collegamento è comunque cliccabile */
     }
   }
 }
