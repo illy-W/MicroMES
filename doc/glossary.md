@@ -15,6 +15,9 @@ Every feature spec that adds or renames a domain entity updates this file.
 | `WorkOrderDependency` | Segment Dependency | Dipendenza | Predecessor -> successor between work orders (copy of the routing edges, plus last step of a child order -> start steps of the parent). | `specs/production-order` |
 | `WorkOrderMaterial` | Material Requirement (*material consumed*) | Materiale richiesto | Required quantity of a BOM component for a work order; links to the child order that produces it, if any. | `specs/production-order` |
 | `WorkOrderResponse` | Job Response | Registrazione | One work session of a work order: start/end, good and scrap quantity, notes. A work order can have several; totals are the sums. | `specs/production-order` |
+| `ScrapReason` | *(none: disposition/reason is left to the implementation)* | Motivo di scarto | Catalog entry: `Code` (unique, uppercase), `Name`, `Description`, `IsActive` (soft-delete). Linked to zero or more `ProcessSegment` (none = valid for every phase). | `specs/scrap-management` |
+| `WorkOrderResponseScrap` | Job Response (material produced actual, scrapped quantity) | Riga di scarto | Row of a work session: reason (nullable = *senza motivo*), snapshot of reason code/name, quantity. `WorkOrderResponse.ScrapQuantity` is their sum. | `specs/scrap-management` |
+| `WorkOrderResponseCorrection` | - | Correzione | Trace of a correction of a closed session: previous and new values, mandatory note, date. Not allowed when the production order is `Completed`/`Cancelled`. | `specs/scrap-management` |
 
 ## Planned (not adopted yet)
 
@@ -52,3 +55,5 @@ Commands: `Start`, `Pause`, `Resume`, `Stop` (end before the planned quantity is
 Record here every further deliberate difference from the standard, with the reason.
 
 - `BomItem.ConsumedInStepId`: material consumption is declared on the BOM line, not as a separate *Material Specification* of the segment; only use `Consumed`; a component can be consumed in one step only (split not supported; extend the unique index to parent+component+step if needed).
+
+- Scrap: a catalog of reasons linked to process segments and per-session scrap rows with a snapshot of the reason; no *disposition* (rework, repair), lots or scrapped raw material; corrections are separate trace rows, not a new Job Response; the operator who corrected is not tracked yet (needs operator identity).

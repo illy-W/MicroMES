@@ -89,6 +89,11 @@ See `AGENTS.md` for the project table and dependency direction.
 - `BomItem.ConsumedInStepId` (nullable FK to `RoutingStep`, `SetNull`): null means the first start step. Editing happens only on the BOM page; the routing page and the order overview show the components per step read-only.
 - Release: `WorkOrderMaterial` goes on the work order of the effective step; a child order's last work order gates only the consuming work order. Routing `PUT` resets the links of deleted steps in the same transaction and returns `unassignedComponents`; the editor asks confirmation before saving.
 
+### Scrap management
+
+- `ScrapFeature`: catalog (`/api/scrap-reasons`, soft-delete, optional phase filter) and report (`GET /api/scrap/report?from&to`, aggregations on the backend, always with a *Senza motivo* row). Closing a session (`scrapEntries`, optional) and corrections (`POST /api/work-orders/{id}/responses/{responseId}/corrections`) live in `ProductionOrderFeature`, one transaction, shared validation (sum = scrap, active reason valid for the phase).
+- Menu: sidebar sections (`sidebarSections`): Dashboard, *Produzione* (orders, work orders, scrap), *Anagrafiche* (materials, process segments, scrap reasons). BOM and routing stay under the material page.
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.

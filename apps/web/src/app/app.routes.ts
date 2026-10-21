@@ -28,6 +28,15 @@ export const appRoutes: Route[] = [
           import('./features/process-segments/process-segments.component').then((m) => m.ProcessSegmentsComponent),
       },
       {
+        path: 'scrap-reasons',
+        loadComponent: () =>
+          import('./features/scrap-reasons/scrap-reasons.component').then((m) => m.ScrapReasonsComponent),
+      },
+      {
+        path: 'scrap',
+        loadComponent: () => import('./features/scrap/scrap.component').then((m) => m.ScrapComponent),
+      },
+      {
         path: 'production-orders/:id',
         loadComponent: () =>
           import('./features/production-orders/production-order-detail.component').then((m) => m.ProductionOrderDetailComponent),

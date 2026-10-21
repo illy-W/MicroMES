@@ -23,14 +23,14 @@
 
 ## Frontend
 
-- [ ] 2.1 [Frontend] Menu raggruppato (`sidebar-data.ts`, `nav-main`): Dashboard in alto, gruppo «Produzione» (Ordini di produzione, Ordini di lavoro, Scarti), gruppo «Anagrafiche» (Materiali, Fasi di processo, Motivi di scarto); etichette di gruppo con `hlm-sidebar-group-label`; voce attiva anche sulle rotte figlie; sidebar compressa e tastiera. Le rotte delle nuove pagine vanno registrate. _Satisfies: REQ-5_
-- [ ] 2.2 [Frontend] Pagina «Motivi di scarto» (`features/scrap-reasons`): lista, crea, modifica, attiva/disattiva, scelta fasi (con ricerca), messaggi 409 specifici; stesso schema di «Fasi di processo». _Satisfies: REQ-1_
-- [ ] 2.3 [Frontend] Dialogo di chiusura del lavoro: righe motivo + quantità (aggiungi/rimuovi), solo motivi validi per la fase del lavoro, voce «Senza motivo», somma calcolata che alimenta lo scarto, nota facoltativa, errori 422 mostrati, segnalazione non bloccante dei pezzi mancanti rispetto al pianificato. _Satisfies: REQ-2_
-- [ ] 2.4 [Frontend] Sessioni del lavoro con correzione: elenco delle sessioni (buoni, scarti con motivi, nota, indicatore «corretta» e storico) e azione «Correggi» con nota obbligatoria, errori 409/422 specifici; azione non offerta se l'ordine è `Completed`/`Cancelled`. _Satisfies: REQ-3_
-- [ ] 2.5 [Frontend] Pagina «Scarti» (`features/scrap`): periodo, totale e percentuale, classifica per motivo/fase/materiale con barre e testo, quota «senza motivo» evidenziata, stati vuoto/caricamento/errore. _Satisfies: REQ-4_
-- [ ] 2.6 [Frontend] `npx nx lint web` e `npx nx build web`; riportare cosa non è verificato a runtime. _Satisfies: REQ-1..REQ-5_
+- [x] 2.1 [Frontend] Menu raggruppato (`sidebar-data.ts`, `nav-main`): Dashboard in alto, gruppo «Produzione» (Ordini di produzione, Ordini di lavoro, Scarti), gruppo «Anagrafiche» (Materiali, Fasi di processo, Motivi di scarto); etichette di gruppo con `hlm-sidebar-group-label`; voce attiva anche sulle rotte figlie; sidebar compressa e tastiera. Le rotte delle nuove pagine vanno registrate. _Satisfies: REQ-5_
+- [x] 2.2 [Frontend] Pagina «Motivi di scarto» (`features/scrap-reasons`): lista, crea, modifica, attiva/disattiva, scelta fasi (con ricerca), messaggi 409 specifici; stesso schema di «Fasi di processo». _Satisfies: REQ-1_
+- [x] 2.3 [Frontend] Dialogo di chiusura del lavoro: righe motivo + quantità (aggiungi/rimuovi), solo motivi validi per la fase del lavoro, voce «Senza motivo», somma calcolata che alimenta lo scarto, nota facoltativa, errori 422 mostrati, segnalazione non bloccante dei pezzi mancanti rispetto al pianificato. _Satisfies: REQ-2_
+- [x] 2.4 [Frontend] Sessioni del lavoro con correzione: elenco delle sessioni (buoni, scarti con motivi, nota, indicatore «corretta» e storico) e azione «Correggi» con nota obbligatoria, errori 409/422 specifici; azione non offerta se l'ordine è `Completed`/`Cancelled`. _Satisfies: REQ-3_
+- [x] 2.5 [Frontend] Pagina «Scarti» (`features/scrap`): periodo, totale e percentuale, classifica per motivo/fase/materiale con barre e testo, quota «senza motivo» evidenziata, stati vuoto/caricamento/errore. _Satisfies: REQ-4_
+- [x] 2.6 [Frontend] `npx nx lint web` e `npx nx build web`; riportare cosa non è verificato a runtime. _Satisfies: REQ-1..REQ-5_
 
 ## Lead
 
-- [ ] 3.1 [Lead] Aggiornare `doc/glossary.md` (`ScrapReason`, `WorkOrderResponseScrap`, `WorkOrderResponseCorrection`, deviazioni da ISA-95) e `doc/structure.md` (scarti, correzioni, menu). _Satisfies: tutti_
+- [x] 3.1 [Lead] Aggiornare `doc/glossary.md` (`ScrapReason`, `WorkOrderResponseScrap`, `WorkOrderResponseCorrection`, deviazioni da ISA-95) e `doc/structure.md` (scarti, correzioni, menu). _Satisfies: tutti_
 - [ ] 3.2 [Lead] Verifica: `npx nx run-many -t lint build`, test unitari e di integrazione, DB di sviluppo ripristinato con il seed, controllo DOM nel browser di menu, motivi, chiusura, correzione e report, verifica dei criteri di accettazione. _Satisfies: tutti_

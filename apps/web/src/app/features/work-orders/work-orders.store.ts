@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import type { AbortRequest, CloseSessionRequest, WorkOrderDetailModel, WorkOrderModel } from '@micromes/api-client/models';
+import type { AbortRequest, CloseSessionRequest, CorrectSessionRequest, WorkOrderDetailModel, WorkOrderModel } from '@micromes/api-client/models';
 import { WorkOrdersService } from '@micromes/api-client/services/work-orders';
 import { firstValueFrom } from 'rxjs';
 import { toFailure } from '../materials/materials.service';
@@ -49,5 +49,13 @@ export class WorkOrdersStore {
 
   async abort(id: number, req: AbortRequest): Promise<WorkOrderDetailModel> {
     return this.apply(await firstValueFrom(this.api.abortWorkOrder(id, req)));
+  }
+
+  getDetail(id: number): Promise<WorkOrderDetailModel> {
+    return firstValueFrom(this.api.getWorkOrder(id));
+  }
+
+  async correct(id: number, responseId: number, req: CorrectSessionRequest): Promise<WorkOrderDetailModel> {
+    return this.apply(await firstValueFrom(this.api.correctWorkOrderSession(id, responseId, req)));
   }
 }

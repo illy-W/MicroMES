@@ -41,6 +41,7 @@ import { formatQty, WORK_STATUS, workStatus } from '../production-orders/product
 import { formatMinutes } from '../routing/routing-metrics';
 import { WorkOrderAbortDialogComponent } from './work-order-abort-dialog.component';
 import { type CloseMode, WorkOrderCloseDialogComponent } from './work-order-close-dialog.component';
+import { WorkOrderSessionsDialogComponent } from './work-order-sessions-dialog.component';
 import { WorkOrderRowActionsComponent } from './work-order-row-actions.component';
 import { WorkOrdersStore } from './work-orders.store';
 
@@ -85,6 +86,7 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
     WorkOrderRowActionsComponent,
     WorkOrderCloseDialogComponent,
     WorkOrderAbortDialogComponent,
+    WorkOrderSessionsDialogComponent,
   ],
   providers: [
     provideIcons({
@@ -262,6 +264,7 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
                               (pauseWork)="closing.set({ work: $event, mode: 'Pause' })"
                               (stopWork)="closing.set({ work: $event, mode: 'Stop' })"
                               (abortWork)="aborting.set($event)"
+                              (sessions)="viewing.set($event)"
                             />
                           }
                         }
@@ -284,6 +287,9 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
 
     @if (closing(); as c) {
       <app-work-order-close-dialog [work]="c.work" [mode]="c.mode" (done)="afterCommand(); closing.set(null)" (closed)="closing.set(null)" />
+    }
+    @if (viewing(); as w) {
+      <app-work-order-sessions-dialog [work]="w" (changed)="afterCommand()" (closed)="viewing.set(null)" />
     }
     @if (aborting(); as w) {
       <app-work-order-abort-dialog [work]="w" (done)="afterCommand(); aborting.set(null)" (closed)="aborting.set(null)" />
@@ -315,6 +321,7 @@ export class WorkOrdersComponent implements OnInit {
   protected readonly orderFilter = signal<string>(ALL);
   protected readonly closing = signal<{ work: WorkOrderModel; mode: CloseMode } | null>(null);
   protected readonly aborting = signal<WorkOrderModel | null>(null);
+  protected readonly viewing = signal<WorkOrderModel | null>(null);
 
   private readonly queryParams = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
 

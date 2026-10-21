@@ -38,6 +38,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
           @if (can('Stop')) {
             <button hlmDropdownMenuItem (click)="stopWork.emit(work())">Chiudi lavoro</button>
           }
+          <button hlmDropdownMenuItem (click)="sessions.emit(work())">Registrazioni</button>
           <button hlmDropdownMenuItem (click)="openOrder()">Apri ordine</button>
         </hlm-dropdown-menu-group>
         @if (can('Abort')) {
@@ -58,6 +59,7 @@ export class WorkOrderRowActionsComponent {
   readonly pauseWork = output<WorkOrderModel>();
   readonly stopWork = output<WorkOrderModel>();
   readonly abortWork = output<WorkOrderModel>();
+  readonly sessions = output<WorkOrderModel>();
 
   protected can(action: string): boolean {
     return this.work().allowedActions.includes(action);

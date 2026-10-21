@@ -3,7 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { HlmSidebarImports } from '@spartan-ng/helm/sidebar';
 import { HeaderComponent } from '../components/header/header.component';
 import { SidebarComponent } from '../components/sidebar/sidebar.component';
-import { sidebarItems } from './sidebar-data';
+import { sidebarSections } from './sidebar-data';
 
 @Component({
   selector: 'app-full-layout',
@@ -12,5 +12,5 @@ import { sidebarItems } from './sidebar-data';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FullLayoutComponent {
-  protected readonly items = sidebarItems;
+  protected readonly sections = sidebarSections;
 }
