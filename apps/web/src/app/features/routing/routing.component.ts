@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, HostListener, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -227,11 +227,22 @@ function toNumberOrNull(v: string): number | null {
             <button hlmTabsTrigger="diagram" type="button">Diagramma</button>
             <button hlmTabsTrigger="list" type="button">Elenco</button>
           </hlm-tabs-list>
+        </hlm-tabs>
 
-          <div class="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-            <div class="min-w-0">
-              <div hlmTabsContent="diagram">
-                @if (view() === 'diagram') {
+        <div class="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div class="relative min-w-0">
+              <!--
+                Il diagramma resta sempre montato: ng-diagram misura nodi e porte solo alla creazione, quindi
+                ricrearlo a ogni cambio di tab lascia archi e selezione non disegnati. Da inattivo lo si
+                nasconde senza display:none (che romperebbe le misure) e lo si rende inerte.
+              -->
+              <div
+                role="tabpanel"
+                aria-label="Diagramma"
+                [class]="view() === 'diagram' ? '' : 'pointer-events-none invisible absolute inset-x-0 top-0'"
+                [attr.aria-hidden]="view() === 'diagram' ? null : 'true'"
+                [attr.inert]="view() === 'diagram' ? null : ''"
+              >
                   <div class="relative h-[calc(100vh-22rem)] min-h-96 overflow-hidden rounded-md border">
                     <ng-diagram
                       [model]="model"
@@ -262,10 +273,8 @@ function toNumberOrNull(v: string): number | null {
                       </div>
                     }
                   </div>
-                }
               </div>
-              <div hlmTabsContent="list">
-                @if (view() === 'list') {
+              <div role="tabpanel" aria-label="Elenco" [hidden]="view() !== 'list'">
                   <div class="overflow-auto rounded-md border">
                     <div hlmTableContainer>
                       <table hlmTable>
@@ -297,7 +306,6 @@ function toNumberOrNull(v: string): number | null {
                       </table>
                     </div>
                   </div>
-                }
               </div>
             </div>
 
@@ -392,7 +400,6 @@ function toNumberOrNull(v: string): number | null {
               }
             </div>
           </div>
-        </hlm-tabs>
       }
     </div>
 
@@ -562,6 +569,10 @@ export class RoutingComponent {
   });
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.unregisterGate?.();
+      this.unregisterGate = null;
+    });
     effect(() => {
       const id = this.materialId();
       untracked(() => {
@@ -673,10 +684,18 @@ export class RoutingComponent {
   }
 
   protected onInit(): void {
-    this.unregisterGate?.();
+    // Il flow core è nuovo a ogni ricreazione del diagramma: si registra una sola volta per istanza.
+    this.diagramService.unregisterMiddleware(this.readOnlyGate.name);
     this.unregisterGate = this.diagramService.registerMiddleware(this.readOnlyGate) as (() => void) | null;
     this.diagramService.updateConfig({ nodeDraggingEnabled: this.editing() });
-    void this.viewport.zoomToFit();
+    void this.fitView();
+  }
+
+  /** Adatta la vista con margine, senza ingrandire oltre 1:1 (pochi passi non devono diventare enormi). */
+  private async fitView(): Promise<void> {
+    await this.viewport.zoomToFit({ padding: 60 });
+    const scale = this.viewport.scale();
+    if (scale > 1) await this.viewport.zoom(1 / scale);
   }
 
   protected fmtMinutes(v: number | null): string {
