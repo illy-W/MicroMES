@@ -1,11 +1,14 @@
 using illyW.Framework.Core.RepositoryPattern;
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.CalendarFeature.Models;
+using MicroMES.ApiFeatures.CalendarFeature.Repositories;
+using MicroMES.ApiFeatures.CalendarFeature.Services;
 using MicroMES.ApiFeatures.EquipmentFeature.Models;
 using MicroMES.ApiFeatures.EquipmentFeature.Repositories;
 
 namespace MicroMES.ApiFeatures.EquipmentFeature.Services;
 
-public class EquipmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinker linker)
+public class EquipmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinker linker, EffectiveCalendarService effective)
 {
     private IEquipmentRepository Repo => unitOfWork.GetRepository<IEquipmentRepository>();
 
@@ -25,9 +28,10 @@ public class EquipmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinker lin
             .Where(e => processSegmentId is null
                         || links.Any(l => l.EquipmentId == e.Id && l.ProcessSegmentId == processSegmentId))
             .OrderBy(e => e.Code, StringComparer.Ordinal)
-            .Select(e => ToModel(e, links, segments))
             .ToList();
-        return EquipmentResult<List<EquipmentModel>>.Ok(models);
+        var summaries = await effective.SummariesAsync(models);
+        var result = models.Select(e => ToModel(e, links, segments, summaries)).ToList();
+        return EquipmentResult<List<EquipmentModel>>.Ok(result);
     }
 
     public async Task<EquipmentResult<EquipmentModel>> GetAsync(int id)
@@ -43,11 +47,13 @@ public class EquipmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinker lin
         if (await CodeExistsAsync(code, null)) return CodeConflict();
         var segmentIds = Distinct(request.ProcessSegmentIds);
         if (await linker.ValidateSegmentsAsync(null, segmentIds) is { IsSuccess: false } invalid) return FromOutcome(invalid);
+        if (await CheckCalendarAsync(request.WorkCalendarId, null) is { } badCalendar) return badCalendar;
 
         var now = DateTime.UtcNow;
         var equipment = new Equipment
         {
             Code = code, Name = request.Name.Trim(), Description = request.Description,
+            WorkCalendarId = request.WorkCalendarId, Capacity = request.Capacity ?? 1, EfficiencyPercent = request.EfficiencyPercent ?? 100m,
             IsActive = true, CreatedAt = now, UpdatedAt = now
         };
         return await SaveAsync(equipment, segmentIds, isNew: true);
@@ -63,10 +69,15 @@ public class EquipmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinker lin
         if (await CodeExistsAsync(code, id)) return CodeConflict();
         var segmentIds = Distinct(request.ProcessSegmentIds);
         if (await linker.ValidateSegmentsAsync(id, segmentIds) is { IsSuccess: false } invalid) return FromOutcome(invalid);
+        if (await CheckCalendarAsync(request.WorkCalendarId, equipment.WorkCalendarId) is { } badCalendar) return badCalendar;
 
         equipment.Code = code;
         equipment.Name = request.Name.Trim();
         equipment.Description = request.Description;
+        // Changing calendar, capacity or efficiency never touches released work orders (their minutes stay the standard ones).
+        equipment.WorkCalendarId = request.WorkCalendarId;
+        if (request.Capacity is { } capacity) equipment.Capacity = capacity;
+        if (request.EfficiencyPercent is { } efficiency) equipment.EfficiencyPercent = efficiency;
         equipment.IsActive = request.IsActive!.Value;
         equipment.UpdatedAt = DateTime.UtcNow;
         return await SaveAsync(equipment, segmentIds, isNew: false);
@@ -131,12 +142,29 @@ public class EquipmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinker lin
         }
     }
 
-    private async Task<EquipmentModel> ReloadAsync(Equipment equipment)
-        => ToModel(equipment, await linker.LoadLinksAsync(), await linker.LoadSegmentsAsync());
+    /// <summary>The calendar must exist and be active (an unchanged reference to a calendar deactivated since is kept).</summary>
+    private async Task<EquipmentResult<EquipmentModel>?> CheckCalendarAsync(int? calendarId, int? current)
+    {
+        if (calendarId is not { } id || id == current) return null;
+        var calendar = await unitOfWork.GetRepository<IWorkCalendarRepository>().GetSingleAsync(id);
+        if (calendar is null)
+            return EquipmentResult<EquipmentModel>.Failed(EquipmentFailure.Invalid, "Il calendario indicato non esiste: scegline un altro o lascia il predefinito.");
+        return calendar.IsActive ? null
+            : EquipmentResult<EquipmentModel>.Failed(EquipmentFailure.Invalid, "Il calendario indicato è disattivato: scegli un calendario attivo.");
+    }
 
-    private static EquipmentModel ToModel(Equipment e, List<EquipmentProcessSegment> links, Dictionary<int, ProcessSegment> segments) => new()
+    private async Task<EquipmentModel> ReloadAsync(Equipment equipment)
+    {
+        var summaries = await effective.SummariesAsync([equipment]);
+        return ToModel(equipment, await linker.LoadLinksAsync(), await linker.LoadSegmentsAsync(), summaries);
+    }
+
+    private static EquipmentModel ToModel(Equipment e, List<EquipmentProcessSegment> links, Dictionary<int, ProcessSegment> segments,
+        Dictionary<int, EffectiveCalendarModel> summaries) => new()
     {
         Id = e.Id, Code = e.Code, Name = e.Name, Description = e.Description, IsActive = e.IsActive,
+        WorkCalendarId = e.WorkCalendarId, Capacity = e.Capacity, EfficiencyPercent = e.EfficiencyPercent,
+        EffectiveCalendar = summaries.GetValueOrDefault(e.Id),
         ProcessSegments = links.Where(l => l.EquipmentId == e.Id && segments.ContainsKey(l.ProcessSegmentId))
             .Select(l => (Segment: segments[l.ProcessSegmentId], l.IsDefault))
             .Select(x => new EquipmentSegmentModel

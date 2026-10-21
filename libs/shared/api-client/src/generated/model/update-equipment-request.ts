@@ -25,5 +25,19 @@ export interface UpdateEquipmentRequest {
   /** @nullable */
   isActive: boolean | null;
   /** @nullable */
+  workCalendarId?: number | null;
+  /**
+     * @minimum 1
+     * @maximum 1000
+     * @nullable
+     */
+  capacity?: number | null;
+  /**
+     * @minimum 0.01
+     * @maximum 1000
+     * @nullable
+     */
+  efficiencyPercent?: number | null;
+  /** @nullable */
   processSegmentIds?: number[] | null;
 }

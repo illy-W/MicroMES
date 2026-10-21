@@ -17,6 +17,7 @@ public class ProductionDataLoader(
     IMaterialRepository materials,
     IEquipmentRepository equipment,
     IEquipmentProcessSegmentRepository equipmentLinks,
+    MicroMES.ApiFeatures.CalendarFeature.Services.EffectiveCalendarService calendars,
     TimeProvider timeProvider)
 {
     /// <summary>Every order (list pages).</summary>
@@ -85,6 +86,7 @@ public class ProductionDataLoader(
         await foreach (var l in equipmentLinks.FetchAsync(x => segmentIds.Contains(x.ProcessSegmentId)))
             data.EquipmentLinks.Add((l.EquipmentId, l.ProcessSegmentId));
 
+        data.Availability = await calendars.LoadAsync(equipmentIds);
         return data;
     }
 }

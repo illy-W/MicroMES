@@ -21,6 +21,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<EquipmentProcessSegment> EquipmentProcessSegments { get; set; } = null!;
     public DbSet<WorkOrderResponseScrap> WorkOrderResponseScraps { get; set; } = null!;
     public DbSet<WorkOrderResponseCorrection> WorkOrderResponseCorrections { get; set; } = null!;
+    public DbSet<WorkCalendar> WorkCalendars { get; set; } = null!;
+    public DbSet<WorkCalendarSlot> WorkCalendarSlots { get; set; } = null!;
+    public DbSet<CalendarException> CalendarExceptions { get; set; } = null!;
+    public DbSet<CalendarExceptionSlot> CalendarExceptionSlots { get; set; } = null!;
+    public DbSet<EquipmentException> EquipmentExceptions { get; set; } = null!;
+    public DbSet<EquipmentExceptionSlot> EquipmentExceptionSlots { get; set; } = null!;
+    public DbSet<SystemSetting> SystemSettings { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -175,7 +182,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
             entity.Property(x => x.Description).HasMaxLength(1000);
             entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.Property(x => x.Capacity).HasDefaultValue(1);
+            entity.Property(x => x.EfficiencyPercent).HasPrecision(7, 2).HasDefaultValue(100m);
             entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasOne<WorkCalendar>().WithMany().HasForeignKey(x => x.WorkCalendarId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<EquipmentProcessSegment>(entity =>
@@ -221,6 +231,76 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.NewEquipmentName).HasMaxLength(200);
             entity.HasIndex(x => x.WorkOrderResponseId);
             entity.HasOne<WorkOrderResponse>().WithMany().HasForeignKey(x => x.WorkOrderResponseId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkCalendar>(entity =>
+        {
+            entity.ToTable("WorkCalendars");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.Property(x => x.IsDefault).HasDefaultValue(false);
+            entity.HasIndex(x => x.Code).IsUnique();
+            // Exactly one default calendar (the application keeps it always present and active).
+            entity.HasIndex(x => x.IsDefault).IsUnique()
+                .HasDatabaseName("IX_WorkCalendars_IsDefault")
+                .HasFilter("\"IsDefault\" = TRUE");
+        });
+
+        modelBuilder.Entity<WorkCalendarSlot>(entity =>
+        {
+            entity.ToTable("WorkCalendarSlots");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DayOfWeek).HasConversion<string>().HasMaxLength(20);
+            entity.HasIndex(x => x.WorkCalendarId);
+            entity.HasOne<WorkCalendar>().WithMany().HasForeignKey(x => x.WorkCalendarId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CalendarException>(entity =>
+        {
+            entity.ToTable("CalendarExceptions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Reason).IsRequired().HasMaxLength(200);
+            entity.HasIndex(x => x.WorkCalendarId);
+            entity.HasOne<WorkCalendar>().WithMany().HasForeignKey(x => x.WorkCalendarId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CalendarExceptionSlot>(entity =>
+        {
+            entity.ToTable("CalendarExceptionSlots");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.CalendarExceptionId);
+            entity.HasOne<CalendarException>().WithMany().HasForeignKey(x => x.CalendarExceptionId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EquipmentException>(entity =>
+        {
+            entity.ToTable("EquipmentExceptions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Reason).IsRequired().HasMaxLength(200);
+            entity.HasIndex(x => x.EquipmentId);
+            entity.HasOne<Equipment>().WithMany().HasForeignKey(x => x.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EquipmentExceptionSlot>(entity =>
+        {
+            entity.ToTable("EquipmentExceptionSlots");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.EquipmentExceptionId);
+            entity.HasOne<EquipmentException>().WithMany().HasForeignKey(x => x.EquipmentExceptionId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SystemSetting>(entity =>
+        {
+            entity.ToTable("SystemSettings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Key).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Value).IsRequired().HasMaxLength(500);
+            entity.HasIndex(x => x.Key).IsUnique();
         });
     }
 }

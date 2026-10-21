@@ -61,6 +61,73 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("BomItems", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.CalendarException", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsRecurringYearly")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("WorkCalendarId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkCalendarId");
+
+                    b.ToTable("CalendarExceptions", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.CalendarExceptionSlot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CalendarExceptionId")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CalendarExceptionId");
+
+                    b.ToTable("CalendarExceptionSlots", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.Equipment", b =>
                 {
                     b.Property<int>("Id")
@@ -68,6 +135,11 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Capacity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -80,6 +152,12 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("EfficiencyPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)")
+                        .HasDefaultValue(100m);
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -94,12 +172,84 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("WorkCalendarId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique();
 
+                    b.HasIndex("WorkCalendarId");
+
                     b.ToTable("Equipment", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.EquipmentException", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EquipmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsRecurringYearly")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentId");
+
+                    b.ToTable("EquipmentExceptions", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.EquipmentExceptionSlot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<int>("EquipmentExceptionId")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentExceptionId");
+
+                    b.ToTable("EquipmentExceptionSlots", (string)null);
                 });
 
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.EquipmentProcessSegment", b =>
@@ -456,6 +606,112 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("ScrapReasonProcessSegments", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.SystemSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("SystemSettings", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkCalendar", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("IsDefault")
+                        .IsUnique()
+                        .HasDatabaseName("IX_WorkCalendars_IsDefault")
+                        .HasFilter("\"IsDefault\" = TRUE");
+
+                    b.ToTable("WorkCalendars", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkCalendarSlot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("DayOfWeek")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<int>("WorkCalendarId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkCalendarId");
+
+                    b.ToTable("WorkCalendarSlots", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrder", b =>
                 {
                     b.Property<int>("Id")
@@ -757,6 +1013,50 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.CalendarException", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkCalendar", null)
+                        .WithMany()
+                        .HasForeignKey("WorkCalendarId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.CalendarExceptionSlot", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.CalendarException", null)
+                        .WithMany()
+                        .HasForeignKey("CalendarExceptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.Equipment", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkCalendar", null)
+                        .WithMany()
+                        .HasForeignKey("WorkCalendarId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.EquipmentException", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.Equipment", null)
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.EquipmentExceptionSlot", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.EquipmentException", null)
+                        .WithMany()
+                        .HasForeignKey("EquipmentExceptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.EquipmentProcessSegment", b =>
                 {
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.Equipment", null)
@@ -827,6 +1127,15 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.ScrapReason", null)
                         .WithMany()
                         .HasForeignKey("ScrapReasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkCalendarSlot", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkCalendar", null)
+                        .WithMany()
+                        .HasForeignKey("WorkCalendarId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

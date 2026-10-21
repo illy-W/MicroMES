@@ -12,6 +12,9 @@ public class ConstraintViolationFixture
     [Theory]
     [InlineData("IX_Materials_Code", "Esiste già un materiale con questo codice.")]
     [InlineData("IX_ProcessSegments_Code", "Esiste già un segmento di processo con questo codice.")]
+    [InlineData("IX_WorkCalendars_Code", "Esiste già un calendario con questo codice.")]
+    [InlineData("IX_WorkCalendars_IsDefault", "Esiste già un calendario predefinito: ne è consentito uno solo.")]
+    [InlineData("IX_SystemSettings_Key", "L'impostazione esiste già.")]
     [InlineData("IX_Equipment_Code", "Esiste già una macchina o postazione con questo codice.")]
     [InlineData("IX_EquipmentProcessSegments_EquipmentId_ProcessSegmentId", "La macchina è già collegata a questa fase di processo.")]
     [InlineData("IX_ProductionOrders_Code", "Esiste già un ordine di produzione con questo codice.")]
@@ -30,7 +33,7 @@ public class ConstraintViolationFixture
     [Fact]
     public void Message_AnyViolation_Success_NeverAsksToRetry()
     {
-        foreach (var c in new[] { "IX_Materials_Code", "IX_ProductionOrders_Code", "IX_WorkOrders_ProductionOrderId_OperationNumber", "IX_Unknown", null })
+        foreach (var c in new[] { "IX_Materials_Code", "IX_WorkCalendars_Code", "IX_WorkCalendars_IsDefault", "IX_ProductionOrders_Code", "IX_WorkOrders_ProductionOrderId_OperationNumber", "IX_Unknown", null })
             ConstraintViolation.From(Pg(ConstraintViolation.UniqueSqlState, c))!.Message.ToLowerInvariant().Should().NotContain("riprova");
         ConstraintViolation.From(Pg(ConstraintViolation.ForeignKeySqlState, "FK_x"))!.Message.ToLowerInvariant().Should().NotContain("riprova");
     }

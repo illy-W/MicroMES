@@ -1,4 +1,5 @@
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.CalendarFeature.Services;
 using MicroMES.ApiFeatures.ProductionOrderFeature.MachineStates;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Planning;
@@ -24,6 +25,9 @@ public class ProductionData(TimeProvider timeProvider)
     public HashSet<(int EquipmentId, int ProcessSegmentId)> EquipmentLinks { get; } = [];
 
     public TimeProvider TimeProvider => timeProvider;
+
+    /// <summary>Calendars of the machines involved (null = no estimate of the end).</summary>
+    public AvailabilityDirectory? Availability { get; set; }
 
     // ---- navigation helpers -------------------------------------------------------------------------
 
@@ -275,7 +279,8 @@ public class ProductionData(TimeProvider timeProvider)
                 .ToList(),
             Materials = Lines.Where(l => ownIds.Contains(l.WorkOrderId)).OrderBy(l => l.Id).Select(ToMaterialModel).ToList(),
             Children = ChildrenOf(order.Id).Select(ToTree).ToList(),
-            Summary = BuildSummary(order, own)
+            Summary = BuildSummary(order, own),
+            EstimatedEnd = ProductionEndEstimator.Estimate(this, order.Id)
         };
     }
 
@@ -376,7 +381,8 @@ public class ProductionData(TimeProvider timeProvider)
                 MinimumDurationMinutes = finish.Count == 0 ? 0m : finish.Values.Max(),
                 CriticalPathWorkOrderIds = ProductionOrderPlanner.CriticalPath(durations, pairs),
                 WorkContentMinutes = durations.Values.Sum(),
-                WorkedMinutes = workOrders.Sum(w => WorkedMinutes(w.Id))
+                WorkedMinutes = workOrders.Sum(w => WorkedMinutes(w.Id)),
+                EstimatedEnd = ProductionEndEstimator.Estimate(this, orderId)
             },
             GeneratedAt = timeProvider.GetUtcNow().UtcDateTime
         };

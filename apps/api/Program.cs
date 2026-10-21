@@ -4,6 +4,8 @@ using MicroMES.Api;
 using MicroMES.ApiCore.Persistence;
 using MicroMES.ApiCore.Persistence.Violations;
 using MicroMES.ApiFeatures.BomFeature;
+using MicroMES.ApiFeatures.CalendarFeature;
+using MicroMES.ApiFeatures.CalendarFeature.Seeding;
 using MicroMES.ApiFeatures.EquipmentFeature;
 using MicroMES.ApiFeatures.MaterialFeature;
 using MicroMES.ApiFeatures.ProcessSegmentFeature;
@@ -73,6 +75,7 @@ builder.Services.AddExceptionHandler<ConstraintViolationExceptionHandler>();
 builder.Services.AddMaterialFeature();
 builder.Services.AddBomFeature();
 builder.Services.AddProcessSegmentFeature();
+builder.Services.AddCalendarFeature();
 builder.Services.AddEquipmentFeature();
 builder.Services.AddScrapFeature();
 builder.Services.AddRoutingFeature();
@@ -88,6 +91,9 @@ if (app.Environment.IsDevelopment() && !isOpenApiEnabled)
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
     scope.ServiceProvider.GetRequiredService<MasterDataDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
+    // The unit of work cannot reopen a transaction within the same scope: the calendar seeder gets its own.
+    using (var calendarScope = app.Services.CreateScope())
+        calendarScope.ServiceProvider.GetRequiredService<CalendarDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
     scope.ServiceProvider.GetRequiredService<ProductionOrderDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
 }
 

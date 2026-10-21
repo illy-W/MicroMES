@@ -90,4 +90,6 @@ public class ProductionOrderDetailModel : ProductionOrderModel
     public required List<WorkOrderMaterialModel> Materials { get; set; }
     public required List<ProductionOrderTreeModel> Children { get; set; }
     public required ProductionOrderSummaryModel Summary { get; set; }
+    /// <summary>Indicative end (UTC), not persisted: remaining work of the order and its children on the machine calendars and efficiency, ignoring capacity conflicts. Null when the order is not open or nothing is left.</summary>
+    public DateTime? EstimatedEnd { get; set; }
 }

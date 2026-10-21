@@ -2399,6 +2399,1354 @@
         }
       }
     },
+    "/api/calendars": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "GetCalendars",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkCalendarModel"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "CreateCalendar",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkCalendarRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkCalendarRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkCalendarRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkCalendarModel"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "GetCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkCalendarModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "UpdateCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkCalendarRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkCalendarRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkCalendarRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkCalendarModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "DeactivateCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}/duplicate": {
+      "post": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "DuplicateCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateWorkCalendarRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateWorkCalendarRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateWorkCalendarRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkCalendarModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}/set-default": {
+      "post": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "SetDefaultCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkCalendarModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/time-zone": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "GetCompanyTimeZone",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyTimeZoneModel"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "UpdateCompanyTimeZone",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyTimeZoneRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyTimeZoneRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyTimeZoneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyTimeZoneModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}/preview": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "PreviewCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "minutes",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarPreviewModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipment/{id}/calendar/preview": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "PreviewEquipmentCalendar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "minutes",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarPreviewModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}/days": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "GetCalendarDays",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarDayModel"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipment/{id}/calendar/days": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "GetEquipmentCalendarDays",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarDayModel"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}/exceptions": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "GetCalendarExceptions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarExceptionModel"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "CreateCalendarException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarExceptionModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}/exceptions/{exceptionId}": {
+      "put": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "UpdateCalendarException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarExceptionModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "DeleteCalendarException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars/{id}/holidays/italy": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "PreviewItalianHolidays",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItalianHolidaysPreviewModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "ImportItalianHolidays",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportItalianHolidaysRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportItalianHolidaysRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportItalianHolidaysRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportItalianHolidaysResultModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipment/{id}/exceptions": {
+      "get": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "GetEquipmentExceptions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarExceptionModel"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "CreateEquipmentException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarExceptionModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipment/{id}/exceptions/{exceptionId}": {
+      "put": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "UpdateEquipmentException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCalendarExceptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarExceptionModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Calendars"
+        ],
+        "operationId": "DeleteEquipmentException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/materials/{id}/bom": {
       "get": {
         "tags": [
@@ -2844,6 +4192,181 @@
           }
         }
       },
+      "CalendarDayModel": {
+        "required": [
+          "date",
+          "dayOfWeek",
+          "status",
+          "slots"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "dayOfWeek": {
+            "$ref": "#/components/schemas/DayOfWeek"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CalendarDayStatus"
+          },
+          "exceptionScope": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExceptionScope"
+              }
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeSlotModel"
+            }
+          }
+        }
+      },
+      "CalendarDayStatus": {
+        "enum": [
+          "Working",
+          "NonWorking",
+          "Closed",
+          "Custom"
+        ]
+      },
+      "CalendarExceptionKind": {
+        "enum": [
+          "Closed",
+          "Custom"
+        ]
+      },
+      "CalendarExceptionModel": {
+        "required": [
+          "id",
+          "ownerId",
+          "fromDate",
+          "toDate",
+          "kind",
+          "isRecurringYearly",
+          "reason",
+          "slots",
+          "overlaps",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ownerId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalendarExceptionKind"
+          },
+          "isRecurringYearly": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeSlotModel"
+            }
+          },
+          "overlaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExceptionOverlapModel"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CalendarPreviewModel": {
+        "required": [
+          "timeZoneId",
+          "start",
+          "firstWorkingInstant",
+          "standardMinutes",
+          "efficiencyPercent",
+          "workingMinutes",
+          "end"
+        ],
+        "type": "object",
+        "properties": {
+          "calendarId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "timeZoneId": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "firstWorkingInstant": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "standardMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "efficiencyPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "workingMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "CloseSessionRequest": {
         "type": "object",
         "properties": {
@@ -2875,6 +4398,17 @@
             "items": {
               "$ref": "#/components/schemas/ScrapEntryRequest"
             }
+          }
+        }
+      },
+      "CompanyTimeZoneModel": {
+        "required": [
+          "timeZoneId"
+        ],
+        "type": "object",
+        "properties": {
+          "timeZoneId": {
+            "type": "string"
           }
         }
       },
@@ -2975,6 +4509,31 @@
               "null",
               "string"
             ]
+          },
+          "workCalendarId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "capacity": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "efficiencyPercent": {
+            "maximum": 1000,
+            "minimum": 0.01,
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           },
           "processSegmentIds": {
             "type": [
@@ -3197,12 +4756,117 @@
           }
         }
       },
+      "CreateWorkCalendarRequest": {
+        "required": [
+          "code",
+          "name",
+          "slots"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "slots": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/WorkCalendarSlotRequest"
+            }
+          }
+        }
+      },
+      "DayOfWeek": {
+        "enum": [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday"
+        ]
+      },
+      "DuplicateWorkCalendarRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      },
+      "EffectiveCalendarModel": {
+        "required": [
+          "calendarId",
+          "code",
+          "name",
+          "isInherited",
+          "weeklyHours",
+          "upcomingClosures"
+        ],
+        "type": "object",
+        "properties": {
+          "calendarId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isInherited": {
+            "type": "boolean"
+          },
+          "weeklyHours": {
+            "type": "number",
+            "format": "double"
+          },
+          "upcomingClosures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpcomingClosureModel"
+            }
+          }
+        }
+      },
       "EquipmentModel": {
         "required": [
           "id",
           "code",
           "name",
           "isActive",
+          "capacity",
+          "efficiencyPercent",
           "processSegments",
           "createdAt",
           "updatedAt"
@@ -3227,6 +4891,31 @@
           },
           "isActive": {
             "type": "boolean"
+          },
+          "workCalendarId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "capacity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "efficiencyPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "effectiveCalendar": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EffectiveCalendarModel"
+              }
+            ]
           },
           "processSegments": {
             "type": "array",
@@ -3269,6 +4958,126 @@
           },
           "isDefault": {
             "type": "boolean"
+          }
+        }
+      },
+      "ExceptionOverlapModel": {
+        "required": [
+          "id",
+          "fromDate",
+          "toDate",
+          "kind",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CalendarExceptionKind"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ExceptionScope": {
+        "enum": [
+          "Calendar",
+          "Equipment"
+        ]
+      },
+      "ImportItalianHolidaysRequest": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "maximum": 2200,
+            "minimum": 1970,
+            "type": "integer",
+            "format": "int32"
+          },
+          "dates": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        }
+      },
+      "ImportItalianHolidaysResultModel": {
+        "required": [
+          "year",
+          "created",
+          "skipped"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarExceptionModel"
+            }
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ItalianHolidayModel": {
+        "required": [
+          "date",
+          "name",
+          "alreadyPresent"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "name": {
+            "type": "string"
+          },
+          "alreadyPresent": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ItalianHolidaysPreviewModel": {
+        "required": [
+          "year",
+          "holidays"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holidays": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItalianHolidayModel"
+            }
           }
         }
       },
@@ -3523,6 +5332,13 @@
           },
           "summary": {
             "$ref": "#/components/schemas/ProductionOrderSummaryModel"
+          },
+          "estimatedEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "id": {
             "type": "integer",
@@ -3893,6 +5709,13 @@
           "workedMinutes": {
             "type": "number",
             "format": "double"
+          },
+          "estimatedEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -4310,6 +6133,58 @@
           }
         }
       },
+      "SaveCalendarExceptionRequest": {
+        "required": [
+          "fromDate",
+          "toDate",
+          "kind",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "fromDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "toDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CalendarExceptionKind"
+              }
+            ]
+          },
+          "isRecurringYearly": {
+            "type": "boolean"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "slots": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/TimeSlotRequest"
+            }
+          }
+        }
+      },
       "ScrapEntryRequest": {
         "type": "object",
         "properties": {
@@ -4556,6 +6431,46 @@
           }
         }
       },
+      "TimeSlotModel": {
+        "required": [
+          "startTime",
+          "endTime"
+        ],
+        "type": "object",
+        "properties": {
+          "startTime": {
+            "type": "string",
+            "format": "time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "time"
+          }
+        }
+      },
+      "TimeSlotRequest": {
+        "required": [
+          "startTime",
+          "endTime"
+        ],
+        "type": "object",
+        "properties": {
+          "startTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "endTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          }
+        }
+      },
       "UnitOfMeasure": {
         "enum": [
           "Piece",
@@ -4564,6 +6479,31 @@
           "Meter",
           "Liter"
         ]
+      },
+      "UpcomingClosureModel": {
+        "required": [
+          "fromDate",
+          "toDate",
+          "reason",
+          "scope"
+        ],
+        "type": "object",
+        "properties": {
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ExceptionScope"
+          }
+        }
       },
       "UpdateBomItemRequest": {
         "required": [
@@ -4586,6 +6526,19 @@
               "integer"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "UpdateCompanyTimeZoneRequest": {
+        "required": [
+          "timeZoneId"
+        ],
+        "type": "object",
+        "properties": {
+          "timeZoneId": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
           }
         }
       },
@@ -4620,6 +6573,31 @@
               "null",
               "boolean"
             ]
+          },
+          "workCalendarId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "capacity": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "efficiencyPercent": {
+            "maximum": 1000,
+            "minimum": 0.01,
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           },
           "processSegmentIds": {
             "type": [
@@ -4971,6 +6949,50 @@
           }
         }
       },
+      "UpdateWorkCalendarRequest": {
+        "required": [
+          "code",
+          "name",
+          "isActive",
+          "slots"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isActive": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "slots": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/WorkCalendarSlotRequest"
+            }
+          }
+        }
+      },
       "ValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -5013,6 +7035,117 @@
                 "type": "string"
               }
             }
+          }
+        }
+      },
+      "WorkCalendarModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive",
+          "isDefault",
+          "weeklyHours",
+          "slots",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "weeklyHours": {
+            "type": "number",
+            "format": "double"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkCalendarSlotModel"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WorkCalendarSlotModel": {
+        "required": [
+          "dayOfWeek",
+          "startTime",
+          "endTime"
+        ],
+        "type": "object",
+        "properties": {
+          "dayOfWeek": {
+            "$ref": "#/components/schemas/DayOfWeek"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "time"
+          }
+        }
+      },
+      "WorkCalendarSlotRequest": {
+        "required": [
+          "dayOfWeek",
+          "startTime",
+          "endTime"
+        ],
+        "type": "object",
+        "properties": {
+          "dayOfWeek": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DayOfWeek"
+              }
+            ]
+          },
+          "startTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "endTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
           }
         }
       },
@@ -5759,6 +7892,9 @@
     },
     {
       "name": "Equipment"
+    },
+    {
+      "name": "Calendars"
     },
     {
       "name": "Bom"

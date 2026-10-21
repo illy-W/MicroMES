@@ -13,4 +13,6 @@ export interface ProductionOrderOverviewSummaryModel {
   criticalPathWorkOrderIds: number[];
   workContentMinutes: number;
   workedMinutes: number;
+  /** @nullable */
+  estimatedEnd?: string | null;
 }

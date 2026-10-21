@@ -65,6 +65,8 @@ public class ProductionOrderOverviewSummaryModel
     public required decimal WorkContentMinutes { get; set; }
     /// <summary>Sum of the closed sessions of the family.</summary>
     public required decimal WorkedMinutes { get; set; }
+    /// <summary>Indicative end (UTC) of the requested order and its children (same rule as the order detail); null when not available.</summary>
+    public DateTime? EstimatedEnd { get; set; }
 }
 
 /// <summary>Whole family of an order (the order and all its descendants, flat) for the graphical overview.</summary>

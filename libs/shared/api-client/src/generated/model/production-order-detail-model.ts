@@ -18,6 +18,8 @@ export interface ProductionOrderDetailModel {
   materials: WorkOrderMaterialModel[];
   children: ProductionOrderTreeModel[];
   summary: ProductionOrderSummaryModel;
+  /** @nullable */
+  estimatedEnd?: string | null;
   id: number;
   code: string;
   materialId: number;

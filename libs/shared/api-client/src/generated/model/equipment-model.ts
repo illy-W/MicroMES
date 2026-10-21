@@ -4,6 +4,7 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { EffectiveCalendarModel } from './effective-calendar-model';
 import type { EquipmentSegmentModel } from './equipment-segment-model';
 
 export interface EquipmentModel {
@@ -13,6 +14,11 @@ export interface EquipmentModel {
   /** @nullable */
   description?: string | null;
   isActive: boolean;
+  /** @nullable */
+  workCalendarId?: number | null;
+  capacity: number;
+  efficiencyPercent: number;
+  effectiveCalendar?: null | EffectiveCalendarModel;
   processSegments: EquipmentSegmentModel[];
   createdAt: string;
   updatedAt: string;

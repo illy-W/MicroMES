@@ -51,6 +51,21 @@ public sealed class ApiFixture : IAsyncLifetime
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();
         await _respawner.ResetAsync(connection);
+
+        // Respawn also empties WorkCalendars: put the default calendar back, as the migration creates it
+        // (the system never runs without one).
+        await using var restore = connection.CreateCommand();
+        restore.CommandText = """
+            INSERT INTO "WorkCalendars" ("Code", "Name", "Description", "IsActive", "IsDefault", "CreatedAt", "UpdatedAt")
+            VALUES ('STANDARD', 'Standard 8-12 / 13-17, lun-ven', NULL, TRUE, TRUE, now(), now());
+            INSERT INTO "WorkCalendarSlots" ("WorkCalendarId", "DayOfWeek", "StartTime", "EndTime")
+            SELECT c."Id", d."Day", t."S"::time, t."E"::time
+            FROM "WorkCalendars" c
+            CROSS JOIN (VALUES ('Monday'), ('Tuesday'), ('Wednesday'), ('Thursday'), ('Friday')) AS d("Day")
+            CROSS JOIN (VALUES ('08:00', '12:00'), ('13:00', '17:00')) AS t("S", "E")
+            WHERE c."Code" = 'STANDARD';
+            """;
+        await restore.ExecuteNonQueryAsync();
     }
 
     /// <summary>Runs code with a scoped <see cref="AppDbContext"/> of the test API (direct access to verify or arrange data).</summary>
