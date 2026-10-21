@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
-import type { WorkOrderDetailModel, WorkOrderModel, WorkOrderSessionModel } from '@micromes/api-client/models';
+import type { WorkOrderCorrectionModel, WorkOrderDetailModel, WorkOrderModel, WorkOrderSessionModel } from '@micromes/api-client/models';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
@@ -57,7 +57,20 @@ import { WorkOrdersStore } from './work-orders.store';
                       </button>
                     }
                   </div>
-                  <dl class="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+                  <dl class="mt-2 grid grid-cols-2 gap-2 text-sm" [class]="showMachine() ? 'sm:grid-cols-4' : 'sm:grid-cols-3'">
+                    @if (showMachine()) {
+                      <div>
+                        <dt class="text-muted-foreground text-xs">Macchina</dt>
+                        <dd>
+                          @if (s.equipmentCode) {
+                            <span class="font-medium">{{ s.equipmentCode }}</span>
+                            <span class="text-muted-foreground"> {{ s.equipmentName }}</span>
+                          } @else {
+                            —
+                          }
+                        </dd>
+                      </div>
+                    }
                     <div>
                       <dt class="text-muted-foreground text-xs">Buono</dt>
                       <dd class="tabular-nums">{{ qty(s.goodQuantity) }} {{ unit() }}</dd>
@@ -92,6 +105,11 @@ import { WorkOrdersStore } from './work-orders.store';
                             @if (c.previousScrapDetail || c.newScrapDetail) {
                               <div class="text-muted-foreground text-xs">
                                 Motivi: {{ c.previousScrapDetail || 'senza motivo' }} → {{ c.newScrapDetail || 'senza motivo' }}
+                              </div>
+                            }
+                            @if (machineChanged(c)) {
+                              <div class="text-muted-foreground text-xs">
+                                Macchina: {{ c.previousEquipmentCode || 'nessuna' }} → {{ c.newEquipmentCode || 'nessuna' }}
                               </div>
                             }
                             <div>Nota: {{ c.notes }}</div>
@@ -138,6 +156,12 @@ export class WorkOrderSessionsDialogComponent implements OnInit {
   protected readonly correcting = signal<WorkOrderSessionModel | null>(null);
 
   protected readonly sessions = computed(() => this.detail()?.sessions ?? []);
+  /** La macchina compare solo se almeno una sessione ne ha una (fasi senza macchine: nessun rumore). */
+  protected readonly showMachine = computed(() => this.sessions().some((s) => !!s.equipmentCode));
+
+  protected machineChanged(c: WorkOrderCorrectionModel): boolean {
+    return (c.previousEquipmentCode ?? null) !== (c.newEquipmentCode ?? null);
+  }
   /** Non offerta con ordine Completed/Cancelled (il 409 del backend resta la rete di sicurezza). */
   protected readonly canCorrect = computed(() => {
     const st = this.detail()?.productionOrderStatus ?? this.work().productionOrderStatus;

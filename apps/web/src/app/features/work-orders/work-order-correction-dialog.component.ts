@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, ou
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideTrash2 } from '@ng-icons/lucide';
-import type { ScrapEntryRequest, ScrapReasonModel, WorkOrderModel, WorkOrderSessionModel } from '@micromes/api-client/models';
+import type { EquipmentModel, ScrapEntryRequest, ScrapReasonModel, WorkOrderModel, WorkOrderSessionModel } from '@micromes/api-client/models';
 import { ScrapReasonsService } from '@micromes/api-client/services/scrap-reasons';
 import { toast } from '@spartan-ng/brain/sonner';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -14,6 +14,7 @@ import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { firstValueFrom } from 'rxjs';
 import { unitLabel } from '../materials/material-labels';
 import { toFailure } from '../materials/materials.service';
+import { machineLabel, WorkOrderMachinesService } from './work-order-machines';
 import { formatQty } from '../production-orders/production-order-labels';
 import { WorkOrdersStore } from './work-orders.store';
 
@@ -61,6 +62,23 @@ const NONE = 'none';
                 <input hlmInput id="co-scrap" type="text" readonly class="tabular-nums" [value]="qty(scrapTotal())" />
               </div>
             </div>
+
+            @if (machineOptions().length) {
+              <div class="grid gap-1.5">
+                <span id="co-machine-label" class="text-sm font-medium">Macchina</span>
+                <hlm-select [value]="machine()" [itemToString]="machineItemLabel" (valueChange)="machine.set($event ?? machine())">
+                  <hlm-select-trigger size="sm" class="w-full" aria-labelledby="co-machine-label">
+                    <hlm-select-value />
+                  </hlm-select-trigger>
+                  <hlm-select-content *hlmSelectPortal>
+                    @for (o of machineOptions(); track o.value) {
+                      <hlm-select-item [value]="o.value">{{ o.label }}</hlm-select-item>
+                    }
+                  </hlm-select-content>
+                </hlm-select>
+                <p class="text-muted-foreground text-xs">Cambiarla aggiorna la macchina della sessione e resta nello storico.</p>
+              </div>
+            }
 
             <fieldset class="grid gap-2">
               <legend class="text-sm font-medium">Motivi di scarto</legend>
@@ -118,6 +136,7 @@ export class WorkOrderCorrectionDialogComponent implements OnInit {
   private readonly fb = inject(FormBuilder).nonNullable;
   private readonly store = inject(WorkOrdersStore);
   private readonly reasonsApi = inject(ScrapReasonsService);
+  private readonly machines = inject(WorkOrderMachinesService);
 
   readonly work = input.required<WorkOrderModel>();
   readonly session = input.required<WorkOrderSessionModel>();
@@ -131,6 +150,20 @@ export class WorkOrderCorrectionDialogComponent implements OnInit {
   protected readonly formError = signal<string | null>(null);
   private readonly serverErrors = signal<Record<string, string>>({});
   protected readonly rows = signal<Row[]>([]);
+  private readonly candidates = signal<EquipmentModel[]>([]);
+  /** Id della macchina scelta (stringa) o '' se la sessione non ne ha. */
+  protected readonly machine = signal('');
+
+  /** Macchine della fase + quella già usata dalla sessione (anche se non più abilitata, con l'istantanea storica). */
+  protected readonly machineOptions = computed(() => {
+    const map = new Map<string, string>();
+    const s = this.session();
+    if (s.equipmentId != null) map.set(String(s.equipmentId), `${s.equipmentCode ?? s.equipmentId} · ${s.equipmentName ?? ''}`.trim());
+    for (const c of this.candidates()) map.set(String(c.id), machineLabel(c));
+    return [...map].map(([value, label]) => ({ value, label }));
+  });
+  protected readonly machineItemLabel = (value: string): string => this.machineOptions().find((o) => o.value === value)?.label ?? '';
+
   private readonly catalog = signal<ScrapReasonModel[]>([]);
   private nextKey = 1;
 
@@ -154,6 +187,11 @@ export class WorkOrderCorrectionDialogComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     const s = this.session();
     this.form.patchValue({ goodQuantity: s.goodQuantity });
+    this.machine.set(s.equipmentId != null ? String(s.equipmentId) : '');
+    void this.machines
+      .candidates(this.work().processSegmentId)
+      .then((c) => this.candidates.set(c))
+      .catch((e) => this.formError.set(`Macchine non caricate: ${toFailure(e).message}`));
     const rows: Row[] = s.scrapEntries.map((e) => ({
       key: this.nextKey++,
       reason: e.scrapReasonId == null ? NONE : String(e.scrapReasonId),
@@ -213,6 +251,8 @@ export class WorkOrderCorrectionDialogComponent implements OnInit {
         goodQuantity: v.goodQuantity ?? 0,
         scrapQuantity: this.scrapTotal(),
         scrapEntries,
+        // la macchina si invia solo se cambiata rispetto a quella della sessione
+        ...(this.machine() && this.machine() !== String(this.session().equipmentId ?? '') ? { equipmentId: Number(this.machine()) } : {}),
         notes: v.notes.trim(),
       });
       toast.success('Registrazione corretta');

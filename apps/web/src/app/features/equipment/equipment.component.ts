@@ -177,7 +177,12 @@ const columns = columnHelper.columns([
                             @if (row.original.processSegments.length) {
                               <span class="flex flex-wrap gap-1">
                                 @for (p of row.original.processSegments; track p.id) {
-                                  <span hlmBadge variant="secondary">{{ p.code }}</span>
+                                  <span class="inline-flex items-center gap-1">
+                                    <span hlmBadge variant="secondary">{{ p.code }}</span>
+                                    @if (p.isDefault) {
+                                      <span hlmBadge variant="outline" class="px-1.5">predefinita</span>
+                                    }
+                                  </span>
                                 }
                               </span>
                             } @else {

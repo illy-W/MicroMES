@@ -6,6 +6,7 @@ import {
   lucideCircleDot,
   lucideCircleOff,
   lucideClock,
+  lucideCog,
   lucideOctagonX,
   lucidePause,
   lucidePlay,
@@ -40,6 +41,7 @@ import { OverviewViewState } from './overview-view-state';
       lucideCircleDot,
       lucideCircleOff,
       lucideClock,
+      lucideCog,
       lucideOctagonX,
       lucidePause,
       lucidePlay,
@@ -86,8 +88,14 @@ import { OverviewViewState } from './overview-view-state';
           <span class="text-destructive">scarto {{ qty(node().data.scrapQuantity) }}</span>
         }
       </p>
-      <p class="text-muted-foreground truncate text-xs tabular-nums">
-        {{ minutes(node().data.workedMinutes) }} / {{ minutes(node().data.plannedMinutes) }}
+      <p class="text-muted-foreground flex items-baseline justify-between gap-2 text-xs tabular-nums">
+        <span class="truncate">{{ minutes(node().data.workedMinutes) }} / {{ minutes(node().data.plannedMinutes) }}</span>
+        @if (node().data.equipmentCode; as machine) {
+          <span class="flex shrink-0 items-center gap-1" [attr.title]="machineTitle()">
+            <ng-icon name="lucideCog" size="12" aria-hidden="true" />
+            <span class="text-foreground font-medium">{{ machine }}</span>
+          </span>
+        }
       </p>
     </div>
     <ng-diagram-port id="in" side="left" type="target" class="pointer-events-none" />
@@ -110,7 +118,12 @@ export class OverviewWorkNodeComponent implements NgDiagramNodeTemplate<WorkNode
   );
   protected readonly ariaLabel = computed(() => {
     const d = this.node().data;
-    return `Lavoro ${d.code}, fase ${d.phaseName}, stato ${this.style().label}${this.highlighted() ? ', sul percorso più lungo' : ''}`;
+    const machine = d.equipmentCode ? `, ${d.equipmentInUse ? 'macchina in uso' : 'macchina assegnata'} ${d.equipmentCode}` : '';
+    return `Lavoro ${d.code}, fase ${d.phaseName}, stato ${this.style().label}${machine}${this.highlighted() ? ', sul percorso più lungo' : ''}`;
+  });
+  protected readonly machineTitle = computed(() => {
+    const d = this.node().data;
+    return `${d.equipmentInUse ? 'Macchina in uso' : 'Macchina assegnata'}: ${d.equipmentCode} ${d.equipmentName ?? ''}`.trim();
   });
 
   protected select(event: Event): void {

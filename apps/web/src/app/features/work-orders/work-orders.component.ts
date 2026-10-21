@@ -35,12 +35,16 @@ import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { TablePaginatorComponent } from '../../shared/components/table-paginator.component';
+import { EquipmentStore } from '../equipment/equipment.store';
+import { ProcessSegmentsStore } from '../process-segments/process-segments.store';
 import { unitLabel } from '../materials/material-labels';
 import { toFailure } from '../materials/materials.service';
 import { formatQty, WORK_STATUS, workStatus } from '../production-orders/production-order-labels';
 import { formatMinutes } from '../routing/routing-metrics';
 import { WorkOrderAbortDialogComponent } from './work-order-abort-dialog.component';
 import { type CloseMode, WorkOrderCloseDialogComponent } from './work-order-close-dialog.component';
+import { machineUsage, usageText } from './work-order-machines';
+import { type MachineMode, WorkOrderMachineDialogComponent } from './work-order-machine-dialog.component';
 import { WorkOrderSessionsDialogComponent } from './work-order-sessions-dialog.component';
 import { WorkOrderRowActionsComponent } from './work-order-row-actions.component';
 import { WorkOrdersStore } from './work-orders.store';
@@ -56,6 +60,7 @@ const columnHelper = createColumnHelper<typeof features, WorkOrderModel>();
 const columns = columnHelper.columns([
   columnHelper.accessor('code', { id: 'code', header: 'Codice lavoro' }),
   columnHelper.accessor('processSegmentName', { id: 'phase', header: 'Fase' }),
+  columnHelper.display({ id: 'equipment', header: 'Macchina' }),
   columnHelper.accessor('materialCode', { id: 'material', header: 'Materiale prodotto' }),
   columnHelper.accessor('plannedQuantity', { id: 'planned', header: 'Quantità pianificata' }),
   columnHelper.accessor('status', { id: 'status', header: 'Stato' }),
@@ -87,6 +92,7 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
     WorkOrderCloseDialogComponent,
     WorkOrderAbortDialogComponent,
     WorkOrderSessionsDialogComponent,
+    WorkOrderMachineDialogComponent,
   ],
   providers: [
     provideIcons({
@@ -158,6 +164,19 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
             </button>
           }
         </div>
+        @if (machineOptions().length) {
+          <hlm-select [value]="machineFilter()" [itemToString]="machineFilterLabel" (valueChange)="machineFilter.set($event ?? 'all')">
+            <hlm-select-trigger size="sm" class="w-48" aria-label="Filtra per macchina">
+              <hlm-select-value />
+            </hlm-select-trigger>
+            <hlm-select-content *hlmSelectPortal>
+              <hlm-select-item value="all">Tutte le macchine</hlm-select-item>
+              @for (m of machineOptions(); track m.id) {
+                <hlm-select-item [value]="m.id">{{ m.code }} · {{ m.name }}</hlm-select-item>
+              }
+            </hlm-select-content>
+          </hlm-select>
+        }
       </div>
 
       @if (store.loading() && !store.workOrders().length) {
@@ -228,6 +247,23 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
                           @case ('phase') {
                             {{ w.processSegmentName }}
                           }
+                          @case ('equipment') {
+                            @if (w.assignedEquipment; as eq) {
+                              <span class="flex flex-wrap items-center gap-1">
+                                <span class="font-medium">{{ eq.code }}</span>
+                                @if (!eq.isEnabled) {
+                                  <span hlmBadge variant="outline" class="text-destructive px-1.5">non più abilitata</span>
+                                }
+                                @if (inUseBy(w); as uses) {
+                                  <span hlmBadge variant="secondary" class="px-1.5" [attr.title]="usageText(uses)">
+                                    in uso<span class="sr-only"> da {{ usageCodes(uses) }}</span>
+                                  </span>
+                                }
+                              </span>
+                            } @else if (hasMachines(w) && w.status !== 'Ended' && w.status !== 'Aborted') {
+                              <span class="text-muted-foreground">Da assegnare</span>
+                            }
+                          }
                           @case ('material') {
                             <span class="font-medium">{{ w.materialCode }}</span>
                             <span class="text-muted-foreground"> {{ w.materialName }}</span>
@@ -265,6 +301,8 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
                               (stopWork)="closing.set({ work: $event, mode: 'Stop' })"
                               (abortWork)="aborting.set($event)"
                               (sessions)="viewing.set($event)"
+                              [hasMachines]="hasMachines(w)"
+                              (assignMachine)="machineDialog.set({ work: $event, mode: 'Assign' })"
                             />
                           }
                         }
@@ -291,6 +329,9 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
     @if (viewing(); as w) {
       <app-work-order-sessions-dialog [work]="w" (changed)="afterCommand()" (closed)="viewing.set(null)" />
     }
+    @if (machineDialog(); as d) {
+      <app-work-order-machine-dialog [work]="d.work" [mode]="d.mode" (done)="afterCommand(); machineDialog.set(null)" (closed)="machineDialog.set(null)" />
+    }
     @if (aborting(); as w) {
       <app-work-order-abort-dialog [work]="w" (done)="afterCommand(); aborting.set(null)" (closed)="aborting.set(null)" />
     }
@@ -316,12 +357,37 @@ export class WorkOrdersComponent implements OnInit {
   protected readonly unit = unitLabel;
   protected readonly minutes = formatMinutes;
 
+  protected readonly machineFilterLabel = (value: string): string =>
+    value === ALL ? 'Tutte le macchine' : (this.machineOptions().find((m) => m.id === value)?.label ?? value);
+  protected readonly usageText = usageText;
+
   protected readonly search = signal('');
   protected readonly statusFilter = signal<string>(OPERATIONAL);
   protected readonly orderFilter = signal<string>(ALL);
   protected readonly closing = signal<{ work: WorkOrderModel; mode: CloseMode } | null>(null);
+  protected readonly machineFilter = signal<string>(ALL);
+  protected readonly machineDialog = signal<{ work: WorkOrderModel; mode: MachineMode } | null>(null);
   protected readonly aborting = signal<WorkOrderModel | null>(null);
   protected readonly viewing = signal<WorkOrderModel | null>(null);
+
+  private readonly equipmentStore = inject(EquipmentStore);
+  private readonly segmentsStore = inject(ProcessSegmentsStore);
+
+  /** Macchine attive per il filtro. */
+  protected readonly machineOptions = computed(() =>
+    this.equipmentStore
+      .items()
+      .filter((e) => e.isActive)
+      .map((e) => ({ id: String(e.id), code: e.code, name: e.name, label: `${e.code} · ${e.name}` })),
+  );
+
+  /** Fasi con almeno una macchina attiva collegata (per sapere se la macchina va chiesta). */
+  private readonly segmentsWithMachines = computed(
+    () => new Set(this.segmentsStore.segments().filter((s) => s.equipment.some((e) => e.isActive)).map((s) => s.id)),
+  );
+
+  /** Macchina -> lavori Running che la usano, dall'elenco già caricato. */
+  private readonly usage = computed(() => machineUsage(this.store.workOrders()));
 
   private readonly queryParams = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
 
@@ -336,12 +402,14 @@ export class WorkOrdersComponent implements OnInit {
     const q = this.search().trim().toLowerCase();
     const s = this.statusFilter();
     const o = this.orderFilter();
+    const m = this.machineFilter();
     return this.store
       .workOrders()
       .filter(
         (w) =>
           (s === ALL || (s === OPERATIONAL ? OPERATIONAL_STATUSES.includes(w.status) : w.status === s)) &&
           (o === ALL || String(w.productionOrderId) === o) &&
+          (m === ALL || String(w.assignedEquipment?.id) === m) &&
           (!q ||
             w.code.toLowerCase().includes(q) ||
             w.processSegmentName.toLowerCase().includes(q) ||
@@ -370,6 +438,7 @@ export class WorkOrdersComponent implements OnInit {
       this.search();
       this.statusFilter();
       this.orderFilter();
+      this.machineFilter();
       untracked(() => this.table.resetPageIndex());
     });
     // ?order=<id> dalla pagina dell'ordine: mostra tutti i lavori di quell'ordine.
@@ -386,6 +455,23 @@ export class WorkOrdersComponent implements OnInit {
 
   ngOnInit(): void {
     void this.store.load();
+    void this.equipmentStore.load();
+    void this.segmentsStore.load();
+  }
+
+  protected hasMachines(w: WorkOrderModel): boolean {
+    return this.segmentsWithMachines().has(w.processSegmentId);
+  }
+
+  /** Altri lavori Running che usano la macchina assegnata (null se nessuno). */
+  protected inUseBy(w: WorkOrderModel) {
+    const id = w.assignedEquipment?.id;
+    const uses = id == null ? [] : (this.usage().get(id) ?? []).filter((u) => u.workOrderId !== w.id);
+    return uses.length ? uses : null;
+  }
+
+  protected usageCodes(uses: readonly { code: string }[]): string {
+    return uses.map((u) => u.code).join(', ');
   }
 
   protected numeric(id: string): boolean {
@@ -403,6 +489,7 @@ export class WorkOrdersComponent implements OnInit {
   protected resetFilters(): void {
     this.search.set('');
     this.statusFilter.set(OPERATIONAL);
+    this.machineFilter.set(ALL);
     this.clearOrderFilter();
   }
 
@@ -413,8 +500,16 @@ export class WorkOrdersComponent implements OnInit {
     }
   }
 
-  /** Comandi senza dialog (Avvia, Riprendi). */
+  /**
+   * Avvia / Riprendi. Se la fase ha macchine si apre il dialogo di scelta (precompilato: un clic se la macchina è
+   * già assegnata e libera); senza macchine la chiamata è diretta, come prima.
+   */
   protected async run(w: WorkOrderModel, command: 'start' | 'resume'): Promise<void> {
+    if (!this.segmentsStore.segments().length) await this.segmentsStore.load();
+    if (this.hasMachines(w)) {
+      this.machineDialog.set({ work: w, mode: command === 'start' ? 'Start' : 'Resume' });
+      return;
+    }
     try {
       if (command === 'start') await this.store.start(w.id);
       else await this.store.resume(w.id);

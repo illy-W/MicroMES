@@ -23,13 +23,13 @@
 
 ## Frontend
 
-- [ ] 2.1 [Frontend] Fasi di processo: nel dialogo, tra le macchine selezionate, scelta di una sola «predefinita» (con possibilità di toglierla); la lista fasi e la lista macchine mostrano il badge «predefinita»; si invia `defaultEquipmentId` insieme a `equipmentIds`. _Satisfies: REQ-6_
-- [ ] 2.2 [Frontend] Ordini di lavoro: colonna «Macchina» (assegnata, con badge «in uso» e «non più abilitata»), filtro per macchina, azione «Assegna macchina» per i lavori `Waiting`/`Ready`/`Interrupted` con l'avviso non bloccante delle macchine in uso (dall'elenco dei lavori `Running`); il campo non compare se la fase non ha macchine. _Satisfies: REQ-1, REQ-3, REQ-4_
-- [ ] 2.3 [Frontend] Avvio e ripresa: dialogo con la macchina precompilata (assegnata, o ultima sessione alla ripresa), obbligatoria se la fase ha macchine, avviso «in uso», errori 422 mostrati; se il lavoro è già assegnato e valido, l'avvio resta a un clic. Sessioni del lavoro con la macchina usata e correzione che può cambiarla. _Satisfies: REQ-2, REQ-3, REQ-4_
-- [ ] 2.4 [Frontend] Dettaglio ordine (tab «Lavori», colonna macchina) e panoramica (macchina nel pannello laterale e indicazione compatta nel nodo con testo accessibile). _Satisfies: REQ-4_
-- [ ] 2.5 [Frontend] `npx nx lint web` e `npx nx build web`; riportare cosa non è verificato a runtime. _Satisfies: REQ-1..REQ-6_
+- [x] 2.1 [Frontend] Fasi di processo: nel dialogo, tra le macchine selezionate, scelta di una sola «predefinita» (con possibilità di toglierla); la lista fasi e la lista macchine mostrano il badge «predefinita»; si invia `defaultEquipmentId` insieme a `equipmentIds`. _Satisfies: REQ-6_
+- [x] 2.2 [Frontend] Ordini di lavoro: colonna «Macchina» (assegnata, con badge «in uso» e «non più abilitata»), filtro per macchina, azione «Assegna macchina» per i lavori `Waiting`/`Ready`/`Interrupted` con l'avviso non bloccante delle macchine in uso (dall'elenco dei lavori `Running`); il campo non compare se la fase non ha macchine. _Satisfies: REQ-1, REQ-3, REQ-4_
+- [x] 2.3 [Frontend] Avvio e ripresa: dialogo con la macchina precompilata (assegnata, o ultima sessione alla ripresa), obbligatoria se la fase ha macchine, avviso «in uso», errori 422 mostrati; se il lavoro è già assegnato e valido, l'avvio resta a un clic. Sessioni del lavoro con la macchina usata e correzione che può cambiarla. _Satisfies: REQ-2, REQ-3, REQ-4_
+- [x] 2.4 [Frontend] Dettaglio ordine (tab «Lavori», colonna macchina) e panoramica (macchina nel pannello laterale e indicazione compatta nel nodo con testo accessibile). _Satisfies: REQ-4_
+- [x] 2.5 [Frontend] `npx nx lint web` e `npx nx build web`; riportare cosa non è verificato a runtime. _Satisfies: REQ-1..REQ-6_
 
 ## Lead
 
-- [ ] 3.1 [Lead] Aggiornare `doc/glossary.md` (campi nuovi, predefinita, deviazioni da ISA-95) e `doc/structure.md` (assegnazione, regola di selezione, avvio/ripresa). _Satisfies: tutti_
-- [ ] 3.2 [Lead] Verifica: `npx nx run-many -t lint build`, test unitari e di integrazione, DB di sviluppo ripristinato con il seed, controllo DOM nel browser (fasi, lavori, avvio, panoramica), verifica dei criteri di accettazione. _Satisfies: tutti_
+- [x] 3.1 [Lead] Aggiornare `doc/glossary.md` (campi nuovi, predefinita, deviazioni da ISA-95) e `doc/structure.md` (assegnazione, regola di selezione, avvio/ripresa). _Satisfies: tutti_
+- [x] 3.2 [Lead] Verifica: `npx nx run-many -t lint build`, test unitari e di integrazione, DB di sviluppo ripristinato con il seed, controllo DOM nel browser (fasi, lavori, avvio, panoramica), verifica dei criteri di accettazione. _Satisfies: tutti_

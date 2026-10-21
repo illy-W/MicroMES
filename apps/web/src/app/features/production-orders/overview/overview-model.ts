@@ -1,4 +1,4 @@
-import type { ProductionOrderOverviewModel } from '@micromes/api-client/models';
+import type { ProductionOrderOverviewModel, ProductionOrderOverviewWorkOrderModel } from '@micromes/api-client/models';
 import type { Edge, GroupNode, Node } from 'ng-diagram';
 import { formatMinutes } from '../../routing/routing-metrics';
 import { orderStatus, workStatus, type StatusStyle } from '../production-order-labels';
@@ -28,6 +28,11 @@ export interface WorkNodeData {
   plannedMinutes: number;
   workedMinutes: number;
   critical: boolean;
+  /** Macchina da mostrare: quella in uso se `Running`, altrimenti l'assegnata (assente se la fase non ne ha). */
+  equipmentCode?: string;
+  equipmentName?: string;
+  /** True se la macchina è quella della sessione aperta (lavoro `Running`). */
+  equipmentInUse?: boolean;
   [key: string]: unknown;
 }
 
@@ -54,6 +59,13 @@ export interface OverviewEdgeData {
 export interface OverviewGraph {
   nodes: Node[];
   edges: Edge[];
+}
+
+/** Macchina del nodo: in uso (sessione aperta) oppure assegnata; nessuna chiave se il lavoro non ne ha. */
+function equipmentData(w: ProductionOrderOverviewWorkOrderModel): Pick<WorkNodeData, 'equipmentCode' | 'equipmentName' | 'equipmentInUse'> {
+  const inUse = w.status === 'Running' ? w.currentEquipment : null;
+  const eq = inUse ?? w.assignedEquipment;
+  return eq ? { equipmentCode: eq.code, equipmentName: eq.name, equipmentInUse: !!inUse } : {};
 }
 
 /**
@@ -127,6 +139,7 @@ export function buildOverviewGraph(overview: ProductionOrderOverviewModel, rootO
       plannedMinutes: w.plannedMinutes,
       workedMinutes: w.workedMinutes,
       critical: critical.has(w.id),
+      ...equipmentData(w),
     },
   }));
 

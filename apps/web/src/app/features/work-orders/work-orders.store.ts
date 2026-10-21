@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import type { AbortRequest, CloseSessionRequest, CorrectSessionRequest, WorkOrderDetailModel, WorkOrderModel } from '@micromes/api-client/models';
+import type { AbortRequest, OpenSessionRequest, CloseSessionRequest, CorrectSessionRequest, WorkOrderDetailModel, WorkOrderModel } from '@micromes/api-client/models';
 import { WorkOrdersService } from '@micromes/api-client/services/work-orders';
 import { firstValueFrom } from 'rxjs';
 import { toFailure } from '../materials/materials.service';
@@ -31,12 +31,18 @@ export class WorkOrdersStore {
     return updated;
   }
 
-  async start(id: number): Promise<WorkOrderDetailModel> {
-    return this.apply(await firstValueFrom(this.api.startWorkOrder(id)));
+  /** Senza corpo (fase senza macchine) o con la macchina scelta. */
+  async start(id: number, req?: OpenSessionRequest): Promise<WorkOrderDetailModel> {
+    return this.apply(await firstValueFrom(this.api.startWorkOrder(id, req)));
   }
 
-  async resume(id: number): Promise<WorkOrderDetailModel> {
-    return this.apply(await firstValueFrom(this.api.resumeWorkOrder(id)));
+  async resume(id: number, req?: OpenSessionRequest): Promise<WorkOrderDetailModel> {
+    return this.apply(await firstValueFrom(this.api.resumeWorkOrder(id, req)));
+  }
+
+  /** Assegna (o rimuove, con null) la macchina del lavoro. */
+  async assignEquipment(id: number, equipmentId: number | null): Promise<WorkOrderDetailModel> {
+    return this.apply(await firstValueFrom(this.api.assignWorkOrderEquipment(id, { equipmentId })));
   }
 
   async pause(id: number, req: CloseSessionRequest): Promise<WorkOrderDetailModel> {

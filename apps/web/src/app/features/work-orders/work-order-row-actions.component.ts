@@ -38,6 +38,14 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
           @if (can('Stop')) {
             <button hlmDropdownMenuItem (click)="stopWork.emit(work())">Chiudi lavoro</button>
           }
+          @if (canAssign()) {
+            <button hlmDropdownMenuItem [disabled]="!hasMachines()" (click)="assignMachine.emit(work())">
+              Assegna macchina
+              @if (!hasMachines()) {
+                <span class="text-muted-foreground text-xs">(la fase non ha macchine)</span>
+              }
+            </button>
+          }
           <button hlmDropdownMenuItem (click)="sessions.emit(work())">Registrazioni</button>
           <button hlmDropdownMenuItem (click)="openOrder()">Apri ordine</button>
         </hlm-dropdown-menu-group>
@@ -60,6 +68,14 @@ export class WorkOrderRowActionsComponent {
   readonly stopWork = output<WorkOrderModel>();
   readonly abortWork = output<WorkOrderModel>();
   readonly sessions = output<WorkOrderModel>();
+  readonly assignMachine = output<WorkOrderModel>();
+  /** La fase del lavoro ha macchine attive collegate: altrimenti «Assegna macchina» è disabilitata. */
+  readonly hasMachines = input(true);
+
+  /** Assegnabile solo da Waiting, Ready e Interrupted (non è un cambio di stato: non è in allowedActions). */
+  protected canAssign(): boolean {
+    return ['Waiting', 'Ready', 'Interrupted'].includes(this.work().status);
+  }
 
   protected can(action: string): boolean {
     return this.work().allowedActions.includes(action);

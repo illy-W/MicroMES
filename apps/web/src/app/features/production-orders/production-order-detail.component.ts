@@ -221,6 +221,9 @@ const columns = columnHelper.columns([
                       <tr hlmTr>
                         <th hlmTh>Lavoro</th>
                         <th hlmTh>Fase</th>
+                        @if (hasMachines(o.workOrders)) {
+                          <th hlmTh>Macchina</th>
+                        }
                         <th hlmTh class="text-right">Pianificato</th>
                         <th hlmTh>Stato</th>
                         <th hlmTh class="text-right">Buono / Scarto</th>
@@ -244,6 +247,18 @@ const columns = columnHelper.columns([
                             >
                           </td>
                           <td hlmTd>{{ w.processSegmentName }}</td>
+                          @if (hasMachines(o.workOrders)) {
+                            <td hlmTd>
+                              @if (w.status === 'Running' && w.currentEquipment; as cur) {
+                                <span class="font-medium">{{ cur.code }}</span>
+                              } @else if (w.assignedEquipment; as eq) {
+                                <span class="font-medium">{{ eq.code }}</span>
+                                @if (!eq.isEnabled) {
+                                  <span hlmBadge variant="outline" class="text-destructive ml-1 px-1.5">non più abilitata</span>
+                                }
+                              }
+                            </td>
+                          }
                           <td hlmTd class="text-right tabular-nums">{{ minutes(w.plannedMinutes) }}</td>
                           <td hlmTd>
                             <span hlmBadge variant="outline" class="px-1.5" [class]="ws.tone"><ng-icon [name]="ws.icon" /> {{ ws.label }}</span>
@@ -477,6 +492,11 @@ export class ProductionOrderDetailComponent {
 
   protected can(action: string): boolean {
     return !!this.order()?.allowedActions.includes(action);
+  }
+
+  /** La colonna compare solo se almeno un lavoro ha una macchina (fasi senza macchine: nessun rumore). */
+  protected hasMachines(works: readonly { assignedEquipment?: unknown; currentEquipment?: unknown }[]): boolean {
+    return works.some((w) => !!w.assignedEquipment || !!w.currentEquipment);
   }
 
   protected links(items: WorkOrderLinkModel[]): string {

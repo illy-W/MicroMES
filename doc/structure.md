@@ -99,6 +99,12 @@ See `AGENTS.md` for the project table and dependency direction.
 - `EquipmentFeature`: `/api/equipment` (soft-delete, filters `includeInactive`, `search`, `processSegmentId`). The machine <-> process segment link is edited from both sides with the same linker (`EquipmentSegmentLinker`): machine `processSegmentIds` always replaces the set; segment `equipmentIds` replaces it only when present (omitted = unchanged). Only active items can be newly linked; existing links to deactivated items are kept. `AddEquipmentFeature()` must be registered together with `AddProcessSegmentFeature()`.
 - Web: `features/equipment`, shared `LinkedItemsPickerComponent` (checkboxes with search) also used in the process segment dialog; menu section *Anagrafiche*.
 
+### Equipment assignment
+
+- Rules in `EquipmentSelector` (pure `Pick`/`Check`): a machine must be active, existing and linked to the work order's process segment; a phase without machines accepts none. Release assigns the segment's active default machine, else the only active linked machine, else none. `PUT /api/work-orders/{id}/equipment` (Waiting/Ready/Interrupted) is not a state-machine transition.
+- `POST start/resume` accept an optional body `OpenSessionRequest {equipmentId}`: without body start uses the assigned machine and resume the last session's; required only if the phase has active linked machines; the work order's assignment follows the machine used; the session keeps a code/name snapshot. Corrections may change the machine (trace in the correction record).
+- Web: one dialog (`work-order-machine-dialog`) for start, resume and assign; shown only when the phase has machines; "in uso" is computed client side from the Running work orders (no endpoint).
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.

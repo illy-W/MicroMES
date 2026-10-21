@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject, input, OnInit, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import type { ProcessSegmentModel } from '@micromes/api-client/models';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmSwitch } from '@spartan-ng/helm/switch';
 import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { LinkedItemsPickerComponent } from '../../shared/components/linked-items-picker.component';
@@ -12,9 +13,11 @@ import { EquipmentStore } from '../equipment/equipment.store';
 import { toFailure } from '../materials/materials.service';
 import { ProcessSegmentsStore } from './process-segments.store';
 
+const NONE = 'none';
+
 @Component({
   selector: 'app-process-segment-form-dialog',
-  imports: [ReactiveFormsModule, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSwitch, HlmTextarea, LinkedItemsPickerComponent],
+  imports: [ReactiveFormsModule, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSelectImports, HlmSwitch, HlmTextarea, LinkedItemsPickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-dialog state="open" (closed)="closed.emit()">
@@ -89,6 +92,29 @@ import { ProcessSegmentsStore } from './process-segments.store';
               <p class="text-destructive text-xs" role="alert">{{ e }}</p>
             }
 
+            @if (defaultOptions().length) {
+              <div class="grid gap-1.5">
+                <span id="ps-default-label" class="text-sm font-medium">Macchina predefinita</span>
+                <hlm-select [value]="effectiveDefault()" [itemToString]="defaultLabel" (valueChange)="defaultEquipment.set($event ?? NONE)">
+                  <hlm-select-trigger size="sm" class="w-full" aria-labelledby="ps-default-label" aria-describedby="ps-default-hint">
+                    <hlm-select-value />
+                  </hlm-select-trigger>
+                  <hlm-select-content *hlmSelectPortal>
+                    <hlm-select-item [value]="NONE">Nessuna</hlm-select-item>
+                    @for (o of defaultOptions(); track o.value) {
+                      <hlm-select-item [value]="o.value">{{ o.label }}</hlm-select-item>
+                    }
+                  </hlm-select-content>
+                </hlm-select>
+                <p id="ps-default-hint" class="text-muted-foreground text-xs">
+                  La macchina predefinita viene assegnata automaticamente ai nuovi lavori della fase.
+                </p>
+                @if (fieldError('defaultEquipmentId'); as e) {
+                  <p class="text-destructive text-xs" role="alert">{{ e }}</p>
+                }
+              </div>
+            }
+
             @if (segment()) {
               <div class="flex items-center gap-2">
                 <hlm-switch inputId="ps-active" formControlName="isActive" />
@@ -121,6 +147,24 @@ export class ProcessSegmentFormDialogComponent implements OnInit {
   protected readonly formError = signal<string | null>(null);
   private readonly serverErrors = signal<Record<string, string>>({});
   protected readonly selectedEquipment = signal<ReadonlySet<number>>(new Set());
+  protected readonly NONE = NONE;
+  /** Predefinita scelta (id come stringa o NONE); decade da sola se la macchina viene deselezionata. */
+  protected readonly defaultEquipment = signal<string>(NONE);
+
+  /** Tra le macchine selezionate solo le attive possono essere predefinite. */
+  protected readonly defaultOptions = computed(() => {
+    const sel = this.selectedEquipment();
+    return this.equipmentStore
+      .items()
+      .filter((e) => sel.has(e.id) && e.isActive)
+      .map((e) => ({ value: String(e.id), label: `${e.code} · ${e.name}` }));
+  });
+  protected readonly effectiveDefault = computed(() => {
+    const v = this.defaultEquipment();
+    return this.defaultOptions().some((o) => o.value === v) ? v : NONE;
+  });
+  protected readonly defaultLabel = (value: string): string =>
+    value === NONE ? 'Nessuna' : (this.defaultOptions().find((o) => o.value === value)?.label ?? '');
 
   protected readonly form = this.fb.group({
     code: ['', [Validators.required, Validators.maxLength(50)]],
@@ -144,6 +188,8 @@ export class ProcessSegmentFormDialogComponent implements OnInit {
         isActive: s.isActive,
       });
       this.selectedEquipment.set(new Set(s.equipment.map((e) => e.id)));
+      const def = s.equipment.find((e) => e.isDefault);
+      if (def) this.defaultEquipment.set(String(def.id));
     }
   }
 
@@ -170,6 +216,8 @@ export class ProcessSegmentFormDialogComponent implements OnInit {
       setupMinutes: v.setupMinutes ?? 0,
       runMinutesPerUnit: v.runMinutesPerUnit ?? 0,
       equipmentIds: [...this.selectedEquipment()],
+      // sempre insieme a equipmentIds: il backend legge la predefinita solo se l'elenco è presente
+      defaultEquipmentId: this.effectiveDefault() === NONE ? null : Number(this.effectiveDefault()),
     };
     this.saving.set(true);
     this.formError.set(null);

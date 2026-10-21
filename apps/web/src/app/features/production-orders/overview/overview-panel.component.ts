@@ -75,6 +75,25 @@ interface LinkedWork {
             <dd>{{ workOrder()?.code }}</dd>
             <dt class="text-muted-foreground">Fase</dt>
             <dd>{{ w.processSegmentCode }}</dd>
+            @if (w.assignedEquipment || (w.status === 'Running' && w.currentEquipment)) {
+              @if (w.assignedEquipment; as eq) {
+                <dt class="text-muted-foreground">Macchina assegnata</dt>
+                <dd>
+                  <span class="font-medium">{{ eq.code }}</span>
+                  <span class="text-muted-foreground"> {{ eq.name }}</span>
+                  @if (!eq.isEnabled) {
+                    <span hlmBadge variant="outline" class="text-destructive ml-1 px-1.5">non più abilitata</span>
+                  }
+                </dd>
+              }
+              @if (w.status === 'Running' && w.currentEquipment; as cur) {
+                <dt class="text-muted-foreground">Macchina in uso</dt>
+                <dd>
+                  <span class="font-medium">{{ cur.code }}</span>
+                  <span class="text-muted-foreground"> {{ cur.name }}</span>
+                </dd>
+              }
+            }
             <dt class="text-muted-foreground">Pianificato</dt>
             <dd class="tabular-nums">{{ qty(w.plannedQuantity) }} {{ unit(workOrder()?.unitOfMeasure) }}</dd>
             <dt class="text-muted-foreground">Buoni</dt>
