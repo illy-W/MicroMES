@@ -98,3 +98,29 @@ export function formatDuration(ms: number): string {
   const rh = h % 24;
   return rh ? `${d} g ${rh} h` : `${d} g`;
 }
+
+/** Giorni (chiave, inizio, fine) che toccano `[from, to)`, nel fuso aziendale. */
+export function daysBetween(from: number, to: number, tz: string): { key: string; start: number; end: number }[] {
+  const out: { key: string; start: number; end: number }[] = [];
+  let key = dayKey(from, tz);
+  let start = dayStart(key, tz);
+  for (let i = 0; i < 800 && start < to; i++) {
+    const next = addDays(key, 1);
+    const end = dayStart(next, tz);
+    out.push({ key, start, end });
+    key = next;
+    start = end;
+  }
+  return out;
+}
+
+/** Titolo dell'intervallo visibile: `gio 22 ott 2026`, `gio 22 – ven 23 ott 2026`, `mer 28 ott – ven 6 nov 2026`. */
+export function formatRangeTitle(a: number, b: number, tz: string): string {
+  const monYear = (ms: number) => formatDay(ms, tz, true).replace(/^\d+\s/, '');
+  const mon = (ms: number) => formatDay(ms, tz).replace(/^\d+\s/, '');
+  const last = Math.max(a, b - 1);
+  if (dayKey(a, tz) === dayKey(last, tz)) return `${formatWeekday(a, tz)} ${monYear(a)}`;
+  if (monYear(a) === monYear(last)) return `${formatWeekday(a, tz)} – ${formatWeekday(last, tz)} ${monYear(last)}`;
+  if (monYear(a).slice(-4) === monYear(last).slice(-4)) return `${formatWeekday(a, tz)} ${mon(a)} – ${formatWeekday(last, tz)} ${monYear(last)}`;
+  return `${formatWeekday(a, tz)} ${monYear(a)} – ${formatWeekday(last, tz)} ${monYear(last)}`;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAxis, carveAroundInstants, clampSpan, commonClosedRanges } from './timeline-axis';
+import { buildAxis, clampSpan, commonClosedRanges } from './timeline-axis';
 import { HOUR } from './timeline-time';
 
 
@@ -11,27 +11,18 @@ describe('real week fixture', () => {
   const t = (s: string) => new Date(s).getTime();
   const win = { start: t('2026-10-18T22:00:00Z'), end: t('2026-10-25T22:00:00Z') };
   const mk = (k: string) => NW[k].map(([s, e]) => ({ start: t(s), end: t(e) }));
-  const edges = JOBS.flatMap(([status, ps, pe, as, ae]) => {
-    const running = status === 'Running' || status === 'Ended';
-    const s0 = (running && as) || ps;
-    if (!s0) return [];
-    const s = t(s0);
-    const e0 = (status === 'Ended' && ae) || pe || ae;
-    return [s, e0 ? t(e0) : s + 30 * 60_000];
-  });
 
   it('collapses nights and weekend', () => {
     // 1 macchina standard (+ calendario azienda) e la doppio turno
-    const ranges = carveAroundInstants(commonClosedRanges([mk('1'), mk('6')], win), edges);
+    const ranges = commonClosedRanges([mk('1'), mk('6')], win);
     const axis = buildAxis(win, ranges, 28, 12);
     const open = axis.segments.filter((s) => !s.collapsed).reduce((a, s) => a + (s.end - s.start), 0);
     expect(open / HOUR).toBeLessThanOrEqual(5 * 16 + 4);
     expect(axis.segments.filter((s) => s.collapsed).length).toBeGreaterThanOrEqual(5);
   });
 
-  it('a job running since the evening does not cancel the compression of the night nor the weekend', () => {
-    const lateEdges = [...edges, t('2026-10-21T21:30:00Z'), t('2026-10-21T22:00:00Z')];
-    const ranges = carveAroundInstants(commonClosedRanges([mk('1'), mk('6')], win), lateEdges);
+  it('bars never change the compression of the compression of the night nor the weekend', () => {
+    const ranges = commonClosedRanges([mk('1'), mk('6')], win);
     const axis = buildAxis(win, ranges, 28, 12);
     const seps = axis.segments.filter((s) => s.collapsed);
     expect(seps.length).toBeGreaterThanOrEqual(6);
@@ -46,7 +37,7 @@ describe('real day window 2026-10-22: asse == estensione massima', () => {
   const t = (s: string) => new Date(s).getTime();
   const win = { start: t('2026-10-21T22:00:00Z'), end: t('2026-10-22T22:00:00Z') };
   const mk = (k: string) => NW[k].map(([s, e]) => ({ start: t(s), end: t(e) }));
-  const axis = buildAxis(win, carveAroundInstants(commonClosedRanges([mk('1'), mk('6')], win), []), 56, 12);
+  const axis = buildAxis(win, commonClosedRanges([mk('1'), mk('6')], win), 56, 12);
   it('nessuna barra ritagliata supera la larghezza dell\'asse', () => {
     let max = 0;
     for (const [, ps, pe] of JOBS) {

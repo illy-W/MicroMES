@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, signal, untracked, viewChild } from '@angular/core';
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -42,11 +42,10 @@ import { WorkOrdersStore } from '../work-orders/work-orders.store';
 import { type DepLink, PlanningWorkPanelComponent } from './planning-work-panel.component';
 import { PlanningStore } from './planning.store';
 import { CHIP_EXTRA_CODE, CHIP_EXTRA_FULL, estimateTextWidth, fitLeftChip, LABEL_INSIDE_MIN, placeLabel } from './bar-label';
-import { type Axis, buildAxis, carveAroundInstants, clampSpan, commonClosedRanges, type Range } from './timeline-axis';
+import { type Axis, buildAxis, centreTime, clampSpan, commonClosedRanges, type Range, scrollForCentre, visibleTimeRange } from './timeline-axis';
+import { capRange, formatAt, initialRange, loadedUnion, parseAt, planCover, planExtension, resolveLanes } from './timeline-nav';
 import { detailLevel, operationNumber, orderColor, STATUS_STYLE } from './timeline-style';
-import {
-  addDays, addMonths, dayKey, daysInMonth, dayStart, formatDateTime, formatDay, formatDuration, formatMonthTitle, formatWeekday, HOUR, hourLabel, mondayOf, monthStart,
-} from './timeline-time';
+import { dayKey, daysBetween, dayStart, formatDateTime, formatDay, formatDuration, formatRangeTitle, formatWeekday, HOUR, hourLabel } from './timeline-time';
 
 type Zoom = 'day' | 'week' | 'month';
 const ZOOMS: { value: Zoom; label: string }[] = [
@@ -122,6 +121,8 @@ interface BarVm {
   aria: string;
   tip: BarTip;
 }
+/** Una richiesta già ricevuta: intervallo (<= 28 giorni) e risposta. */
+interface Chunk { range: Range; model: TimelineModel }
 interface BandVm { left: number; width: number; reason: string; cls: string }
 interface LoadMarkVm { left: number; width: number; pct: number; title: string }
 /** Etichetta fuori barra (stile Gantt): chip a destra/sinistra della barra o solo codice fase. */
@@ -192,9 +193,9 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           }
         </div>
         <div class="flex items-center gap-1">
-          <button hlmBtn type="button" size="icon-sm" variant="outline" aria-label="Periodo precedente" hlmTooltip="Periodo precedente" (click)="shift(-1)"><ng-icon name="lucideChevronLeft" aria-hidden="true" /></button>
+          <button hlmBtn type="button" size="icon-sm" variant="outline" [attr.aria-label]="navLabel(-1)" [hlmTooltip]="navLabel(-1)" (click)="shift(-1)"><ng-icon name="lucideChevronLeft" aria-hidden="true" /></button>
           <button hlmBtn type="button" size="sm" variant="outline" (click)="today()">Oggi</button>
-          <button hlmBtn type="button" size="icon-sm" variant="outline" aria-label="Periodo successivo" hlmTooltip="Periodo successivo" (click)="shift(1)"><ng-icon name="lucideChevronRight" aria-hidden="true" /></button>
+          <button hlmBtn type="button" size="icon-sm" variant="outline" [attr.aria-label]="navLabel(1)" [hlmTooltip]="navLabel(1)" (click)="shift(1)"><ng-icon name="lucideChevronRight" aria-hidden="true" /></button>
         </div>
         <p class="min-w-32 text-sm font-medium capitalize" aria-live="polite">{{ title() }}</p>
         <button hlmBtn type="button" size="icon-sm" variant="ghost" aria-label="Ricarica timeline" hlmTooltip="Ricarica timeline" (click)="reload()"><ng-icon name="lucideRefreshCw" aria-hidden="true" /></button>
@@ -202,7 +203,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
         <div class="ml-auto flex items-center gap-1" role="group" aria-label="Opzioni di visualizzazione">
           <button hlmBtn type="button" size="icon-sm" variant="outline" aria-label="Riduci densità" [hlmTooltip]="'Riduci densità (' + pph() + ' px/h)'" [disabled]="pph() <= PPH_MIN" (click)="density(-1)"><ng-icon name="lucideMinus" aria-hidden="true" /></button>
           <button hlmBtn type="button" size="icon-sm" variant="outline" aria-label="Aumenta densità" [hlmTooltip]="'Aumenta densità (' + pph() + ' px/h)'" [disabled]="pph() >= PPH_MAX" (click)="density(1)"><ng-icon name="lucidePlus" aria-hidden="true" /></button>
-          <button hlmBtn type="button" size="icon-sm" [variant]="collapse() ? 'secondary' : 'outline'" aria-label="Comprimi tempo non lavorativo" hlmTooltip="Comprimi tempo non lavorativo" [attr.aria-pressed]="collapse()" (click)="collapse.set(!collapse())">
+          <button hlmBtn type="button" size="icon-sm" [variant]="collapse() ? 'secondary' : 'outline'" aria-label="Comprimi tempo non lavorativo" hlmTooltip="Comprimi tempo non lavorativo" [attr.aria-pressed]="collapse()" (click)="toggleCollapse()">
             <ng-icon name="lucideFoldHorizontal" aria-hidden="true" />
           </button>
           <button hlmBtn type="button" size="icon-sm" [variant]="depsAll() ? 'secondary' : 'outline'" aria-label="Mostra tutte le dipendenze" hlmTooltip="Mostra tutte le dipendenze (altrimenti solo quelle del lavoro selezionato o sotto il mouse)" [attr.aria-pressed]="depsAll()" (click)="depsAll.set(!depsAll())">
@@ -269,7 +270,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
             @for (s of statuses; track s.value) { <hlm-select-item [value]="s.value">{{ s.label }}</hlm-select-item> }
           </hlm-select-content>
         </hlm-select>
-        <hlm-select [value]="machineFilter()" [itemToString]="machineLabel" (valueChange)="machineFilter.set($event ?? 'all')">
+        <hlm-select [value]="machineFilter()" [itemToString]="machineLabel" (valueChange)="setMachine($event ?? 'all')">
           <hlm-select-trigger size="sm" class="w-36 shrink-0" aria-label="Filtra per macchina"><hlm-select-value /></hlm-select-trigger>
           <hlm-select-content *hlmSelectPortal>
             <hlm-select-item value="all">Tutte le macchine</hlm-select-item>
@@ -325,22 +326,44 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           @for (i of [1, 2, 3, 4]; track i) { <hlm-skeleton class="h-14 w-full" /> }
         </div>
       } @else {
-        @if (windowEmpty()) {
-          <div class="bg-muted/50 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-1.5 text-sm" role="status">
-            <ng-icon name="lucideCalendarX" aria-hidden="true" class="text-muted-foreground" />
-            <span class="font-medium">Nessun lavoro in questa finestra</span>
-            @if (jump(); as j) {
-              <button hlmBtn type="button" size="sm" variant="outline" (click)="goTo(j.ms)">{{ j.label }}</button>
-            }
-          </div>
-        }
         <div class="flex min-h-0 flex-1 gap-2" [attr.aria-busy]="loading()">
-          <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
+            @if (loadingLeft() || errorLeft()) {
+              <div class="bg-card/90 text-muted-foreground pointer-events-none absolute z-30 flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs shadow-xs" [style.left.px]="LEFT + 8" [style.top.px]="headH() + 8" role="status">
+                @if (errorLeft(); as msg) {
+                  <ng-icon name="lucideTriangleAlert" size="14" class="text-destructive" aria-hidden="true" />
+                  <span class="text-foreground">Impossibile caricare i giorni precedenti</span>
+                  <button hlmBtn type="button" size="sm" variant="outline" class="pointer-events-auto h-6 px-2 text-xs" [title]="msg" (click)="retryEdge('left')">Riprova</button>
+                } @else {
+                  <ng-icon name="lucideRefreshCw" size="14" class="animate-spin" aria-hidden="true" /> Carico i giorni precedenti…
+                }
+              </div>
+            }
+            @if (loadingRight() || errorRight()) {
+              <div class="bg-card/90 text-muted-foreground pointer-events-none absolute right-4 z-30 flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs shadow-xs" [style.top.px]="headH() + 8" role="status">
+                @if (errorRight(); as msg) {
+                  <ng-icon name="lucideTriangleAlert" size="14" class="text-destructive" aria-hidden="true" />
+                  <span class="text-foreground">Impossibile caricare i giorni successivi</span>
+                  <button hlmBtn type="button" size="sm" variant="outline" class="pointer-events-auto h-6 px-2 text-xs" [title]="msg" (click)="retryEdge('right')">Riprova</button>
+                } @else {
+                  <ng-icon name="lucideRefreshCw" size="14" class="animate-spin" aria-hidden="true" /> Carico i giorni successivi…
+                }
+              </div>
+            }
+            @if (windowEmpty()) {
+              <div class="bg-card/95 absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-1.5 text-sm shadow-xs" role="status">
+                <ng-icon name="lucideCalendarX" aria-hidden="true" class="text-muted-foreground" />
+                <span class="font-medium">Nessun lavoro in questo periodo</span>
+                @if (jump(); as j) {
+                  <button hlmBtn type="button" size="sm" variant="outline" (click)="goTo(j.ms)">{{ j.label }}</button>
+                }
+              </div>
+            }
             <div
               #scroller
               role="region"
               aria-label="Timeline delle macchine"
-              class="relative min-h-0 flex-1 overflow-auto rounded-md border"
+              class="relative min-h-0 flex-1 overflow-auto rounded-md border [overflow-anchor:none]"
               [class.opacity-70]="loading()"
               (scroll)="onScroll()"
             >
@@ -489,7 +512,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                   </div>
                 }
 
-                <svg class="pointer-events-none absolute z-[6] overflow-hidden" [style.left.px]="LEFT" [style.top.px]="headH() + 1" [attr.width]="totalPx()" [attr.height]="rowsH()" aria-hidden="true">
+                <svg class="pointer-events-none absolute z-[6] overflow-hidden" [style.left.px]="LEFT + vpFrom()" [style.top.px]="headH() + 1" [attr.width]="vpWidth()" [attr.height]="rowsH()" [attr.viewBox]="vpFrom() + ' 0 ' + vpWidth() + ' ' + rowsH()" aria-hidden="true">
                   <defs>
                     <marker id="dep-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="context-stroke" /></marker>
                   </defs>
@@ -544,6 +567,7 @@ export class PlanningTimelineComponent {
   private readonly store = inject(PlanningStore);
   private readonly orders = inject(WorkOrdersStore);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   protected readonly LEFT = LEFT;
@@ -558,8 +582,11 @@ export class PlanningTimelineComponent {
 
   // --- stato (inizializzato dai query params) ---
   private readonly qp = this.route.snapshot.queryParamMap;
+  private readonly bootTz = bootstrapTz();
   protected readonly zoom = signal<Zoom>((['day', 'week', 'month'] as const).find((z) => z === this.qp.get('zoom')) ?? 'week');
-  protected readonly cursor = signal<string>(/^\d{4}-\d{2}-\d{2}$/.test(this.qp.get('from') ?? '') ? (this.qp.get('from') as string) : dayKey(Date.now(), bootstrapTz()));
+  /** Istante al centro dell'area visibile (URL `at`, con lettura del vecchio `from`); `null` finché non c'è stato scorrimento. */
+  private readonly initialAt = parseAt(this.qp.get('at') ?? this.qp.get('from'), (k) => dayStart(k, bootstrapTz()));
+  private readonly atMs = signal<number | null>(this.initialAt);
   protected readonly orderFilter = signal(this.qp.get('order') ?? ALL);
   protected readonly statusFilter = signal(this.qp.get('status') ?? ALL);
   protected readonly machineFilter = signal(this.qp.get('machine') ?? ALL);
@@ -580,9 +607,16 @@ export class PlanningTimelineComponent {
   /** Modalità dipendenze: `false` = solo catena del lavoro attivo; `true` = tutte (query `deps=all`). */
   protected readonly depsAll = signal(this.qp.get('deps') === 'all');
 
-  protected readonly data = signal<TimelineModel | null>(null);
+  /** Richieste già ricevute, ognuna per un intervallo di al più 28 giorni; l'unione è l'intervallo caricato (contiguo). */
+  private readonly chunkList = signal<Chunk[]>([]);
+  protected readonly loaded = computed<Range | null>(() => loadedUnion(this.chunkList().map((c) => c.range)));
+  /** Ricarica per i filtri (la vista resta quella di prima, attenuata). */
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly loadingLeft = signal(false);
+  protected readonly loadingRight = signal(false);
+  protected readonly errorLeft = signal<string | null>(null);
+  protected readonly errorRight = signal<string | null>(null);
   private readonly knownOrders = signal<ReadonlyMap<number, string>>(new Map());
   /**
    * Tonalità per ordine (indice 0..7 di `--chart-n`), assegnata alla prima apparizione nei dati caricati e mai riassegnata
@@ -592,53 +626,59 @@ export class PlanningTimelineComponent {
   private readonly orderHue = signal<ReadonlyMap<number, number>>(new Map());
   private readonly lastSelected = signal<TimelineWorkOrderModel | null>(null);
   private readonly now = signal(Date.now());
+  /** Area orizzontale da renderizzare (px d'asse): viewport ± margine, a gradini per non ricalcolare a ogni pixel. */
   private readonly vp = signal({ from: 0, to: 1600 });
-  /** Lavori in una finestra ampia (senza filtri) per saltare al lavoro più vicino e mostrare lavori fuori finestra. */
+  /** Intervallo di tempo visibile (aggiornato con debounce). */
+  private readonly visible = signal<Range | null>(null);
+  /** Lavori in una finestra ampia (senza filtri) per saltare al lavoro più vicino e risolvere i collegamenti fuori dall'intervallo caricato. */
   private readonly probe = signal<TimelineWorkOrderModel[]>([]);
   private pendingScroll: number | null = null;
   private autoStartDone = false;
-  /** Selezione da ripristinare (parametro `wo` o collegamento fuori finestra) quando i dati sono caricati. */
+  /** Selezione da ripristinare (parametro `wo` o collegamento fuori intervallo) quando i dati sono caricati. */
   private pendingSelect: number | null = Number(this.qp.get('wo')) || null;
 
-  protected readonly tz = computed(() => this.data()?.timeZoneId ?? bootstrapTz());
-
-  /** Chiave del primo giorno e numero di giorni della finestra visibile. */
-  private readonly span = computed(() => {
-    const z = this.zoom();
-    const c = this.cursor();
-    if (z === 'day') return { start: c, days: 1 };
-    if (z === 'week') return { start: mondayOf(c), days: 7 };
-    const s = monthStart(c);
-    return { start: s, days: daysInMonth(s) };
+  /** Dati uniti di tutte le richieste: lavori senza duplicati (corsie ricomposte), fasce non lavorative e carico. */
+  protected readonly data = computed<TimelineModel | null>(() => {
+    const list = this.chunkList();
+    if (!list.length) return null;
+    const ref = list[0].model;
+    const wos = new Map<number, TimelineWorkOrderModel>();
+    const nw = new Map<string, TimelineNonWorkingModel>();
+    const load = new Map<string, TimelineLoadModel>();
+    for (const c of list) {
+      for (const w of c.model.workOrders) if (!wos.has(w.id)) wos.set(w.id, w);
+      for (const n of c.model.nonWorking) nw.set(`${n.equipmentId ?? ''}|${n.kind}|${n.start}|${n.end}`, n);
+      for (const l of c.model.load) load.set(`${l.equipmentId}|${l.periodStart}|${l.periodEnd}`, l);
+    }
+    const items = [...wos.values()].flatMap((w) => {
+      const r = this.range(w);
+      return r ? [{ id: w.id, row: w.equipmentId ?? NONE_ROW, s: r.s, e: r.e, lane: w.lane }] : [];
+    });
+    const lanes = resolveLanes(items);
+    const workOrders = [...wos.values()].map((w) => (lanes.has(w.id) && lanes.get(w.id) !== w.lane ? { ...w, lane: lanes.get(w.id) as number } : w));
+    return { ...ref, workOrders, nonWorking: [...nw.values()], load: [...load.values()] };
   });
-  protected readonly win = computed(() => {
-    const { start, days } = this.span();
-    const tz = this.tz();
-    return { start: dayStart(start, tz), end: dayStart(addDays(start, days), tz) };
-  });
+  protected readonly tz = computed(() => this.data()?.timeZoneId ?? this.bootTz);
 
-  /** Intervalli compressi: chiusi per TUTTE le macchine mostrate e senza inizio/fine di lavori al loro interno. */
+  /** Intervallo caricato = estensione dell'asse continuo. */
+  protected readonly win = computed<Range>(() => this.loaded() ?? { start: 0, end: 0 });
+
+  /**
+   * Intervalli compressi: chiusi per TUTTE le macchine mostrate, dai soli calendari (mai dalle barre né dalla finestra),
+   * così caricare altri dati non sposta ciò che è già disegnato.
+   */
   private readonly closed = computed<Range[]>(() => {
     const d = this.data();
     if (!d || !this.collapse()) return [];
-    const w = this.win();
     const mf = this.machineFilter();
     const machines = d.equipment.filter((e) => e.isActive && (mf === ALL || String(e.id) === mf));
     const nw = d.nonWorking.map((n) => ({ eq: n.equipmentId ?? null, start: new Date(n.start).getTime(), end: new Date(n.end).getTime() }));
-    const perMachine = machines.map((m) => nw.filter((n) => n.eq == null || n.eq === m.id));
-    const edges = d.workOrders
-      .filter((x) => mf === ALL || String(x.equipmentId) === mf)
-      .flatMap((x) => {
-        const r = this.range(x);
-        return r ? [r.s, r.e] : [];
-      });
-    const ranges = carveAroundInstants(commonClosedRanges(perMachine, w), edges);
-    const total = ranges.reduce((a, r) => a + (r.end - r.start), 0);
-    // Finestra quasi tutta chiusa (es. domenica nella vista Giorno): non comprimere.
-    return total >= (w.end - w.start) * 0.9 ? [] : ranges;
+    return commonClosedRanges(machines.map((m) => nw.filter((n) => n.eq == null || n.eq === m.id)), this.win());
   });
   protected readonly axis = computed<Axis>(() => buildAxis(this.win(), this.closed(), this.pph(), SEP_W));
   protected readonly totalPx = computed(() => this.axis().width);
+  protected readonly vpFrom = computed(() => this.vp().from);
+  protected readonly vpWidth = computed(() => Math.max(1, Math.min(this.vp().to, this.axis().width) - this.vp().from));
   protected readonly headH = computed(() => DAY_H + (this.zoom() === 'month' ? 0 : HOUR_H));
   protected readonly nowPx = computed(() => {
     const n = this.now();
@@ -647,8 +687,9 @@ export class PlanningTimelineComponent {
   });
   protected readonly seps = computed<SepVm[]>(() => {
     const tz = this.tz();
+    const { from, to } = this.vp();
     return this.axis().segments
-      .filter((sg) => sg.collapsed)
+      .filter((sg) => sg.collapsed && sg.x1 >= from && sg.x0 <= to)
       .map((sg) => ({
         left: sg.x0,
         width: sg.x1 - sg.x0,
@@ -656,28 +697,38 @@ export class PlanningTimelineComponent {
       }));
   });
 
+  /** Intervallo visibile (da scroll, debounced), per esempio `gio 22 – ven 23 ott 2026`. */
   protected readonly title = computed(() => {
+    const v = this.visible();
+    return v ? formatRangeTitle(v.start, v.end, this.tz()) : '';
+  });
+  protected navLabel(dir: 1 | -1): string {
+    const unit = { day: 'un giorno', week: 'una settimana', month: 'un mese' }[this.zoom()];
+    return `${dir < 0 ? 'Indietro' : 'Avanti'} di ${unit}`;
+  }
+
+  /** Giorni che toccano l'area da renderizzare (solo questi hanno DOM). */
+  private readonly visibleDays = computed(() => {
+    const { from, to } = this.vp();
+    const ax = this.axis();
     const w = this.win();
-    const tz = this.tz();
-    const z = this.zoom();
-    if (z === 'month') return formatMonthTitle(w.start, tz);
-    if (z === 'day') return `${formatWeekday(w.start, tz)} ${formatDay(w.start, tz, true).replace(/^\d+\s/, '')}`;
-    return `${formatDay(w.start, tz)} – ${formatDay(w.end - 1, tz, true)}`;
+    if (w.end <= w.start) return [];
+    return daysBetween(Math.max(w.start, ax.toTime(from)), Math.min(w.end, ax.toTime(to)), this.tz());
   });
 
-  /** Intestazione giorni (etichetta sticky). */
+  /** Intestazione giorni (etichetta sticky): copre l'intera larghezza scorrevole, solo per i giorni visibili. */
   protected readonly dayCells = computed<DayCell[]>(() => {
-    const { start, days } = this.span();
     const tz = this.tz();
     const ax = this.axis();
+    const z = this.zoom();
     const out: DayCell[] = [];
-    for (let i = 0; i < days; i++) {
-      const ds = dayStart(addDays(start, i), tz);
-      const de = dayStart(addDays(start, i + 1), tz);
-      const left = ax.toX(ds);
-      const width = ax.toX(de) - left;
+    for (const d of this.visibleDays()) {
+      const left = Math.max(0, ax.toX(d.start));
+      const width = Math.min(ax.width, ax.toX(d.end)) - left;
       if (width < 1) continue;
-      out.push({ left, width, label: this.zoom() === 'day' ? `${formatWeekday(ds, tz)} ${formatDay(ds, tz).replace(/^\d+\s/, '')}` : formatWeekday(ds, tz) });
+      const wd = formatWeekday(d.start, tz);
+      const mon = formatDay(d.start, tz).replace(/^\d+\s/, '');
+      out.push({ left, width, label: z === 'day' ? `${wd} ${mon}` : d.key.endsWith('-01') ? `${wd} ${mon}` : wd });
     }
     return out;
   });
@@ -686,16 +737,14 @@ export class PlanningTimelineComponent {
   protected readonly hourTicks = computed<HourTick[]>(() => {
     const z = this.zoom();
     if (z === 'month') return [];
-    const { start, days } = this.span();
     const tz = this.tz();
     const ax = this.axis();
+    const w = this.win();
     const np = this.nowPx();
     const out: HourTick[] = [];
-    for (let i = 0; i < days; i++) {
-      const ds = dayStart(addDays(start, i), tz);
-      const de = dayStart(addDays(start, i + 1), tz);
-      for (let t = ds; t < de; t += HOUR) {
-        if (ax.isCollapsed(t)) continue;
+    for (const d of this.visibleDays()) {
+      for (let t = d.start; t < d.end; t += HOUR) {
+        if (t < w.start || t >= w.end || ax.isCollapsed(t)) continue;
         const label = hourLabel(t, tz);
         if (z === 'week' && Number(label) % 2 !== 0) continue;
         const l = ax.toX(t);
@@ -706,16 +755,12 @@ export class PlanningTimelineComponent {
     return out;
   });
 
-  /** Linee verticali della griglia: giorni (marcate) e ore. */
+  /** Linee verticali della griglia: giorni (marcate) e ore, solo nell'area renderizzata. */
   protected readonly gridLines = computed<GridLine[]>(() => {
-    const { start, days } = this.span();
-    const tz = this.tz();
     const ax = this.axis();
+    const w = this.win();
     const out: GridLine[] = [];
-    for (let i = 0; i < days; i++) {
-      const ds = dayStart(addDays(start, i), tz);
-      if (!ax.isCollapsed(ds)) out.push({ left: ax.toX(ds), major: true });
-    }
+    for (const d of this.visibleDays()) if (d.start >= w.start && !ax.isCollapsed(d.start)) out.push({ left: ax.toX(d.start), major: true });
     for (const t of this.hourTicks()) if (!out.some((g) => Math.abs(g.left - t.left) < 1)) out.push({ left: t.left, major: false });
     return out;
   });
@@ -739,23 +784,25 @@ export class PlanningTimelineComponent {
   });
   protected readonly undated = computed(() => (this.data()?.workOrders ?? []).filter((w) => !this.range(w)).length);
 
+  /** Nessun lavoro nell'intervallo visibile (avviso sovrapposto, senza spostare il layout). */
   protected readonly windowEmpty = computed(() => {
     const d = this.data();
-    if (!d || this.loading()) return false;
-    const w = this.win();
+    const v = this.visible();
+    if (!d || !v || this.loading() || this.loadingLeft() || this.loadingRight()) return false;
     return !d.workOrders.some((x) => {
       const r = this.range(x);
-      return r && r.e > w.start && r.s < w.end;
+      return r && r.e > v.start && r.s < v.end;
     });
   });
-  /** Lavoro pianificato più vicino alla finestra: prima il successivo, altrimenti l'ultimo precedente. */
+  /** Lavoro pianificato più vicino all'intervallo visibile: prima il successivo, altrimenti l'ultimo precedente. */
   protected readonly jump = computed<{ ms: number; label: string } | null>(() => {
-    const w = this.win();
+    const v = this.visible();
+    if (!v) return null;
     const tz = this.tz();
-    const starts = this.probe().flatMap((x) => (x.plannedStartAt ? [new Date(x.plannedStartAt).getTime()] : []));
-    const next = Math.min(...starts.filter((t) => t >= w.end));
+    const starts = [...this.probe(), ...(this.data()?.workOrders ?? [])].flatMap((x) => (x.plannedStartAt ? [new Date(x.plannedStartAt).getTime()] : []));
+    const next = Math.min(...starts.filter((t) => t >= v.end));
     if (Number.isFinite(next)) return { ms: next, label: `Vai al primo lavoro pianificato (${this.ddmm(next, tz)})` };
-    const prev = Math.max(...starts.filter((t) => t < w.start));
+    const prev = Math.max(...starts.filter((t) => t < v.start));
     return Number.isFinite(prev) ? { ms: prev, label: `Vai all'ultimo lavoro pianificato (${this.ddmm(prev, tz)})` } : null;
   });
   private ddmm(ms: number, tz: string): string {
@@ -896,55 +943,58 @@ export class PlanningTimelineComponent {
     return { ...c, all: new Set([id, ...c.up, ...c.down]) };
   });
 
-  /** Connettori di tutti i lavori caricati (geometria memoizzata; il filtro per viewport/modalità è in `drawn`). */
-  private readonly depEdges = computed<DepEdge[]>(() => {
-    const d = this.data();
-    if (!d) return [];
-    const geo = this.barGeometry();
-    const pool = this.pool();
-    const hues = this.orderHue();
-    const out: DepEdge[] = [];
-    for (const succ of d.workOrders) {
-      const s = geo.get(succ.id);
-      if (!s) continue;
-      for (const pid of succ.predecessorIds) {
-        const p = geo.get(pid);
-        const pw = pool.get(pid);
-        const cross = !!pw && pw.productionOrderId !== succ.productionOrderId;
-        const stroke = cross ? orderColor(hues.get(succ.productionOrderId) ?? 0) : 'var(--foreground)';
-        const key = `${pid}-${succ.id}`;
-        if (isOffRange(p)) {
-          const r = stubRoute(s);
-          out.push({ key, predId: pid, succId: succ.id, d: r.d, stroke, dash: cross, conflict: false, warn: null, label: { x: r.points[0].x - 3, y: r.points[0].y + 3.5, text: pw?.code ?? `#${pid}` }, minX: r.points[0].x, maxX: s.x });
-          continue;
-        }
-        const r = routeConnector(p as BarRect, s);
-        const pr = pw ? this.range(pw) : null;
-        const sr = this.range(succ);
-        const conflict = !!pr && !!sr && sr.s < pr.e;
-        const xs = r.points.map((q) => q.x);
-        const mid = r.points[Math.min(2, r.points.length - 1)];
-        out.push({
-          key, predId: pid, succId: succ.id, d: r.d, stroke: conflict ? 'var(--destructive)' : stroke, dash: cross, conflict,
-          warn: conflict ? { x: mid.x, y: mid.y } : null, label: null, minX: Math.min(...xs), maxX: Math.max(...xs),
-        });
-      }
+  /** Connettore di una dipendenza (calcolato solo per i collegamenti visibili o evidenziati). */
+  private edgeFor(succ: TimelineWorkOrderModel, pid: number, geo: ReadonlyMap<number, BarRect>, pool: ReadonlyMap<number, TimelineWorkOrderModel>, hues: ReadonlyMap<number, number>): DepEdge | null {
+    const s = geo.get(succ.id);
+    if (!s) return null;
+    const p = geo.get(pid);
+    const pw = pool.get(pid);
+    const cross = !!pw && pw.productionOrderId !== succ.productionOrderId;
+    const stroke = cross ? orderColor(hues.get(succ.productionOrderId) ?? 0) : 'var(--foreground)';
+    const key = `${pid}-${succ.id}`;
+    if (isOffRange(p)) {
+      const r = stubRoute(s);
+      return { key, predId: pid, succId: succ.id, d: r.d, stroke, dash: cross, conflict: false, warn: null, label: { x: r.points[0].x - 3, y: r.points[0].y + 3.5, text: pw?.code ?? `#${pid}` }, minX: r.points[0].x, maxX: s.x };
     }
-    return out;
-  });
+    const r = routeConnector(p as BarRect, s);
+    const pr = pw ? this.range(pw) : null;
+    const sr = this.range(succ);
+    const conflict = !!pr && !!sr && sr.s < pr.e;
+    const xs = r.points.map((q) => q.x);
+    const mid = r.points[Math.min(2, r.points.length - 1)];
+    return {
+      key, predId: pid, succId: succ.id, d: r.d, stroke: conflict ? 'var(--destructive)' : stroke, dash: cross, conflict,
+      warn: conflict ? { x: mid.x, y: mid.y } : null, label: null, minX: Math.min(...xs), maxX: Math.max(...xs),
+    };
+  }
 
   protected readonly drawn = computed<DepDrawn[]>(() => {
-    const { from, to } = this.vp();
+    const d = this.data();
     const act = this.activeId();
     const ch = this.chain();
     const all = this.depsAll();
+    if (!d || (!all && !ch)) return [];
+    const { from, to } = this.vp();
+    const geo = this.barGeometry();
+    const pool = this.pool();
+    const hues = this.orderHue();
     const out: DepDrawn[] = [];
-    for (const e of this.depEdges()) {
-      if (e.maxX < from || e.minX > to) continue;
-      const inChain = !!ch && ch.all.has(e.predId) && ch.all.has(e.succId);
-      if (!all && !inChain) continue;
-      const direct = act != null && (e.predId === act || e.succId === act);
-      out.push({ ...e, opacity: all ? (inChain ? 1 : 0.5) : direct ? 1 : 0.6, width: all ? (inChain ? 2.25 : 1) : direct ? 2 : 1.5 });
+    for (const succ of d.workOrders) {
+      const s = geo.get(succ.id);
+      if (!s || succ.predecessorIds.length === 0) continue;
+      for (const pid of succ.predecessorIds) {
+        const inChain = !!ch && ch.all.has(pid) && ch.all.has(succ.id);
+        if (!all && !inChain) continue;
+        const p = geo.get(pid);
+        // Prefiltro economico sul rettangolo che racchiude le due barre: il routing è solo per i collegamenti nell'area renderizzata.
+        const lo = Math.min(s.x, p ? p.x : s.x - 40);
+        const hi = Math.max(s.x + s.w, p ? p.x + p.w : s.x);
+        if (hi < from || lo > to) continue;
+        const e = this.edgeFor(succ, pid, geo, pool, hues);
+        if (!e || e.maxX < from || e.minX > to) continue;
+        const direct = act != null && (e.predId === act || e.succId === act);
+        out.push({ ...e, opacity: all ? (inChain ? 1 : 0.5) : direct ? 1 : 0.6, width: all ? (inChain ? 2.25 : 1) : direct ? 2 : 1.5 });
+      }
     }
     // Le linee evidenziate sopra le altre.
     return out.sort((a, b) => a.opacity - b.opacity);
@@ -1046,11 +1096,17 @@ export class PlanningTimelineComponent {
     this.highlight.update((h) => (h === id ? null : id));
   }
 
-  /** Righe con soli i lavori che intersecano il viewport orizzontale (virtualizzazione). */
+  /** Righe con soli i lavori, le fasce e i marcatori che intersecano l'area renderizzata (virtualizzazione orizzontale). */
   protected readonly rows = computed<RowVm[]>(() => {
     const { from, to } = this.vp();
     const keep = this.selectedId();
-    return this.allRows().map((r) => ({ ...r, bars: r.bars.filter((b) => (b.left + b.width >= from && b.left <= to) || b.w.id === this.focusId() || b.w.id === keep) }));
+    const inView = (l: number, w: number) => l + w >= from && l <= to;
+    return this.allRows().map((r) => ({
+      ...r,
+      bars: r.bars.filter((b) => inView(b.left, b.width) || b.w.id === this.focusId() || b.w.id === keep),
+      bands: r.bands.filter((b) => inView(b.left, b.width)),
+      marks: r.marks.filter((m) => inView(m.left, m.width)),
+    }));
   });
 
   protected readonly tabStop = computed(() => {
@@ -1066,44 +1122,63 @@ export class PlanningTimelineComponent {
   });
 
   // --- caricamento ---
-  private seq = 0;
+  private epoch = 0;
+  private cap: Range = capRange(Date.now());
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private visTimer: ReturnType<typeof setTimeout> | undefined;
+  private atTimer: ReturnType<typeof setTimeout> | undefined;
   private first = true;
+  /** Durante un riposizionamento programmato (zoom, nuova ancora) gli eventi di scroll transitori vengono ignorati. */
+  private anchoring = false;
+  private readonly cache = new Map<string, Promise<TimelineModel>>();
+  private readonly running: Record<'left' | 'right', Promise<boolean> | null> = { left: null, right: null };
 
   constructor() {
     const tick = setInterval(() => this.now.set(Date.now()), 60_000);
     this.destroyRef.onDestroy(() => {
       clearInterval(tick);
       clearTimeout(this.timer);
+      clearTimeout(this.visTimer);
+      clearTimeout(this.atTimer);
     });
 
-    const ro = new ResizeObserver(([e]) => this.hostW.set(Math.round(e.contentRect.width)));
+    const ro = new ResizeObserver(([e]) => {
+      this.hostW.set(Math.round(e.contentRect.width));
+      setTimeout(() => this.onScroll());
+    });
     ro.observe(this.host.nativeElement);
     this.hostW.set(this.host.nativeElement.clientWidth);
     this.destroyRef.onDestroy(() => ro.disconnect());
 
-    void this.loadProbe(true);
+    void this.loadProbe();
+    void this.resetAround(this.initialAt ?? Date.now());
 
     effect(() => {
       const req = this.store.focusRequest();
       if (req) untracked(() => this.focusRequested(req.workOrderId, req.productionOrderId));
     });
 
+    // Cambio di filtri lato server: ricarica l'intervallo già caricato, stessa posizione.
     effect(() => {
-      const w = this.win();
-      const q = { order: this.orderFilter(), status: this.statusFilter() };
+      this.orderFilter();
+      this.statusFilter();
       untracked(() => {
+        if (this.first) {
+          this.first = false;
+          return;
+        }
         clearTimeout(this.timer);
-        this.timer = setTimeout(() => void this.load(w.start, w.end, q), this.first ? 0 : 250);
-        this.first = false;
+        this.timer = setTimeout(() => void this.reloadLoaded(), 250);
       });
     });
 
     effect(() => {
       const z = this.zoom();
+      const at = this.atMs();
       const params = {
         zoom: z === 'week' ? null : z,
-        from: this.cursor() === dayKey(Date.now(), this.tz()) ? null : this.cursor(),
+        at: at == null ? null : formatAt(at),
+        from: null,
         order: this.orderFilter() === ALL ? null : this.orderFilter(),
         status: this.statusFilter() === ALL ? null : this.statusFilter(),
         machine: this.machineFilter() === ALL ? null : this.machineFilter(),
@@ -1113,60 +1188,243 @@ export class PlanningTimelineComponent {
       };
       untracked(() => void this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge', replaceUrl: true }));
     });
-
-    // Posizione dello scroll solo quando cambia la finestra (o compare l'area scorrevole la prima volta): mai per la selezione.
-    effect(() => {
-      this.win();
-      const el = this.scroller()?.nativeElement;
-      if (!el) return;
-      this.scrollInitial = true;
-      setTimeout(() => this.applyInitialScroll(), 0);
-    });
   }
 
-  private scrollInitial = false;
+  private filters(): { order: string; status: string } {
+    return { order: this.orderFilter(), status: this.statusFilter() };
+  }
 
-  /** Prima posizione di scroll di una finestra: adesso, altrimenti il primo lavoro pianificato (dopo il caricamento: l'asse cambia coi dati). */
-  private applyInitialScroll(): void {
-    const el = this.scroller()?.nativeElement;
-    if (!el || this.pendingScroll != null) return;
-    const ax = this.axis();
-    const np = this.nowPx();
-    let left = 0;
-    if (this.zoom() === 'day') left = Math.max(0, ax.toX(ax.win.start + 6 * HOUR) - 8);
-    else if (np != null) left = Math.max(0, np - 120);
-    else {
-      const first = this.allRows().flatMap((r) => r.bars).reduce((m, b) => Math.min(m, b.left), Infinity);
-      if (Number.isFinite(first)) left = Math.max(0, first - 80);
+  /** Richiesta di un intervallo (<= 28 giorni), con cache per [from,to] + filtri e coalescenza delle richieste identiche. */
+  private fetchChunk(range: Range): Promise<TimelineModel> {
+    const q = this.filters();
+    const key = `${range.start}|${range.end}|${q.order}|${q.status}`;
+    const hit = this.cache.get(key);
+    if (hit) return hit;
+    const p = firstValueFrom(
+      this.api.getPlanningTimeline({
+        from: new Date(range.start).toISOString(),
+        to: new Date(range.end).toISOString(),
+        ...(q.order !== ALL ? { productionOrderId: Number(q.order) } : {}),
+        ...(q.status !== ALL ? { status: q.status as WorkOrderStatus } : {}),
+      }),
+    );
+    this.cache.set(key, p);
+    p.catch(() => this.cache.delete(key));
+    return p;
+  }
+
+  /** Registra tonalità e ordini noti dei dati appena arrivati. */
+  private ingest(models: readonly TimelineModel[]): void {
+    const hues = new Map(this.orderHue());
+    const known = new Map(this.knownOrders());
+    for (const m of models) {
+      for (const w of m.workOrders) {
+        if (!hues.has(w.productionOrderId)) hues.set(w.productionOrderId, hues.size % 8);
+        known.set(w.productionOrderId, w.productionOrderCode);
+      }
     }
-    el.scrollLeft = left;
+    this.orderHue.set(hues);
+    this.knownOrders.set(known);
+  }
+
+  /** Dopo ogni applicazione di dati: selezione in attesa, aggiornamento viewport, scroll in attesa. */
+  private afterApply(): void {
+    const d = this.data();
+    if (!d) return;
+    if (this.pendingSelect != null) {
+      const target = d.workOrders.find((w) => w.id === this.pendingSelect);
+      if (target) {
+        this.pendingScroll = target.id;
+        this.select(target);
+        this.pendingSelect = null;
+      }
+    }
+    const sel = this.selectedId();
+    const found = sel != null ? d.workOrders.find((w) => w.id === sel) : null;
+    if (found) this.lastSelected.set(found);
     this.onScroll();
+    if (this.pendingScroll != null) this.scrollToPending();
   }
 
-  /** Scorrimento orizzontale corrente: serve a non lasciare etichette a sinistra sotto la colonna macchina sticky. */
-  private readonly scrollX = signal(0);
-
-  /** Chip effettivamente mostrabile: a sinistra non finisce sotto la colonna macchina sticky (scende a solo codice o sparisce). */
-  protected chipView(ch: ChipVm): { text: string; sub: string | null } | null {
-    if (!ch.end) return { text: ch.text, sub: ch.sub };
-    const fit = fitLeftChip(ch.left, ch.sub ? ch.fullW : ch.codeW, ch.codeW, this.scrollX());
-    if (fit === 'full') return { text: ch.text, sub: ch.sub };
-    return fit === 'code' ? { text: ch.code, sub: null } : null;
+  /** (Ri)parte da una nuova ancora: carica `[ancora − 7 g, ancora + 21 g]` e centra l'ancora. */
+  private async resetAround(anchor: number): Promise<void> {
+    const n = ++this.epoch;
+    this.cap = capRange(anchor);
+    this.running.left = this.running.right = null;
+    this.loadingLeft.set(false);
+    this.loadingRight.set(false);
+    this.errorLeft.set(null);
+    this.errorRight.set(null);
+    this.error.set(null);
+    this.chunkList.set([]);
+    const range = initialRange(anchor);
+    try {
+      const model = await this.fetchChunk(range);
+      if (n !== this.epoch) return;
+      this.anchoring = true;
+      this.chunkList.set([{ range, model }]);
+      this.ingest([model]);
+      afterNextRender(() => this.centreNow(anchor), { injector: this.injector });
+      this.autoStart(anchor);
+      this.afterApply();
+    } catch (e) {
+      if (n === this.epoch) this.error.set(toFailure(e).message);
+    }
   }
 
-  protected onScroll(): void {
+  /** Centra `t` senza animazione (nuova ancora, ripristino da URL) e riabilita gli eventi di scroll. */
+  private centreNow(t: number): void {
     const el = this.scroller()?.nativeElement;
-    if (!el) return;
-    this.scrollX.set(el.scrollLeft);
-    const bucket = 300;
-    const from = Math.floor(Math.max(0, el.scrollLeft - 400) / bucket) * bucket;
-    const to = Math.ceil((el.scrollLeft + el.clientWidth + 400) / bucket) * bucket;
-    const cur = this.vp();
-    if (cur.from !== from || cur.to !== to) this.vp.set({ from, to });
+    if (el) el.scrollLeft = scrollForCentre(this.axis(), t, el.clientWidth - LEFT);
+    this.anchoring = false;
+    this.onScroll();
+    this.updateVisible();
   }
 
-  /** Finestra ampia (-30/+90 giorni) in due richieste entro il limite di 62 giorni. */
-  private async loadProbe(initial = false): Promise<void> {
+  /** Ricarica l'intervallo già caricato (filtri o pulsante Ricarica) mantenendo la posizione. */
+  private async reloadLoaded(): Promise<void> {
+    const ranges = this.chunkList().map((c) => c.range);
+    if (!ranges.length) {
+      await this.resetAround(this.atMs() ?? Date.now());
+      return;
+    }
+    const n = ++this.epoch;
+    this.running.left = this.running.right = null;
+    this.loadingLeft.set(false);
+    this.loadingRight.set(false);
+    this.loading.set(true);
+    this.error.set(null);
+    try {
+      const models = await Promise.all(ranges.map((r) => this.fetchChunk(r)));
+      if (n !== this.epoch) return;
+      this.chunkList.set(ranges.map((range, i) => ({ range, model: models[i] })));
+      this.ingest(models);
+      this.afterApply();
+    } catch (e) {
+      if (n === this.epoch) this.error.set(toFailure(e).message);
+    } finally {
+      if (n === this.epoch) this.loading.set(false);
+    }
+  }
+
+  /** Estende l'intervallo caricato di un blocco sul lato indicato; una sola richiesta per lato alla volta. Ritorna `false` se fallisce. */
+  private extend(side: 'left' | 'right', range: Range): Promise<boolean> {
+    const running = this.running[side];
+    if (running) return running;
+    const flag = side === 'left' ? this.loadingLeft : this.loadingRight;
+    const err = side === 'left' ? this.errorLeft : this.errorRight;
+    const n = this.epoch;
+    flag.set(true);
+    err.set(null);
+    const run = (async (): Promise<boolean> => {
+      try {
+        const model = await this.fetchChunk(range);
+        if (n !== this.epoch) return false;
+        this.applyChunk(side, range, model);
+        return true;
+      } catch (e) {
+        if (n === this.epoch) err.set(toFailure(e).message);
+        return false;
+      } finally {
+        if (n === this.epoch) {
+          flag.set(false);
+          this.running[side] = null;
+          setTimeout(() => this.checkExtend());
+        }
+      }
+    })();
+    this.running[side] = run;
+    return run;
+  }
+
+  /** Aggiunge un blocco; a sinistra compensa `scrollLeft` della larghezza aggiunta così ciò che si vede non si sposta. */
+  private applyChunk(side: 'left' | 'right', range: Range, model: TimelineModel): void {
+    if (this.chunkList().some((c) => c.range.start === range.start && c.range.end === range.end)) return;
+    const old = this.axis();
+    this.chunkList.update((l) => [...l, { range, model }].sort((a, b) => a.range.start - b.range.start));
+    this.ingest([model]);
+    if (side === 'left') {
+      const shift = this.axis().toX(old.win.end) - old.width;
+      if (shift) {
+        this.anchoring = true;
+        afterNextRender(() => {
+          const el = this.scroller()?.nativeElement;
+          if (el) el.scrollLeft += shift;
+          this.anchoring = false;
+          this.onScroll();
+        }, { injector: this.injector });
+      }
+    }
+    this.afterApply();
+  }
+
+  /** Quando il viewport è vicino a un bordo dell'asse carica il blocco successivo (coalescenza: al più uno per lato). */
+  private checkExtend(): void {
+    const el = this.scroller()?.nativeElement;
+    const l = this.loaded();
+    if (!el || !l || this.loading() || this.anchoring) return;
+    const plan = planExtension({
+      scrollLeft: el.scrollLeft,
+      viewW: el.clientWidth - LEFT,
+      axisWidth: this.axis().width,
+      loaded: l,
+      cap: this.cap,
+      busy: { left: this.loadingLeft() || !!this.errorLeft(), right: this.loadingRight() || !!this.errorRight() },
+    });
+    for (const c of plan) void this.extend(c.side, c.range);
+  }
+
+  protected retryEdge(side: 'left' | 'right'): void {
+    (side === 'left' ? this.errorLeft : this.errorRight).set(null);
+    this.checkExtend();
+  }
+
+  /**
+   * Garantisce che `t` sia nell'intervallo caricato: estende a blocchi, oppure riparte da `t` se è oltre il tetto.
+   * Ritorna `'noop' | 'extended' | 'reset'`, `false` se il caricamento fallisce.
+   */
+  private async ensureLoaded(t: number): Promise<'noop' | 'extended' | 'reset' | false> {
+    let did = false;
+    for (let guard = 0; guard < 20; guard++) {
+      const l = this.loaded();
+      if (!l) return false;
+      const plan = planCover(l, t, this.cap);
+      if (plan === null) {
+        await this.resetAround(t);
+        return this.error() ? false : 'reset';
+      }
+      if (!plan.length) return did ? 'extended' : 'noop';
+      if (!(await this.extend(plan[0].side, plan[0].range))) return false;
+      did = true;
+    }
+    return false;
+  }
+
+  /** Primo avvio senza `at`: se non c'è lavoro vicino a oggi ma ce n'è nei 14 giorni seguenti, parte da lì (una sola volta). */
+  private autoStart(anchor: number): void {
+    if (this.autoStartDone) return;
+    this.autoStartDone = true;
+    if (this.initialAt != null) return;
+    const d = this.data();
+    if (!d) return;
+    const today = anchor;
+    const busyNear = d.workOrders.some((x) => {
+      const r = this.range(x);
+      return r && r.e > today - 24 * HOUR && r.s < today + 7 * 24 * HOUR;
+    });
+    if (busyNear) return;
+    const starts = d.workOrders.flatMap((x) => (x.plannedStartAt ? [new Date(x.plannedStartAt).getTime()] : [])).filter((t) => t >= today + 7 * 24 * HOUR && t <= today + 14 * 24 * HOUR);
+    if (!starts.length) return;
+    const first = Math.min(...starts);
+    afterNextRender(() => {
+      const el = this.scroller()?.nativeElement;
+      if (el) el.scrollLeft = Math.max(0, this.axis().toX(first) - 80);
+      this.onScroll();
+    }, { injector: this.injector });
+  }
+
+  /** Lavori in una finestra ampia (-30/+90 giorni) in due richieste entro il limite di 62 giorni. */
+  private async loadProbe(): Promise<void> {
     const tz = this.tz();
     const today = dayStart(dayKey(Date.now(), tz), tz);
     const at = (days: number) => new Date(today + days * 24 * HOUR).toISOString();
@@ -1177,44 +1435,32 @@ export class PlanningTimelineComponent {
     const all = parts.flatMap((p) => (p.status === 'fulfilled' ? p.value.workOrders : []));
     // La seconda richiesta può ripetere lavori a cavallo del confine.
     this.probe.set([...new Map(all.map((w) => [w.id, w])).values()]);
-    // Posizione iniziale: una sola volta all'avvio, mai per selezione o parametri URL.
-    if (initial && !this.autoStartDone) {
-      this.autoStartDone = true;
-      if (!this.qp.get('from')) this.autoStart(today);
+    if (this.pendingSelect != null) {
+      const w = this.probe().find((x) => x.id === this.pendingSelect);
+      if (w && !this.data()?.workOrders.some((x) => x.id === w.id)) {
+        this.select(w);
+        this.pendingSelect = null;
+      }
     }
   }
 
-  /** Al primo caricamento: se la finestra corrente è vuota ma c'è lavoro nei 14 giorni seguenti, parte da lì. */
-  private autoStart(today: number): void {
-    const w = this.win();
-    const inWin = this.probe().some((x) => {
-      const r = this.range(x);
-      return r && r.e > w.start && r.s < w.end;
-    });
-    if (inWin) return;
-    const limit = today + 14 * 24 * HOUR;
-    const starts = this.probe().flatMap((x) => (x.plannedStartAt ? [new Date(x.plannedStartAt).getTime()] : [])).filter((t) => t >= w.end && t <= limit);
-    if (starts.length) this.cursor.set(dayKey(Math.min(...starts), this.tz()));
-  }
-
-  protected goTo(ms: number): void {
-    this.cursor.set(dayKey(ms, this.tz()));
-  }
-
-  /** Seleziona un lavoro (anche fuori finestra) e sposta la finestra solo se il lavoro non è visibile. */
+  /** Seleziona un lavoro (anche fuori dall'intervallo caricato) e scorre fino al suo inizio, estendendo l'asse se serve. */
   focusWorkOrder(id: number): void {
     const known = this.pool().get(id);
     if (known && this.range(known)) {
       this.focusRequested(id, null);
       return;
     }
-    void this.orders.getDetail(id).then((d) => {
+    void this.orders.getDetail(id).then(async (d) => {
       const iso = d.status === 'Running' || d.status === 'Ended' ? (d.startedAt ?? d.plannedStartAt) : d.plannedStartAt;
       if (!iso) return;
       this.pendingSelect = id;
-      const before = this.win().start;
-      this.cursor.set(dayKey(new Date(iso).getTime(), this.tz()));
-      if (this.win().start === before) this.reload();
+      const ms = new Date(iso).getTime();
+      const res = await this.ensureLoaded(ms);
+      if (!res) return;
+      if (this.pendingSelect === id && this.filtersActive()) this.clearFilters();
+      else this.afterApply();
+      if (res !== 'reset') await this.scrollToTime(ms, 'start');
     }, () => undefined);
   }
 
@@ -1229,12 +1475,9 @@ export class PlanningTimelineComponent {
     if (filtersChanged) this.clearFilters();
     this.select(target);
     const r = this.range(target);
-    const w = this.win();
-    const visible = !!r && r.e > w.start && r.s < w.end;
     this.pendingScroll = target.id;
-    // Lo zoom resta: la finestra cambia solo se il lavoro non è in quella corrente.
-    if (!visible && r) this.cursor.set(dayKey(r.s, this.tz()));
-    if (!filtersChanged && visible) this.scrollToPending();
+    // Con i filtri azzerati lo scroll parte a fine ricaricamento (afterApply); altrimenti subito.
+    if (!filtersChanged && r) void this.ensureLoaded(r.s).then((ok) => ok && this.scrollToPending());
   }
 
   protected onSheetState(state: string): void {
@@ -1249,84 +1492,124 @@ export class PlanningTimelineComponent {
     const id = this.pendingScroll;
     if (id == null) return;
     setTimeout(() => {
-      const el = this.scroller()?.nativeElement;
       const w = this.data()?.workOrders.find((x) => x.id === id) ?? this.probe().find((x) => x.id === id);
       const r = w ? this.range(w) : null;
-      if (!el || !r) return;
+      const l = this.loaded();
+      if (!w || !r || !l || r.s < l.start || r.s > l.end) return;
       this.pendingScroll = null;
-      const left = this.axis().toX(r.s);
-      el.scrollLeft = Math.max(0, left - 80);
-      el.querySelector<HTMLElement>(`[data-row="${w!.equipmentId ?? NONE_ROW}"]`)?.scrollIntoView({ block: 'nearest' });
-      this.onScroll();
+      this.scrollNow(r.s, 'start', true);
+      this.scroller()?.nativeElement.querySelector<HTMLElement>(`[data-row="${w.equipmentId ?? NONE_ROW}"]`)?.scrollIntoView({ block: 'nearest' });
     }, 60);
   }
 
   protected reload(): void {
+    this.cache.clear();
     void this.loadProbe();
-    const w = this.win();
-    void this.load(w.start, w.end, { order: this.orderFilter(), status: this.statusFilter() });
+    void this.reloadLoaded();
   }
 
-  private async load(start: number, end: number, q: { order: string; status: string }): Promise<void> {
-    const n = ++this.seq;
-    this.loading.set(true);
-    this.error.set(null);
-    try {
-      const d = await firstValueFrom(
-        this.api.getPlanningTimeline({
-          from: new Date(start - 24 * HOUR).toISOString(),
-          to: new Date(end + 24 * HOUR).toISOString(),
-          ...(q.order !== ALL ? { productionOrderId: Number(q.order) } : {}),
-          ...(q.status !== ALL ? { status: q.status as WorkOrderStatus } : {}),
-        }),
-      );
-      if (n !== this.seq) return;
-      const hues = new Map(this.orderHue());
-      for (const w of d.workOrders) if (!hues.has(w.productionOrderId)) hues.set(w.productionOrderId, hues.size % 8);
-      this.orderHue.set(hues);
-      this.data.set(d);
-      if (this.scrollInitial) {
-        this.scrollInitial = false;
-        setTimeout(() => this.applyInitialScroll(), 0);
-      }
-      const known = new Map(this.knownOrders());
-      for (const w of d.workOrders) known.set(w.productionOrderId, w.productionOrderCode);
-      this.knownOrders.set(known);
-      if (this.pendingSelect != null) {
-        const target = d.workOrders.find((w) => w.id === this.pendingSelect);
-        if (target) {
-          this.pendingScroll = target.id;
-          this.select(target);
-          this.pendingSelect = null;
-        }
-      }
-      const sel = this.selectedId();
-      const found = sel != null ? d.workOrders.find((w) => w.id === sel) : null;
-      if (found) this.lastSelected.set(found);
-      this.onScroll();
-      if (this.pendingScroll != null) this.scrollToPending();
-    } catch (e) {
-      if (n === this.seq) this.error.set(toFailure(e).message);
-    } finally {
-      if (n === this.seq) this.loading.set(false);
+  // --- scroll, viewport e posizione ---
+  /** Scorrimento orizzontale corrente: serve a non lasciare etichette a sinistra sotto la colonna macchina sticky. */
+  private readonly scrollX = signal(0);
+
+  /** Chip effettivamente mostrabile: a sinistra non finisce sotto la colonna macchina sticky (scende a solo codice o sparisce). */
+  protected chipView(ch: ChipVm): { text: string; sub: string | null } | null {
+    if (!ch.end) return { text: ch.text, sub: ch.sub };
+    const fit = fitLeftChip(ch.left, ch.sub ? ch.fullW : ch.codeW, ch.codeW, this.scrollX());
+    if (fit === 'full') return { text: ch.text, sub: ch.sub };
+    return fit === 'code' ? { text: ch.code, sub: null } : null;
+  }
+
+  protected onScroll(): void {
+    const el = this.scroller()?.nativeElement;
+    if (!el || this.anchoring) return;
+    this.scrollX.set(el.scrollLeft);
+    const viewW = el.clientWidth - LEFT;
+    const bucket = 300;
+    const margin = Math.max(600, viewW);
+    const from = Math.floor(Math.max(0, el.scrollLeft - margin) / bucket) * bucket;
+    const to = Math.ceil((el.scrollLeft + viewW + margin) / bucket) * bucket;
+    const cur = this.vp();
+    if (cur.from !== from || cur.to !== to) this.vp.set({ from, to });
+    clearTimeout(this.visTimer);
+    this.visTimer = setTimeout(() => this.updateVisible(), 120);
+    clearTimeout(this.atTimer);
+    this.atTimer = setTimeout(() => this.updateAt(), 500);
+    this.checkExtend();
+  }
+
+  private updateVisible(): void {
+    const el = this.scroller()?.nativeElement;
+    if (!el || !this.loaded()) return;
+    this.visible.set(visibleTimeRange(this.axis(), el.scrollLeft, el.clientWidth - LEFT));
+  }
+
+  private updateAt(): void {
+    const el = this.scroller()?.nativeElement;
+    if (!el || !this.loaded() || this.anchoring) return;
+    this.atMs.set(Math.round(centreTime(this.axis(), el.scrollLeft, el.clientWidth - LEFT)));
+  }
+
+  /** Esegue un cambiamento di scala/asse mantenendo fermo l'istante al centro dell'area visibile. */
+  private withAnchor(change: () => void): void {
+    const el = this.scroller()?.nativeElement;
+    if (!el) {
+      change();
+      return;
     }
+    const c = centreTime(this.axis(), el.scrollLeft, el.clientWidth - LEFT);
+    this.anchoring = true;
+    change();
+    afterNextRender(() => this.centreNow(c), { injector: this.injector });
+  }
+
+  private scrollNow(t: number, align: 'centre' | 'start', smooth: boolean): void {
+    const el = this.scroller()?.nativeElement;
+    if (!el) return;
+    const ax = this.axis();
+    const viewW = el.clientWidth - LEFT;
+    const x = align === 'centre' ? ax.toX(t) - viewW / 2 : ax.toX(t) - 80;
+    const left = Math.min(Math.max(0, ax.width - viewW), Math.max(0, x));
+    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollTo({ left, behavior: smooth && !reduce ? 'smooth' : 'auto' });
+  }
+
+  /** Scorre (animato) a `t`, estendendo prima l'intervallo caricato se serve. */
+  private async scrollToTime(t: number, align: 'centre' | 'start'): Promise<void> {
+    const res = await this.ensureLoaded(t);
+    if (!res || res === 'reset') return;
+    if (res === 'noop') this.scrollNow(t, align, true);
+    else afterNextRender(() => this.scrollNow(t, align, true), { injector: this.injector });
   }
 
   // --- navigazione ---
   protected setZoom(z: Zoom): void {
-    this.zoom.set(z);
-    this.pph.set(DEFAULT_PPH[z]);
+    this.withAnchor(() => {
+      this.zoom.set(z);
+      this.pph.set(DEFAULT_PPH[z]);
+    });
   }
   protected density(dir: 1 | -1): void {
-    this.pph.update((p) => clampPph(dir > 0 ? p * 1.25 : p / 1.25));
+    this.withAnchor(() => this.pph.update((p) => clampPph(dir > 0 ? p * 1.25 : p / 1.25)));
   }
+  protected toggleCollapse(): void {
+    this.withAnchor(() => this.collapse.update((c) => !c));
+  }
+  protected setMachine(v: string): void {
+    this.withAnchor(() => this.machineFilter.set(v));
+  }
+  /** Indietro/avanti di una unità dello zoom corrente (1 giorno, 7 giorni, ~1 mese), partendo dal centro visibile. */
   protected shift(dir: 1 | -1): void {
-    const z = this.zoom();
-    const s = this.span().start;
-    this.cursor.set(z === 'day' ? addDays(s, dir) : z === 'week' ? addDays(s, 7 * dir) : addMonths(s, dir));
+    const el = this.scroller()?.nativeElement;
+    if (!el) return;
+    const unit = { day: 1, week: 7, month: 30 }[this.zoom()] * 24 * HOUR;
+    void this.scrollToTime(centreTime(this.axis(), el.scrollLeft, el.clientWidth - LEFT) + dir * unit, 'centre');
   }
   protected today(): void {
-    this.cursor.set(dayKey(Date.now(), this.tz()));
+    void this.scrollToTime(Date.now(), 'centre');
+  }
+  protected goTo(ms: number): void {
+    void this.scrollToTime(ms, 'start');
   }
   protected clearFilters(): void {
     this.orderFilter.set(ALL);

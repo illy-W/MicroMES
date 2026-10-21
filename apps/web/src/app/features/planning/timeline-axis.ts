@@ -66,35 +66,6 @@ export function commonClosedRanges(perMachine: readonly (readonly Range[])[], wi
   return common.filter((r) => r.end - r.start >= minMs);
 }
 
-/** Scarta gli intervalli in cui cade (strettamente dentro) un istante, per esempio l'inizio o la fine di una barra. */
-export function dropRangesContaining(ranges: readonly Range[], instants: readonly number[]): Range[] {
-  const sorted = [...instants].sort((x, y) => x - y);
-  return ranges.filter((r) => !sorted.some((t) => t > r.start && t < r.end));
-}
-
-/**
- * Ritaglia gli intervalli attorno agli istanti (inizio/fine barra) che cadono al loro interno: tiene un margine `padMs` per lato
- * e scarta i pezzi rimasti più corti di `minMs`. A differenza di `dropRangesContaining` un solo lavoro notturno
- * (es. un lavoro in corso iniziato di sera) non annulla l'intera compressione della notte/weekend.
- */
-export function carveAroundInstants(ranges: readonly Range[], instants: readonly number[], padMs = HOUR / 2, minMs = HOUR): Range[] {
-  const sorted = [...instants].sort((x, y) => x - y);
-  const out: Range[] = [];
-  for (const r of ranges) {
-    let pieces: Range[] = [r];
-    for (const t of sorted) {
-      if (t <= r.start || t >= r.end) continue;
-      pieces = pieces.flatMap((p) =>
-        t > p.start - padMs && t < p.end + padMs
-          ? [{ start: p.start, end: t - padMs }, { start: t + padMs, end: p.end }].filter((q) => q.end > q.start)
-          : [p],
-      );
-    }
-    out.push(...pieces.filter((q) => q.end - q.start >= minMs));
-  }
-  return out;
-}
-
 /** Costruisce l'asse: i tratti `collapsed` occupano `sepPx` pixel, il resto `pxPerHour` per ora reale. */
 export function buildAxis(win: Range, collapsed: readonly Range[], pxPerHour: number, sepPx: number): Axis {
   const clipped = mergeRanges(collapsed.map((r) => ({ start: Math.max(r.start, win.start), end: Math.min(r.end, win.end) })));
@@ -169,4 +140,33 @@ export function clampSpan(left: number, width: number, max: number): { left: num
   const r = Math.min(max, left + width);
   if (r <= l) return null;
   return { left: l, width: r - l };
+}
+
+/**
+ * Estende l'asse a sinistra o a destra con la finestra `add` (adiacente a quella esistente).
+ * `closedAll` sono gli intervalli compressi calcolati dai SOLI calendari sull'intera finestra risultante.
+ * `shift` è lo spostamento in pixel del contenuto già esistente: 0 a destra, la larghezza aggiunta a sinistra
+ * (il chiamante lo somma a `scrollLeft` per non muovere ciò che l'utente vede).
+ */
+export function extendAxis(prev: Axis, side: 'left' | 'right', add: Range, closedAll: readonly Range[], pxPerHour: number, sepPx: number): { axis: Axis; shift: number } {
+  const win = side === 'left' ? { start: add.start, end: prev.win.end } : { start: prev.win.start, end: add.end };
+  const axis = buildAxis(win, closedAll, pxPerHour, sepPx);
+  return { axis, shift: side === 'left' ? axis.toX(prev.win.end) - prev.width : 0 };
+}
+
+/** Istante al centro dell'area visibile (`viewW` esclude la colonna macchina sticky). */
+export function centreTime(axis: Axis, scrollLeft: number, viewW: number): number {
+  return axis.toTime(scrollLeft + viewW / 2);
+}
+
+/** `scrollLeft` che porta l'istante `t` al centro dell'area visibile (limitato a `[0, width - viewW]`). */
+export function scrollForCentre(axis: Axis, t: number, viewW: number): number {
+  return Math.min(Math.max(0, axis.width - viewW), Math.max(0, axis.toX(t) - viewW / 2));
+}
+
+/** Intervallo di tempo visibile (ritagliato alla finestra caricata). */
+export function visibleTimeRange(axis: Axis, scrollLeft: number, viewW: number): Range {
+  const a = Math.max(0, scrollLeft);
+  const b = Math.min(axis.width, scrollLeft + viewW);
+  return { start: axis.toTime(a), end: axis.toTime(b) };
 }

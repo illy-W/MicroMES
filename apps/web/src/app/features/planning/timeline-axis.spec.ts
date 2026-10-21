@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAxis, commonClosedRanges, dropRangesContaining, intersectRanges, mergeRanges } from './timeline-axis';
+import { buildAxis, centreTime, commonClosedRanges, extendAxis, intersectRanges, scrollForCentre, visibleTimeRange, mergeRanges } from './timeline-axis';
 import { addDays, dayStart, formatDuration, HOUR } from './timeline-time';
 
 const h = (n: number) => n * HOUR;
@@ -35,12 +35,6 @@ describe('range helpers', () => {
   it('discards closed ranges shorter than the minimum', () => {
     const win = { start: 0, end: h(24) };
     expect(commonClosedRanges([[{ start: 0, end: h(0.5) }]], win)).toEqual([]);
-  });
-
-  it('does not collapse ranges with a bar edge strictly inside', () => {
-    const r = [{ start: h(18), end: h(32) }, { start: h(42), end: h(56) }];
-    expect(dropRangesContaining(r, [h(18), h(20)])).toEqual([{ start: h(42), end: h(56) }]);
-    expect(dropRangesContaining(r, [h(32), h(42)])).toEqual(r);
   });
 });
 
@@ -132,5 +126,79 @@ describe('clampSpan / larghezza asse', () => {
     expect(clampSpan(-20, 100, 1000)).toEqual({ left: 0, width: 80 });
     expect(clampSpan(950, 100, 1000)).toEqual({ left: 950, width: 50 });
     expect(clampSpan(10, 20, 1000)).toEqual({ left: 10, width: 20 });
+  });
+});
+
+describe('extendAxis (asse continuo estensibile)', () => {
+  // Chiuso ogni giorno 18:00 → 08:00 del giorno dopo (14 h), a partire da 0.
+  const day = h(24);
+  const closedIn = (w: { start: number; end: number }) => {
+    const out = [];
+    for (let d = Math.floor(w.start / day) - 1; d <= Math.ceil(w.end / day); d++) out.push({ start: d * day + h(18), end: d * day + h(32) });
+    return out.filter((r) => r.end > w.start && r.start < w.end);
+  };
+  const base = { start: 0, end: 4 * day };
+  const build = (w: { start: number; end: number }) => buildAxis(w, commonClosedRanges([closedIn(w)], w), 10, 12);
+
+  it('extending right never moves existing positions and keeps shift 0', () => {
+    const a = build(base);
+    const win2 = { start: 0, end: 8 * day };
+    const { axis, shift } = extendAxis(a, 'right', { start: base.end, end: win2.end }, commonClosedRanges([closedIn(win2)], win2), 10, 12);
+    expect(shift).toBe(0);
+    for (const t of [0, h(10), h(17), h(40), h(60), h(80)]) expect(axis.toX(t)).toBeCloseTo(a.toX(t), 6);
+    expect(axis.width).toBeGreaterThan(a.width);
+  });
+
+  it('extending left shifts everything by the added width (stable reference)', () => {
+    const a = build(base);
+    const win2 = { start: -4 * day, end: base.end };
+    const { axis, shift } = extendAxis(a, 'left', { start: win2.start, end: base.start }, commonClosedRanges([closedIn(win2)], win2), 10, 12);
+    expect(shift).toBeGreaterThan(0);
+    for (const t of [h(10), h(17), h(40), h(60), h(80)]) expect(axis.toX(t) - a.toX(t)).toBeCloseTo(shift, 6);
+    // Una chiusura a cavallo del bordo resta un solo separatore (12 px), non due.
+    const sepsAtEdge = axis.segments.filter((s) => s.collapsed && s.start < 0 && s.end > 0);
+    expect(sepsAtEdge.length).toBe(1);
+  });
+
+  it('has cumulative closed ranges: every full day is 10 working hours + one separator', () => {
+    const w = { start: h(8), end: h(8) + 6 * day };
+    const ax = build(w);
+    expect(ax.width).toBeCloseTo(6 * 10 * 10 + 6 * 12, 6);
+    expect(ax.segments.filter((s) => s.collapsed).length).toBe(6);
+  });
+
+  it('merges a closure split across two chunks into a single separator', () => {
+    const w1 = { start: 0, end: day + h(22) };
+    const w2 = { start: 0, end: 3 * day };
+    const a = build(w1);
+    const { axis } = extendAxis(a, 'right', { start: w1.end, end: w2.end }, commonClosedRanges([closedIn(w2)], w2), 10, 12);
+    expect(axis.segments.filter((s) => s.collapsed && s.start <= day + h(22) && s.end > day + h(22)).length).toBe(1);
+    expect(axis.toX(day + h(8))).toBeCloseTo(a.toX(day + h(8)), 6);
+  });
+});
+
+describe('ancoraggio dello zoom e intervallo visibile', () => {
+  const win = { start: 0, end: 10 * 24 * HOUR };
+  const closed = Array.from({ length: 10 }, (_, d) => ({ start: d * 24 * HOUR + h(18), end: d * 24 * HOUR + h(32) })).filter((r) => r.end <= win.end);
+  const viewW = 1000;
+
+  it('keeps the centre time stable when the density changes', () => {
+    const a = buildAxis(win, closed, 90, 12);
+    const left = 3000;
+    const c = centreTime(a, left, viewW);
+    for (const pph of [28, 10, 90, 40]) {
+      const b = buildAxis(win, closed, pph, 12);
+      const l2 = scrollForCentre(b, c, viewW);
+      if (l2 > 0 && l2 < b.width - viewW) expect(centreTime(b, l2, viewW)).toBeCloseTo(c, 3);
+    }
+  });
+
+  it('computes the visible time range clipped to the loaded window', () => {
+    const a = buildAxis(win, closed, 28, 12);
+    const v = visibleTimeRange(a, 100, 500);
+    expect(v.start).toBeCloseTo(a.toTime(100), 6);
+    expect(v.end).toBeCloseTo(a.toTime(600), 6);
+    expect(visibleTimeRange(a, -50, viewW).start).toBe(win.start);
+    expect(visibleTimeRange(a, a.width - 10, viewW).end).toBe(win.end);
   });
 });
