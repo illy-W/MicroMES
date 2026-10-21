@@ -32,4 +32,6 @@ export interface CreateProcessSegmentRequest {
      * @maximum 999999
      */
   runMinutesPerUnit?: number;
+  /** @nullable */
+  equipmentIds?: number[] | null;
 }

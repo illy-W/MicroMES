@@ -1,6 +1,7 @@
 using MicroMES.ApiCore.Persistence;
 using MicroMES.ApiCore.Persistence.Entities;
 using MicroMES.ApiFeatures.BomFeature;
+using MicroMES.ApiFeatures.EquipmentFeature;
 using MicroMES.ApiFeatures.MaterialFeature;
 using MicroMES.ApiFeatures.ProcessSegmentFeature;
 using MicroMES.ApiFeatures.ProductionOrderFeature;
@@ -35,6 +36,7 @@ public abstract class BaseFeatureFixture : IDisposable
         services.AddMaterialFeature();
         services.AddBomFeature();
         services.AddProcessSegmentFeature();
+        services.AddEquipmentFeature();
         services.AddRoutingFeature();
         services.AddScrapFeature();
         services.AddProductionOrderFeature();

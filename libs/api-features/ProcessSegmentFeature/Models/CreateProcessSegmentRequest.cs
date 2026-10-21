@@ -18,4 +18,9 @@ public class CreateProcessSegmentRequest
 
     [Range(0, 999999)]
     public decimal RunMinutesPerUnit { get; set; }
+
+    /// <summary>
+    /// Machines enabled for the segment. Missing (null) = links unchanged; present (even empty) = replaces the set.
+    /// </summary>
+    public List<int>? EquipmentIds { get; set; }
 }

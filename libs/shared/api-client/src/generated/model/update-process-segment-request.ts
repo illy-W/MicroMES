@@ -34,4 +34,6 @@ export interface UpdateProcessSegmentRequest {
   runMinutesPerUnit?: number;
   /** @nullable */
   isActive: boolean | null;
+  /** @nullable */
+  equipmentIds?: number[] | null;
 }

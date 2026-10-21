@@ -17,6 +17,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<WorkOrderResponse> WorkOrderResponses { get; set; } = null!;
     public DbSet<ScrapReason> ScrapReasons { get; set; } = null!;
     public DbSet<ScrapReasonProcessSegment> ScrapReasonProcessSegments { get; set; } = null!;
+    public DbSet<Equipment> Equipment { get; set; } = null!;
+    public DbSet<EquipmentProcessSegment> EquipmentProcessSegments { get; set; } = null!;
     public DbSet<WorkOrderResponseScrap> WorkOrderResponseScraps { get; set; } = null!;
     public DbSet<WorkOrderResponseCorrection> WorkOrderResponseCorrections { get; set; } = null!;
 
@@ -158,6 +160,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.ScrapReasonId, x.ProcessSegmentId }).IsUnique();
             entity.HasOne<ScrapReason>().WithMany().HasForeignKey(x => x.ScrapReasonId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ProcessSegment>().WithMany().HasForeignKey(x => x.ProcessSegmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Equipment>(entity =>
+        {
+            entity.ToTable("Equipment");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.HasIndex(x => x.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<EquipmentProcessSegment>(entity =>
+        {
+            entity.ToTable("EquipmentProcessSegments");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.EquipmentId, x.ProcessSegmentId }).IsUnique();
+            entity.HasOne<Equipment>().WithMany().HasForeignKey(x => x.EquipmentId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<ProcessSegment>().WithMany().HasForeignKey(x => x.ProcessSegmentId).OnDelete(DeleteBehavior.Restrict);
         });
 

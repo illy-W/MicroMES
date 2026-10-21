@@ -56,6 +56,7 @@ public class ProcessSegmentsController(ProcessSegmentService service) : Controll
         {
             ProcessSegmentFailure.NotFound => Problem(detail, statusCode: StatusCodes.Status404NotFound),
             ProcessSegmentFailure.Conflict => Problem(detail, statusCode: StatusCodes.Status409Conflict),
+            ProcessSegmentFailure.Invalid => Problem(detail, statusCode: StatusCodes.Status422UnprocessableEntity),
             _ => Problem(detail, statusCode: StatusCodes.Status500InternalServerError)
         };
     }

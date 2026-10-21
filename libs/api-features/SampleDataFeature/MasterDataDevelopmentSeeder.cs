@@ -2,6 +2,7 @@ using illyW.Framework.Core.RepositoryPattern;
 using illyW.Framework.Core.ResultPattern;
 using MicroMES.ApiCore.Persistence.Entities;
 using MicroMES.ApiFeatures.BomFeature.Repositories;
+using MicroMES.ApiFeatures.EquipmentFeature.Repositories;
 using MicroMES.ApiFeatures.MaterialFeature.Repositories;
 using MicroMES.ApiFeatures.ProcessSegmentFeature.Repositories;
 using MicroMES.ApiFeatures.RoutingFeature.Repositories;
@@ -114,6 +115,31 @@ public class MasterDataDevelopmentSeeder(IUnitOfWork unitOfWork)
 
         var segments = new[] { tagTub, tagLam, sal, sba, verPolSeg, freLeg, lev, finLeg, ass, col, imbSeg };
         foreach (var segment in segments) await Save(segmentRepo.AddAsync(segment));
+
+        // ---- Equipment ---------------------------------------------------------------------------------
+        // A segment with no machine has no constraint (here: fresatura legno, levigatura, collaudo).
+        var equipmentRepo = unitOfWork.GetRepository<IEquipmentRepository>();
+        var equipmentLinkRepo = unitOfWork.GetRepository<IEquipmentProcessSegmentRepository>();
+
+        async Task Machine(string code, string name, string? description, params ProcessSegment[] linked)
+        {
+            var machine = await Save(equipmentRepo.AddAsync(new Equipment
+            {
+                Code = code, Name = name, Description = description, IsActive = true, CreatedAt = now, UpdatedAt = now
+            }));
+            foreach (var segment in linked)
+                await Save(equipmentLinkRepo.AddAsync(new EquipmentProcessSegment { EquipmentId = machine.Id, ProcessSegmentId = segment.Id }));
+        }
+
+        await Machine("TAG-TUB-1", "Troncatrice a disco 1", "Troncatrice principale per tubolare", tagTub);
+        await Machine("TAG-TUB-2", "Troncatrice a disco 2", "Seconda troncatrice, usata nei picchi", tagTub);
+        await Machine("TAG-LAM-1", "Cesoia e piegatrice lamiera", "Cesoia con piegatrice a controllo numerico", tagLam);
+        await Machine("SAL-1", "Postazione di saldatura 1", "Saldatrice MIG con dima per telai", sal);
+        await Machine("SAL-2", "Postazione di saldatura 2", "Saldatrice MIG; usata anche per la sbavatura dei cordoni", sal, sba);
+        await Machine("VER-POL-1", "Cabina e forno a polvere", "Cabina di applicazione e forno di cottura", verPolSeg);
+        await Machine("VER-ACQ-1", "Cabina vernice acquosa", "Verniciatura a spruzzo e asciugatura del legno", finLeg);
+        await Machine("ASS-B1", "Banco di assemblaggio", null, ass);
+        await Machine("IMB-T1", "Tavolo di imballaggio", null, imbSeg);
 
         // ---- Scrap reasons ----------------------------------------------------------------------------
         // No linked segment = valid for every segment.

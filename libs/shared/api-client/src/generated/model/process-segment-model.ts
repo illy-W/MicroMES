@@ -4,6 +4,7 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { ProcessSegmentEquipmentModel } from './process-segment-equipment-model';
 
 export interface ProcessSegmentModel {
   id: number;
@@ -14,6 +15,7 @@ export interface ProcessSegmentModel {
   setupMinutes: number;
   runMinutesPerUnit: number;
   isActive: boolean;
+  equipment: ProcessSegmentEquipmentModel[];
   createdAt: string;
   updatedAt: string;
 }

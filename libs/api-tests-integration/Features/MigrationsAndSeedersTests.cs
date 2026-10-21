@@ -1,5 +1,6 @@
 using FluentAssertions;
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.EquipmentFeature.Models;
 using MicroMES.ApiFeatures.MaterialFeature.Models;
 using MicroMES.ApiFeatures.ProcessSegmentFeature.Models;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
@@ -38,6 +39,16 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
         materials.Should().ContainSingle(m => !m.IsActive, "one raw material is kept inactive on purpose");
 
         (await api.GetAsync<List<ProcessSegmentModel>>("/api/process-segments")).Ok.Should().HaveCount(11);
+
+        var equipment = (await api.GetAsync<List<EquipmentModel>>("/api/equipment?includeInactive=true")).Ok;
+        equipment.Should().HaveCount(9).And.OnlyContain(e => e.IsActive);
+        equipment.Select(e => e.Code).Should().BeEquivalentTo(
+            "TAG-TUB-1", "TAG-TUB-2", "TAG-LAM-1", "SAL-1", "SAL-2", "VER-POL-1", "VER-ACQ-1", "ASS-B1", "IMB-T1");
+        equipment.Should().Contain(e => e.ProcessSegments.Count > 1, "one machine serves more than one segment");
+        var segmentsWithMachines = (await api.GetAsync<List<ProcessSegmentModel>>("/api/process-segments")).Ok;
+        segmentsWithMachines.Should().Contain(s => s.Equipment.Count == 0, "some segments have no constraint");
+        segmentsWithMachines.Single(s => s.Code == "TAG-TUB").Equipment.Select(e => e.Code).Should().Equal("TAG-TUB-1", "TAG-TUB-2");
+        segmentsWithMachines.Single(s => s.Code == "SAL").Equipment.Select(e => e.Code).Should().Equal("SAL-1", "SAL-2");
 
         var topLevel = (await api.GetOrdersAsync(includeChildren: false)).Ok;
         topLevel.Select(o => o.Status).Should().BeEquivalentTo(new[]
@@ -167,5 +178,6 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
         (await api.GetOrdersAsync(includeChildren: true)).Ok.Should().HaveCount(orders.Count);
         (await api.GetAsync<List<MaterialModel>>("/api/materials?includeInactive=true")).Ok.Should().HaveCount(18);
         (await api.GetWorkOrdersAsync()).Ok.Should().HaveCount(workOrderCount);
+        (await api.GetAsync<List<EquipmentModel>>("/api/equipment?includeInactive=true")).Ok.Should().HaveCount(9);
     }
 }

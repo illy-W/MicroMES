@@ -61,6 +61,71 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("BomItems", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.Equipment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Equipment", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.EquipmentProcessSegment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("EquipmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProcessSegmentId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessSegmentId");
+
+                    b.HasIndex("EquipmentId", "ProcessSegmentId")
+                        .IsUnique();
+
+                    b.ToTable("EquipmentProcessSegments", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.Material", b =>
                 {
                     b.Property<int>("Id")
@@ -646,6 +711,21 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
                         .WithMany()
                         .HasForeignKey("ParentMaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.EquipmentProcessSegment", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.Equipment", null)
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.ProcessSegment", null)
+                        .WithMany()
+                        .HasForeignKey("ProcessSegmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

@@ -21,4 +21,9 @@ public class UpdateProcessSegmentRequest
 
     [Required]
     public bool? IsActive { get; set; }
+
+    /// <summary>
+    /// Machines enabled for the segment. Missing (null) = links unchanged; present (even empty) = replaces the set.
+    /// </summary>
+    public List<int>? EquipmentIds { get; set; }
 }

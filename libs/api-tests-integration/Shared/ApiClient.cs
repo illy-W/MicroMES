@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using MicroMES.ApiCore.Persistence.Entities;
 using MicroMES.ApiFeatures.BomFeature.Models;
+using MicroMES.ApiFeatures.EquipmentFeature.Models;
 using MicroMES.ApiFeatures.MaterialFeature.Models;
 using MicroMES.ApiFeatures.ProcessSegmentFeature.Models;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
@@ -68,6 +69,13 @@ public sealed class ApiClient(HttpClient http)
         {
             Code = code, Name = $"Segment {code}", SetupMinutes = setup, RunMinutesPerUnit = run
         })).Ok;
+
+    public Task<ApiResult<EquipmentModel>> CreateEquipmentRawAsync(string code, params int[] segmentIds)
+        => PostAsync<EquipmentModel>("/api/equipment",
+            new CreateEquipmentRequest { Code = code, Name = $"Macchina {code}", ProcessSegmentIds = segmentIds.ToList() });
+
+    public async Task<EquipmentModel> CreateEquipmentAsync(string code, params int[] segmentIds)
+        => (await CreateEquipmentRawAsync(code, segmentIds)).Ok;
 
     public Task<ApiResult<BomItemModel>> AddBomItemAsync(int parentId, int componentId, decimal quantity, int? consumedInStepId = null)
         => PostAsync<BomItemModel>($"/api/materials/{parentId}/bom/items",
