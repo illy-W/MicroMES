@@ -11,6 +11,11 @@ public class BomNodeModel
     public required MaterialType Type { get; set; }
     public required UnitOfMeasure UnitOfMeasure { get; set; }
     public required decimal Quantity { get; set; }
+    /// <summary>Explicit step of the parent routing; null = automatic.</summary>
+    public int? ConsumedInStepId { get; set; }
+    public BomStepModel? ConsumedInStep { get; set; }
+    /// <summary>Resolved step; null when the parent has no routing.</summary>
+    public BomEffectiveStepModel? EffectiveStep { get; set; }
     public required bool IsActive { get; set; }
     public required List<BomNodeModel> Children { get; set; }
 }

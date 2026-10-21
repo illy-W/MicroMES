@@ -41,6 +41,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(x => new { x.ParentMaterialId, x.ComponentMaterialId }).IsUnique();
             entity.HasOne<Material>().WithMany().HasForeignKey(x => x.ParentMaterialId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Material>().WithMany().HasForeignKey(x => x.ComponentMaterialId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<RoutingStep>().WithMany().HasForeignKey(x => x.ConsumedInStepId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ProcessSegment>(entity =>

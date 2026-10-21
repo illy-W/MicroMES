@@ -4,12 +4,18 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { BomEffectiveStepModel } from './bom-effective-step-model';
+import type { BomStepModel } from './bom-step-model';
 
 export interface BomItemModel {
   id: number;
   parentMaterialId: number;
   componentMaterialId: number;
   quantity: number;
+  /** @nullable */
+  consumedInStepId?: number | null;
+  consumedInStep?: null | BomStepModel;
+  effectiveStep?: null | BomEffectiveStepModel;
   createdAt: string;
   updatedAt: string;
 }

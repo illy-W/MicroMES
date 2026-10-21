@@ -1,9 +1,42 @@
+using MicroMES.ApiCore.Persistence.Entities;
+
 namespace MicroMES.ApiFeatures.RoutingFeature.Models;
 
 public class RoutingModel
 {
     public required List<RoutingStepModel> Steps { get; set; }
     public required List<RoutingDependencyModel> Dependencies { get; set; }
+    /// <summary>
+    /// Set by PUT: BOM components that were linked to a step removed by the save and went back to automatic.
+    /// Always empty on GET.
+    /// </summary>
+    public List<RoutingUnassignedComponentModel> UnassignedComponents { get; set; } = [];
+}
+
+/// <summary>BOM component consumed in a routing step.</summary>
+public class RoutingStepComponentModel
+{
+    public required int BomItemId { get; set; }
+    public required int MaterialId { get; set; }
+    public required string MaterialCode { get; set; }
+    public required string MaterialName { get; set; }
+    public required UnitOfMeasure UnitOfMeasure { get; set; }
+    /// <summary>Quantity per unit of the routing material.</summary>
+    public required decimal Quantity { get; set; }
+    /// <summary>True when the row has no explicit step and it falls on the first start step.</summary>
+    public required bool IsAutomatic { get; set; }
+}
+
+/// <summary>Component whose link was reset because its step was removed.</summary>
+public class RoutingUnassignedComponentModel
+{
+    public required int BomItemId { get; set; }
+    public required int MaterialId { get; set; }
+    public required string MaterialCode { get; set; }
+    public required string MaterialName { get; set; }
+    public required int PreviousStepId { get; set; }
+    public required int PreviousOperationNumber { get; set; }
+    public required string PreviousProcessSegmentName { get; set; }
 }
 
 public class RoutingStepModel
@@ -22,6 +55,7 @@ public class RoutingStepModel
     public string? Notes { get; set; }
     public double? PositionX { get; set; }
     public double? PositionY { get; set; }
+    public List<RoutingStepComponentModel> ConsumedComponents { get; set; } = [];
 }
 
 public class RoutingDependencyModel

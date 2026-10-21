@@ -36,6 +36,8 @@ public class ProductionOrderOverviewWorkOrderModel
     public required decimal WorkedMinutes { get; set; }
     /// <summary>Commands the UI may offer now: Start, Pause, Resume, Stop, Abort.</summary>
     public required List<string> AllowedActions { get; set; }
+    /// <summary>Materials consumed by this work order (ChildProductionOrderId set for intermediates made by a child order).</summary>
+    public required List<WorkOrderMaterialModel> Materials { get; set; }
 }
 
 /// <summary>Number of work orders of the family per status.</summary>

@@ -93,6 +93,27 @@ public abstract class BaseFeatureFixture : IDisposable
         return segment.Id;
     }
 
+    /// <summary>Adds a routing step; <paramref name="afterStepId"/> makes it a successor of that step.</summary>
+    protected int AddStep(int materialId, int segmentId, int operation, int? afterStepId = null)
+    {
+        DisposeScopes();
+        using var scope = _provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var now = DateTime.UtcNow;
+        var step = new RoutingStep
+        {
+            MaterialId = materialId, ProcessSegmentId = segmentId, OperationNumber = operation, CreatedAt = now, UpdatedAt = now
+        };
+        db.RoutingSteps.Add(step);
+        db.SaveChanges();
+        if (afterStepId is { } pred)
+        {
+            db.RoutingStepDependencies.Add(new RoutingStepDependency { PredecessorStepId = pred, SuccessorStepId = step.Id });
+            db.SaveChanges();
+        }
+        return step.Id;
+    }
+
     private void DisposeScopes()
     {
         foreach (var scope in _scopes) scope.Dispose();

@@ -4,7 +4,8 @@ namespace MicroMES.ApiFeatures.ProductionOrderFeature.Planning;
 
 public record PlannerMaterial(int Id, string Code, MaterialType Type, bool IsActive);
 
-public record PlannerBomLine(int ComponentMaterialId, decimal Quantity);
+/// <summary>BOM row; ConsumedInStepId null (or not a step of the routing) = first start step.</summary>
+public record PlannerBomLine(int ComponentMaterialId, decimal Quantity, int? ConsumedInStepId = null);
 
 /// <summary>Routing step with the effective times already resolved (step value, else process segment value).</summary>
 public record PlannerStep(
@@ -40,6 +41,8 @@ public class PlannedMaterial
     public required int MaterialId { get; init; }
     public required decimal RequiredQuantity { get; init; }
     public PlannedOrder? Child { get; init; }
+    /// <summary>Work order of this order that consumes the material.</summary>
+    public required PlannedWorkOrder ConsumerStep { get; init; }
 }
 
 public class PlannedOrder
@@ -47,7 +50,7 @@ public class PlannedOrder
     public required int MaterialId { get; init; }
     public required decimal Quantity { get; init; }
     public List<PlannedWorkOrder> WorkOrders { get; } = [];
-    /// <summary>Dependencies inside this order plus those from the last step of each child to the start steps of this order.</summary>
+    /// <summary>Dependencies inside this order plus those from the last step of each child to the step of this order that consumes it.</summary>
     public List<(PlannedWorkOrder Predecessor, PlannedWorkOrder Successor)> Dependencies { get; } = [];
     public List<PlannedMaterial> Materials { get; } = [];
     public List<PlannedOrder> Children { get; } = [];
@@ -121,9 +124,11 @@ public static class ProductionOrderPlanner
         order.StartSteps.AddRange(order.WorkOrders.Where(w => !hasPredecessor.Contains(w.Step.StepId)));
         order.FinalSteps.AddRange(order.WorkOrders.Where(w => !hasSuccessor.Contains(w.Step.StepId)));
 
+        var firstStart = FirstStartStep(order);
         foreach (var line in catalog.Bom.GetValueOrDefault(materialId) ?? [])
         {
             var required = line.Quantity * quantity;
+            var consumer = line.ConsumedInStepId is { } stepId && byStep.TryGetValue(stepId, out var linked) ? linked : firstStart;
             PlannedOrder? child = null;
 
             var component = catalog.Materials[line.ComponentMaterialId];
@@ -138,14 +143,13 @@ public static class ProductionOrderPlanner
                     path.RemoveAt(path.Count - 1);
 
                     order.Children.Add(child);
-                    // The last step of the child gates every start step of this order.
+                    // The last step of the child gates only the step of this order that consumes it.
                     foreach (var last in child.FinalSteps)
-                        foreach (var start in order.StartSteps)
-                            order.Dependencies.Add((last, start));
+                        order.Dependencies.Add((last, consumer));
                 }
             }
 
-            order.Materials.Add(new PlannedMaterial { MaterialId = component.Id, RequiredQuantity = required, Child = child });
+            order.Materials.Add(new PlannedMaterial { MaterialId = component.Id, RequiredQuantity = required, Child = child, ConsumerStep = consumer });
         }
 
         return order;

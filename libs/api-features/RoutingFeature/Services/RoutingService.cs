@@ -1,6 +1,7 @@
 using illyW.Framework.Core.RepositoryPattern;
 using illyW.Framework.Core.ResultPattern;
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.BomFeature.Repositories;
 using MicroMES.ApiFeatures.MaterialFeature.Repositories;
 using MicroMES.ApiFeatures.ProcessSegmentFeature.Repositories;
 using MicroMES.ApiFeatures.RoutingFeature.Models;
@@ -27,6 +28,7 @@ public class RoutingService(
     // Repositories always come from the unit of work (same scope, same DbContext, same transaction).
     private IRoutingStepRepository Steps => unitOfWork.GetRepository<IRoutingStepRepository>();
     private IRoutingStepDependencyRepository Dependencies => unitOfWork.GetRepository<IRoutingStepDependencyRepository>();
+    private IBomItemRepository BomItems => unitOfWork.GetRepository<IBomItemRepository>();
     private IMaterialRepository Materials => unitOfWork.GetRepository<IMaterialRepository>();
     private IProcessSegmentRepository Segments => unitOfWork.GetRepository<IProcessSegmentRepository>();
 
@@ -92,10 +94,11 @@ public class RoutingService(
         if (errors.Count > 0) return Failed(RoutingFailure.Invalid, errors);
 
         // Persist everything in one transaction.
+        var unassigned = new List<RoutingUnassignedComponentModel>();
         try
         {
             unitOfWork.BeginTransaction();
-            var saveError = await PersistAsync(materialId, request, existing, edges);
+            var saveError = await PersistAsync(materialId, request, existing, edges, unassigned);
             if (saveError is not null)
             {
                 unitOfWork.Rollback();
@@ -109,14 +112,46 @@ public class RoutingService(
             return Failed(RoutingFailure.None, $"Unable to save the routing: {ex.Message}");
         }
 
-        return Succeeded(await LoadModelAsync(materialId));
+        var model = await LoadModelAsync(materialId);
+        model.UnassignedComponents = unassigned;
+        return Succeeded(model);
     }
 
     private async Task<string?> PersistAsync(
-        int materialId, UpdateRoutingRequest request, Dictionary<int, RoutingStep> existing, HashSet<(string, string)> edges)
+        int materialId, UpdateRoutingRequest request, Dictionary<int, RoutingStep> existing, HashSet<(string, string)> edges,
+        List<RoutingUnassignedComponentModel> unassigned)
     {
         var keptIds = request.Steps.Where(s => s.Id is not null).Select(s => s.Id!.Value).ToHashSet();
         var removedIds = existing.Keys.Where(id => !keptIds.Contains(id)).ToHashSet();
+
+        // 0. Components linked to a removed step go back to automatic (same transaction); the caller is told which.
+        if (removedIds.Count > 0)
+        {
+            var removedList = removedIds.ToList();
+            var linked = new List<BomItem>();
+            await foreach (var b in BomItems.FetchAsync(x => x.ConsumedInStepId != null && removedList.Contains(x.ConsumedInStepId.Value))) linked.Add(b);
+            var componentIds = linked.Select(b => b.ComponentMaterialId).Distinct().ToList();
+            var components = new Dictionary<int, Material>();
+            await foreach (var m in Materials.FetchAsync(x => componentIds.Contains(x.Id))) components[m.Id] = m;
+            var segIds = removedIds.Select(id => existing[id].ProcessSegmentId).Distinct().ToList();
+            var segNames = new Dictionary<int, string>();
+            await foreach (var seg in Segments.FetchAsync(x => segIds.Contains(x.Id))) segNames[seg.Id] = seg.Name;
+
+            foreach (var b in linked.OrderBy(b => existing[b.ConsumedInStepId!.Value].OperationNumber).ThenBy(b => components[b.ComponentMaterialId].Code, StringComparer.Ordinal))
+            {
+                var step = existing[b.ConsumedInStepId!.Value];
+                var component = components[b.ComponentMaterialId];
+                unassigned.Add(new RoutingUnassignedComponentModel
+                {
+                    BomItemId = b.Id, MaterialId = component.Id, MaterialCode = component.Code, MaterialName = component.Name,
+                    PreviousStepId = step.Id, PreviousOperationNumber = step.OperationNumber,
+                    PreviousProcessSegmentName = segNames[step.ProcessSegmentId]
+                });
+                b.ConsumedInStepId = null;
+                b.UpdatedAt = DateTime.UtcNow;
+                if (!(await BomItems.UpdateAsync(b)).IsSuccessful) return "Unable to reset a BOM item link.";
+            }
+        }
 
         // 1. Remove all existing dependencies of this routing; they are recreated from the request.
         var existingIds = existing.Keys.ToList();
@@ -231,6 +266,14 @@ public class RoutingService(
         var depList = new List<RoutingStepDependency>();
         await foreach (var d in Dependencies.FetchAsync(x => stepIds.Contains(x.PredecessorStepId))) depList.Add(d);
 
+        var bomRows = new List<BomItem>();
+        await foreach (var b in BomItems.FetchAsync(x => x.ParentMaterialId == materialId)) bomRows.Add(b);
+        var compIds = bomRows.Select(b => b.ComponentMaterialId).ToList();
+        var compMap = new Dictionary<int, Material>();
+        await foreach (var m in Materials.FetchAsync(x => compIds.Contains(x.Id))) compMap[m.Id] = m;
+        var firstStartId = RoutingStepRules.FirstStartStep(stepList, depList)?.Id;
+        int? EffectiveStepId(BomItem b) => b.ConsumedInStepId ?? firstStartId;
+
         return new RoutingModel
         {
             Steps = stepList.OrderBy(s => s.OperationNumber).Select(s =>
@@ -251,7 +294,16 @@ public class RoutingService(
                     EffectiveRunMinutesPerUnit = s.RunMinutesPerUnit ?? seg.RunMinutesPerUnit,
                     Notes = s.Notes,
                     PositionX = s.PositionX,
-                    PositionY = s.PositionY
+                    PositionY = s.PositionY,
+                    ConsumedComponents = bomRows.Where(b => EffectiveStepId(b) == s.Id)
+                        .OrderBy(b => compMap[b.ComponentMaterialId].Code, StringComparer.Ordinal)
+                        .Select(b => new RoutingStepComponentModel
+                        {
+                            BomItemId = b.Id, MaterialId = b.ComponentMaterialId,
+                            MaterialCode = compMap[b.ComponentMaterialId].Code, MaterialName = compMap[b.ComponentMaterialId].Name,
+                            UnitOfMeasure = compMap[b.ComponentMaterialId].UnitOfMeasure, Quantity = b.Quantity,
+                            IsAutomatic = b.ConsumedInStepId is null
+                        }).ToList()
                 };
             }).ToList(),
             Dependencies = depList.OrderBy(d => d.Id).Select(d => new RoutingDependencyModel

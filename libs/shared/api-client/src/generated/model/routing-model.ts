@@ -6,8 +6,10 @@
  */
 import type { RoutingDependencyModel } from './routing-dependency-model';
 import type { RoutingStepModel } from './routing-step-model';
+import type { RoutingUnassignedComponentModel } from './routing-unassigned-component-model';
 
 export interface RoutingModel {
   steps: RoutingStepModel[];
   dependencies: RoutingDependencyModel[];
+  unassignedComponents?: RoutingUnassignedComponentModel[];
 }

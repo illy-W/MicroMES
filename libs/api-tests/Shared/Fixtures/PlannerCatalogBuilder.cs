@@ -37,10 +37,11 @@ public sealed class PlannerCatalogBuilder
             operations.Select(o => (o, 0m, 1m)).ToArray(),
             operations.Zip(operations.Skip(1), (a, b) => (a, b)).ToArray());
 
-    public PlannerCatalogBuilder Bom(int parentId, int componentId, decimal quantity)
+    /// <summary>BOM row; <paramref name="consumedInOperation"/> is the operation of the parent routing that consumes it (null = automatic).</summary>
+    public PlannerCatalogBuilder Bom(int parentId, int componentId, decimal quantity, int? consumedInOperation = null)
     {
         if (!_catalog.Bom.TryGetValue(parentId, out var lines)) _catalog.Bom[parentId] = lines = [];
-        lines.Add(new PlannerBomLine(componentId, quantity));
+        lines.Add(new PlannerBomLine(componentId, quantity, consumedInOperation is { } op ? StepId(parentId, op) : null));
         return this;
     }
 

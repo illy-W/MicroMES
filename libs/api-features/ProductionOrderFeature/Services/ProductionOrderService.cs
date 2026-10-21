@@ -196,7 +196,7 @@ public class ProductionOrderService(
         await foreach (var m in Materials.FetchAsync(x => ids.Contains(x.Id)))
             catalog.Materials[m.Id] = new PlannerMaterial(m.Id, m.Code, m.Type, m.IsActive);
         foreach (var (parent, items) in bom.Where(kv => reachable.Contains(kv.Key)))
-            catalog.Bom[parent] = items.OrderBy(i => i.Id).Select(i => new PlannerBomLine(i.ComponentMaterialId, i.Quantity)).ToList();
+            catalog.Bom[parent] = items.OrderBy(i => i.Id).Select(i => new PlannerBomLine(i.ComponentMaterialId, i.Quantity, i.ConsumedInStepId)).ToList();
 
         var steps = new List<RoutingStep>();
         await foreach (var s in RoutingSteps.FetchAsync(x => ids.Contains(x.MaterialId))) steps.Add(s);
@@ -277,10 +277,10 @@ public class ProductionOrderService(
             Persist.Ensure(await Orders.UpdateAsync(child), "Impossibile aggiornare un ordine figlio.");
         }
 
-        // Required materials: all on the first start step.
-        var target = created[ProductionOrderPlanner.FirstStartStep(plan)];
+        // Required materials: on the work order of the step that consumes each one.
         foreach (var material in plan.Materials)
         {
+            var target = created[material.ConsumerStep];
             var line = Persist.Ensure(await Lines.AddAsync(new WorkOrderMaterial
             {
                 WorkOrderId = target.Id,

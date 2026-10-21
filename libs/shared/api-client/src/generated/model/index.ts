@@ -6,8 +6,10 @@
  */
 
 export * from './abort-request';
+export * from './bom-effective-step-model';
 export * from './bom-item-model';
 export * from './bom-node-model';
+export * from './bom-step-model';
 export * from './close-session-request';
 export * from './create-bom-item-request';
 export * from './create-material-request';
@@ -32,7 +34,9 @@ export * from './production-order-summary-model';
 export * from './production-order-tree-model';
 export * from './routing-dependency-model';
 export * from './routing-model';
+export * from './routing-step-component-model';
 export * from './routing-step-model';
+export * from './routing-unassigned-component-model';
 export * from './unit-of-measure';
 export * from './update-bom-item-request';
 export * from './update-material-request';

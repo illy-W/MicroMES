@@ -157,9 +157,9 @@ public class ProductionOrderPlannerFixture
     }
 
     [Fact]
-    public void Plan_ComponentWithRouting_Success_ChildLastStepGatesEveryStartStepOfParent()
+    public void Plan_ComponentWithRouting_Success_UnlinkedChildGatesOnlyFirstStartStepOfParent()
     {
-        // parent has two start steps (10 and 20), the child ends with step 20
+        // parent has two start steps (10 and 20), the child ends with step 20; no explicit link = first start step
         var catalog = new PlannerCatalogBuilder()
             .Material(1, Finished).Routing(1, [(10, 0m, 1m), (20, 0m, 1m), (30, 0m, 1m)], (10, 30), (20, 30))
             .Material(2, Inter).LinearRouting(2, 10, 20)
@@ -169,11 +169,69 @@ public class ProductionOrderPlannerFixture
         var order = ProductionOrderPlanner.Plan(1, 1m, catalog).Order!;
 
         var childLast = order.Children.Single().FinalSteps.Single();
-        var gated = order.Dependencies.Where(d => d.Predecessor == childLast).Select(d => d.Successor.OperationNumber);
-        gated.Should().BeEquivalentTo([10, 20]);
-        order.Dependencies.Should().HaveCount(4, "two from the routing and two from the child");
+        order.Dependencies.Where(d => d.Predecessor == childLast).Select(d => d.Successor.OperationNumber)
+            .Should().Equal(10);
+        order.Dependencies.Should().HaveCount(3, "two from the routing and one from the child");
         order.StartSteps.Select(w => w.OperationNumber).Should().BeEquivalentTo([10, 20],
             "child dependencies do not change which steps are start steps of the routing");
+        order.Materials.Single().ConsumerStep.OperationNumber.Should().Be(10);
+    }
+
+    [Fact]
+    public void Plan_ComponentLinkedToStep_Success_MaterialsOnLinkedStepAndOthersOnFirstStart()
+    {
+        var catalog = new PlannerCatalogBuilder()
+            .Material(1, Finished).LinearRouting(1, 10, 20, 30)
+            .Material(2, Raw).Material(3, Raw).Material(4, Raw)
+            .Bom(1, 2, 1m).Bom(1, 3, 2m, consumedInOperation: 20).Bom(1, 4, 3m, consumedInOperation: 30)
+            .Build();
+
+        var order = ProductionOrderPlanner.Plan(1, 1m, catalog).Order!;
+
+        order.Materials.ToDictionary(m => m.MaterialId, m => m.ConsumerStep.OperationNumber)
+            .Should().BeEquivalentTo(new Dictionary<int, int> { [2] = 10, [3] = 20, [4] = 30 });
+    }
+
+    [Fact]
+    public void Plan_IntermediateLinkedToNonStartStep_Success_ChildGatesOnlyConsumerAndNoCycle()
+    {
+        // 10 -> 20 -> 30; the child is consumed at step 30: step 10 is free to start, 30 waits for 20 and the child
+        var catalog = new PlannerCatalogBuilder()
+            .Material(1, Finished).Routing(1, [(10, 0m, 10m), (20, 0m, 10m), (30, 0m, 10m)], (10, 20), (20, 30))
+            .Material(2, Inter).LinearRouting(2, 10, 20)
+            .Bom(1, 2, 1m, consumedInOperation: 30)
+            .Build();
+
+        var order = ProductionOrderPlanner.Plan(1, 1m, catalog).Order!;
+
+        var childLast = order.Children.Single().FinalSteps.Single();
+        var consumer = order.WorkOrders.Single(w => w.OperationNumber == 30);
+        order.Dependencies.Should().HaveCount(3);
+        order.Dependencies.Should().Contain((childLast, consumer));
+        order.Dependencies.Where(d => d.Successor.OperationNumber is 10 or 20 && d.Predecessor == childLast).Should().BeEmpty();
+        order.Materials.Single().ConsumerStep.Should().BeSameAs(consumer);
+
+        // the graph over parent and child is acyclic: earliest finish is computed for every node
+        var all = order.WorkOrders.Concat(order.Children.SelectMany(c => c.WorkOrders)).ToList();
+        var ids = all.Select((w, i) => (w, i)).ToDictionary(x => x.w, x => x.i);
+        var durations = ids.ToDictionary(kv => kv.Value, kv => kv.Key.PlannedMinutes);
+        var deps = order.Dependencies.Concat(order.Children.SelectMany(c => c.Dependencies))
+            .Select(d => (ids[d.Predecessor], ids[d.Successor])).ToList();
+        ProductionOrderPlanner.EarliestFinish(durations, deps).Should().HaveCount(all.Count);
+        // child (2 min) is shorter than 10 + 10 min of steps 10 and 20: the parent path is critical
+        ProductionOrderPlanner.EarliestFinish(durations, deps)[ids[consumer]].Should().Be(30m);
+    }
+
+    [Fact]
+    public void Plan_LinkToStepOutsideRouting_Success_FallsBackToFirstStartStep()
+    {
+        var catalog = new PlannerCatalogBuilder()
+            .Material(1, Finished).LinearRouting(1, 10, 20)
+            .Material(2, Raw)
+            .Bom(1, 2, 1m, consumedInOperation: 99)
+            .Build();
+
+        ProductionOrderPlanner.Plan(1, 1m, catalog).Order!.Materials.Single().ConsumerStep.OperationNumber.Should().Be(10);
     }
 
     [Fact]

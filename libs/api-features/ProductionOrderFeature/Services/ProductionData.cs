@@ -316,7 +316,8 @@ public class ProductionData(TimeProvider timeProvider)
                     Id = m.Id, ProductionOrderId = m.ProductionOrderId, Code = m.Code, OperationNumber = m.OperationNumber,
                     ProcessSegmentCode = m.ProcessSegmentCode, ProcessSegmentName = m.ProcessSegmentName, Status = m.Status,
                     PlannedQuantity = m.PlannedQuantity, GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity,
-                    PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes, AllowedActions = m.AllowedActions
+                    PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes, AllowedActions = m.AllowedActions,
+                    Materials = Lines.Where(l => l.WorkOrderId == w.Id).OrderBy(l => l.Id).Select(ToMaterialModel).ToList()
                 };
             }).ToList(),
             Dependencies = deps.Select(d => new WorkOrderDependencyModel

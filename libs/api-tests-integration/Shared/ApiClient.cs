@@ -68,9 +68,9 @@ public sealed class ApiClient(HttpClient http)
             Code = code, Name = $"Segment {code}", SetupMinutes = setup, RunMinutesPerUnit = run
         })).Ok;
 
-    public Task<ApiResult<BomItemModel>> AddBomItemAsync(int parentId, int componentId, decimal quantity)
+    public Task<ApiResult<BomItemModel>> AddBomItemAsync(int parentId, int componentId, decimal quantity, int? consumedInStepId = null)
         => PostAsync<BomItemModel>($"/api/materials/{parentId}/bom/items",
-            new CreateBomItemRequest { ComponentMaterialId = componentId, Quantity = quantity });
+            new CreateBomItemRequest { ComponentMaterialId = componentId, Quantity = quantity, ConsumedInStepId = consumedInStepId });
 
     public Task<ApiResult<RoutingModel>> PutRoutingAsync(int materialId, UpdateRoutingRequest request)
         => PutAsync<RoutingModel>($"/api/materials/{materialId}/routing", request);

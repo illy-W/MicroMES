@@ -181,4 +181,121 @@ public class BomServiceFixture : BaseFeatureFixture
 
         result.Failure.Should().Be(BomFailure.NotFound);
     }
+
+    // ---- step link ---------------------------------------------------------------------------------
+
+    private (int parent, int component, int seg, int s10, int s20) ParentWithRouting()
+    {
+        var parent = AddMaterial("PF", MaterialType.FinishedGood);
+        var component = AddMaterial("RAW", MaterialType.RawMaterial);
+        var seg = AddSegment("SEG");
+        var s10 = AddStep(parent, seg, 10);
+        var s20 = AddStep(parent, seg, 20, afterStepId: s10);
+        return (parent, component, seg, s10, s20);
+    }
+
+    [Fact]
+    public async Task AddAsync_NoStep_Success_AutomaticOnFirstStartStep()
+    {
+        var (parent, component, _, s10, _) = ParentWithRouting();
+
+        var result = await Service<BomService>().AddAsync(parent, Item(component));
+
+        result.IsSuccessful.Should().BeTrue();
+        result.Data!.ConsumedInStepId.Should().BeNull();
+        result.Data.ConsumedInStep.Should().BeNull();
+        result.Data.EffectiveStep.Should().Match<BomEffectiveStepModel>(e => e.Id == s10 && e.OperationNumber == 10 && e.IsAutomatic);
+    }
+
+    [Fact]
+    public async Task AddAsync_ExplicitStep_Success_ResolvedAsNotAutomatic()
+    {
+        var (parent, component, _, _, s20) = ParentWithRouting();
+
+        var result = await Service<BomService>().AddAsync(parent,
+            new CreateBomItemRequest { ComponentMaterialId = component, Quantity = 1, ConsumedInStepId = s20 });
+
+        result.IsSuccessful.Should().BeTrue();
+        result.Data!.ConsumedInStepId.Should().Be(s20);
+        result.Data.ConsumedInStep!.OperationNumber.Should().Be(20);
+        result.Data.EffectiveStep.Should().Match<BomEffectiveStepModel>(e => e.Id == s20 && !e.IsAutomatic);
+        Query(db => db.BomItems.Single().ConsumedInStepId).Should().Be(s20);
+    }
+
+    [Fact]
+    public async Task AddAsync_StepOfAnotherMaterial_Failure_Invalid()
+    {
+        var (parent, component, seg, _, _) = ParentWithRouting();
+        var other = AddMaterial("OTHER", MaterialType.Intermediate);
+        var foreign = AddStep(other, seg, 10);
+
+        var result = await Service<BomService>().AddAsync(parent,
+            new CreateBomItemRequest { ComponentMaterialId = component, Quantity = 1, ConsumedInStepId = foreign });
+
+        result.Failure.Should().Be(BomFailure.Invalid);
+        Query(db => db.BomItems.Count()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task AddAsync_UnknownStep_Failure_Invalid()
+    {
+        var (parent, component, _, _, _) = ParentWithRouting();
+
+        var result = await Service<BomService>().AddAsync(parent,
+            new CreateBomItemRequest { ComponentMaterialId = component, Quantity = 1, ConsumedInStepId = 999999 });
+
+        result.Failure.Should().Be(BomFailure.Invalid);
+    }
+
+    [Fact]
+    public async Task AddAsync_StepWithoutParentRouting_Failure_Invalid()
+    {
+        var parent = AddMaterial("PF", MaterialType.FinishedGood);
+        var component = AddMaterial("RAW", MaterialType.RawMaterial);
+
+        var result = await Service<BomService>().AddAsync(parent,
+            new CreateBomItemRequest { ComponentMaterialId = component, Quantity = 1, ConsumedInStepId = 1 });
+
+        result.Failure.Should().Be(BomFailure.Invalid);
+        result.Errors.Should().Contain(e => e.Contains("ciclo"));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ChangeAndClearStep_Success()
+    {
+        var (parent, component, _, s10, s20) = ParentWithRouting();
+        var id = (await Service<BomService>().AddAsync(parent, Item(component))).Data!.Id;
+
+        var linked = await Service<BomService>().UpdateAsync(id, new UpdateBomItemRequest { Quantity = 2, ConsumedInStepId = s20 });
+        linked.Data!.ConsumedInStepId.Should().Be(s20);
+
+        var cleared = await Service<BomService>().UpdateAsync(id, new UpdateBomItemRequest { Quantity = 2 });
+        cleared.Data!.ConsumedInStepId.Should().BeNull();
+        cleared.Data.EffectiveStep!.Id.Should().Be(s10);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_StepOfAnotherMaterial_Failure_Invalid()
+    {
+        var (parent, component, seg, _, _) = ParentWithRouting();
+        var id = (await Service<BomService>().AddAsync(parent, Item(component))).Data!.Id;
+        var foreign = AddStep(AddMaterial("OTHER", MaterialType.Intermediate), seg, 10);
+
+        var result = await Service<BomService>().UpdateAsync(id, new UpdateBomItemRequest { Quantity = 1, ConsumedInStepId = foreign });
+
+        result.Failure.Should().Be(BomFailure.Invalid);
+        Query(db => db.BomItems.Single().ConsumedInStepId).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetTreeAsync_LinkedComponent_Success_ExposesStep()
+    {
+        var (parent, component, _, _, s20) = ParentWithRouting();
+        await Service<BomService>().AddAsync(parent, new CreateBomItemRequest { ComponentMaterialId = component, Quantity = 1, ConsumedInStepId = s20 });
+
+        var tree = (await Service<BomService>().GetTreeAsync(parent)).Data!;
+
+        tree.Single().ConsumedInStepId.Should().Be(s20);
+        tree.Single().EffectiveStep!.OperationNumber.Should().Be(20);
+    }
 }

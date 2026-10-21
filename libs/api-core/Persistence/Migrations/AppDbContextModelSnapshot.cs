@@ -33,6 +33,9 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.Property<int>("ComponentMaterialId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ConsumedInStepId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -49,6 +52,8 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ComponentMaterialId");
+
+                    b.HasIndex("ConsumedInStepId");
 
                     b.HasIndex("ParentMaterialId", "ComponentMaterialId")
                         .IsUnique();
@@ -482,6 +487,11 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                         .HasForeignKey("ComponentMaterialId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.RoutingStep", null)
+                        .WithMany()
+                        .HasForeignKey("ConsumedInStepId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
                         .WithMany()

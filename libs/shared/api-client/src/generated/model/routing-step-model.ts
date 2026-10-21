@@ -4,6 +4,7 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { RoutingStepComponentModel } from './routing-step-component-model';
 
 export interface RoutingStepModel {
   id: number;
@@ -25,4 +26,5 @@ export interface RoutingStepModel {
   positionX?: number | null;
   /** @nullable */
   positionY?: number | null;
+  consumedComponents?: RoutingStepComponentModel[];
 }

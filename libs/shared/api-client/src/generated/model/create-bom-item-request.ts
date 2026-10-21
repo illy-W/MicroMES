@@ -14,4 +14,6 @@ export interface CreateBomItemRequest {
      * @nullable
      */
   quantity: number | null;
+  /** @nullable */
+  consumedInStepId?: number | null;
 }

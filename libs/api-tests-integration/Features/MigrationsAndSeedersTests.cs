@@ -34,7 +34,7 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
         var api = new ApiClient(factory.CreateClient());
 
         var materials = (await api.GetAsync<List<MaterialModel>>("/api/materials?includeInactive=true")).Ok;
-        materials.Should().HaveCount(16);
+        materials.Should().HaveCount(18);
         materials.Should().ContainSingle(m => !m.IsActive, "one raw material is kept inactive on purpose");
 
         (await api.GetAsync<List<ProcessSegmentModel>>("/api/process-segments")).Ok.Should().HaveCount(11);
@@ -44,9 +44,9 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
         {
             ProductionOrderStatus.Completed, ProductionOrderStatus.Cancelled, ProductionOrderStatus.Released,
             ProductionOrderStatus.InProgress, ProductionOrderStatus.Planned,
-            ProductionOrderStatus.Released, ProductionOrderStatus.Aborted
+            ProductionOrderStatus.Released, ProductionOrderStatus.Aborted, ProductionOrderStatus.InProgress
         }, "the x20 coffee-table order stays Released while only its child order (frame) is being worked; "
-            + "the paused-milling order is Released; the chair order with the aborted run is Aborted");
+            + "the paused-milling order is Released; the chair order with the aborted run is Aborted; the bookshelf order has work started");
 
         // The seeded history must obey the state machines: a Completed order has every work order Ended.
         var completed = topLevel.Single(o => o.Status == ProductionOrderStatus.Completed);
@@ -55,7 +55,7 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
             .Should().NotBeEmpty().And.OnlyContain(w => w.Status == WorkOrderStatus.Ended);
 
         var running = (await api.GetAsync<List<WorkOrderModel>>($"/api/work-orders?status={WorkOrderStatus.Running}")).Ok;
-        running.Should().HaveCount(2, "one work order runs on the frame child order and one on the chair order");
+        running.Should().HaveCount(4, "frame, chair cutting, bookshelf shelf finishing and bookshelf side-panel welding");
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
 
         var orders = (await api.GetOrdersAsync(includeChildren: true)).Ok;
         var top = orders.Where(o => o.ParentOrderId is null).OrderBy(o => o.Id).ToList();
-        top.Should().HaveCount(7);
+        top.Should().HaveCount(8);
 
         ProductionOrderModel Top(string material, decimal qty) => top.Single(o => o.MaterialCode == material && o.Quantity == qty);
 
@@ -122,6 +122,40 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
         (await api.GetOrderOverviewAsync(aborted.Id)).Ok.WorkOrders
             .Should().Contain(w => w.Status == WorkOrderStatus.Aborted);
 
+        // Bookshelves x6 (OP-2026-0008): the side panels (child order) are consumed only at assembly (op 30).
+        var shelves = Top("PF-LIB-01", 6);
+        shelves.Code.Should().Be("OP-2026-0008");
+        shelves.Status.Should().Be(ProductionOrderStatus.InProgress);
+        var sov = (await api.GetOrderOverviewAsync(shelves.Id)).Ok;
+        sov.Orders.Should().HaveCount(2);
+        sov.WorkOrders.Should().HaveCount(8, "five bookshelf steps and three side-panel steps");
+        var shelfWo = sov.WorkOrders.Where(w => w.ProductionOrderId == shelves.Id).ToDictionary(w => w.OperationNumber);
+        var panelOrder = sov.Orders.Single(o => o.ParentOrderId == shelves.Id);
+        var panelLast = sov.WorkOrders.Single(w => w.ProductionOrderId == panelOrder.Id && w.OperationNumber == 30).Id;
+        sov.Dependencies.Where(d => d.PredecessorWorkOrderId == panelLast).Select(d => d.SuccessorWorkOrderId)
+            .Should().Equal([shelfWo[30].Id], "the child feeds the third step, not the first");
+        sov.Dependencies.Should().HaveCount(4 + 2 + 1);
+        shelfWo[10].Status.Should().Be(WorkOrderStatus.Ended);
+        shelfWo[20].Status.Should().Be(WorkOrderStatus.Running);
+        shelfWo[30].Status.Should().Be(WorkOrderStatus.Waiting);
+        // Raw components land on different steps; the intermediate on the assembly.
+        shelfWo[10].Materials.Select(m => m.MaterialCode).Should().Equal("TAV-ROV-25");
+        shelfWo[20].Materials.Select(m => m.MaterialCode).Should().Equal("VER-ACQ-TRA");
+        shelfWo[30].Materials.Select(m => m.MaterialCode).Should().BeEquivalentTo("SL-LIB-FIA", "VIT-M6-30", "PIE-GOM-30");
+        shelfWo[30].Materials.Single(m => m.MaterialCode == "SL-LIB-FIA").ChildProductionOrderId.Should().Be(panelOrder.Id);
+        shelfWo[50].Materials.Select(m => m.MaterialCode).Should().Equal("IMB-SCA-60");
+
+        // Coffee tables: only the packaging box is linked (to the packing step); the structure/top stay on assembly.
+        var tavWo = ov.WorkOrders.Where(w => w.ProductionOrderId == tav.Id).ToDictionary(w => w.OperationNumber);
+        tavWo[10].Materials.Select(m => m.MaterialCode).Should().BeEquivalentTo("SL-TAV-STR", "SL-TAV-PIA", "VIT-M6-30", "PIE-GOM-30");
+        tavWo[30].Materials.Select(m => m.MaterialCode).Should().Equal("IMB-SCA-60");
+
+        // Chairs: tubes at cutting, sheet at plate cutting, hardware at assembly.
+        cov.WorkOrders.Single(w => w.OperationNumber == 10).Materials.Select(m => m.MaterialCode).Should().Equal("TUB-Q30-2");
+        cov.WorkOrders.Single(w => w.OperationNumber == 20).Materials.Select(m => m.MaterialCode).Should().Equal("LAM-S235-2");
+        cov.WorkOrders.Single(w => w.OperationNumber == 60).Materials.Select(m => m.MaterialCode)
+            .Should().BeEquivalentTo("TAV-ROV-25", "VIT-M6-30", "PIE-GOM-30");
+
         var workOrderCount = (await api.GetWorkOrdersAsync()).Ok.Count;
 
         // Idempotence: a second run of both seeders adds nothing.
@@ -131,7 +165,7 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
             await scope.ServiceProvider.GetRequiredService<ProductionOrderDevelopmentSeeder>().SeedAsync();
         }
         (await api.GetOrdersAsync(includeChildren: true)).Ok.Should().HaveCount(orders.Count);
-        (await api.GetAsync<List<MaterialModel>>("/api/materials?includeInactive=true")).Ok.Should().HaveCount(16);
+        (await api.GetAsync<List<MaterialModel>>("/api/materials?includeInactive=true")).Ok.Should().HaveCount(18);
         (await api.GetWorkOrdersAsync()).Ok.Should().HaveCount(workOrderCount);
     }
 }

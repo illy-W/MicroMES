@@ -82,11 +82,13 @@ public class MasterDataDevelopmentSeeder(IUnitOfWork unitOfWork)
         var pianoTav = M("SL-TAV-PIA", "Piano tavolino in rovere finito", MaterialType.Intermediate, UnitOfMeasure.Piece, "Piano levigato e verniciato trasparente");
         var tavolino = M("PF-TAV-60", "Tavolino da caffè 60 cm", MaterialType.FinishedGood, UnitOfMeasure.Piece, "Struttura in acciaio nero e piano in rovere");
         var sedia = M("PF-SED-01", "Sedia in acciaio e rovere", MaterialType.FinishedGood, UnitOfMeasure.Piece, "Telaio in tubolare, seduta in rovere");
+        var fiancataLib = M("SL-LIB-FIA", "Fiancata libreria saldata e verniciata", MaterialType.Intermediate, UnitOfMeasure.Piece, "Montante in tubolare con traversi, verniciato nero");
+        var libreria = M("PF-LIB-01", "Libreria a giorno 4 ripiani", MaterialType.FinishedGood, UnitOfMeasure.Piece, "Due fiancate in acciaio nero e quattro ripiani in rovere");
 
         var materials = new[]
         {
             tubQ30, tubQ25, lamS235, tavRov, verPol, verAcq, vit, pie, imb, filSal, disTag, carAbr,
-            strutturaTav, pianoTav, tavolino, sedia
+            strutturaTav, pianoTav, tavolino, sedia, fiancataLib, libreria
         };
         foreach (var material in materials) await Save(materialRepo.AddAsync(material));
 
@@ -113,26 +115,38 @@ public class MasterDataDevelopmentSeeder(IUnitOfWork unitOfWork)
         foreach (var segment in segments) await Save(segmentRepo.AddAsync(segment));
 
         // ---- BOM -------------------------------------------------------------------------------------
-        async Task Bom(Material parent, params (Material component, decimal quantity)[] items)
+        // The BOM rows are saved before the routings exist: the step links (operation numbers) are applied afterwards.
+        var bomRows = new List<(BomItem row, Material parent, int? op)>();
+
+        async Task Bom(Material parent, params (Material component, decimal quantity, int? op)[] items)
         {
-            foreach (var (component, quantity) in items)
-                await Save(bomRepo.AddAsync(new BomItem
+            foreach (var (component, quantity, op) in items)
+            {
+                var row = new BomItem
                 {
                     ParentMaterialId = parent.Id, ComponentMaterialId = component.Id, Quantity = quantity,
                     CreatedAt = now, UpdatedAt = now
-                }));
+                };
+                await Save(bomRepo.AddAsync(row));
+                bomRows.Add((row, parent, op));
+            }
         }
 
-        await Bom(tavolino, (strutturaTav, 1), (pianoTav, 1), (vit, 8), (pie, 4), (imb, 1));
-        await Bom(strutturaTav, (tubQ30, 3.2m), (lamS235, 0.8m), (filSal, 0.05m), (disTag, 0.1m), (verPol, 0.15m));
-        await Bom(pianoTav, (tavRov, 1), (carAbr, 3), (verAcq, 0.12m));
-        await Bom(sedia, (tubQ30, 4.5m), (lamS235, 1.2m), (tavRov, 0.5m), (filSal, 0.08m), (verPol, 0.2m), (vit, 6), (pie, 4), (imb, 1));
+        // The third value is the operation number of the parent routing where the component is consumed
+        // (null = automatic: first start step).
+        await Bom(tavolino, (strutturaTav, 1, null), (pianoTav, 1, null), (vit, 8, null), (pie, 4, null), (imb, 1, 30));
+        await Bom(strutturaTav, (tubQ30, 3.2m, 10), (lamS235, 0.8m, 10), (filSal, 0.05m, 20), (disTag, 0.1m, 10), (verPol, 0.15m, 40));
+        await Bom(pianoTav, (tavRov, 1, 10), (carAbr, 3, 20), (verAcq, 0.12m, 30));
+        await Bom(sedia, (tubQ30, 4.5m, 10), (lamS235, 1.2m, 20), (tavRov, 0.5m, 60), (filSal, 0.08m, 30), (verPol, 0.2m, 50), (vit, 6, 60), (pie, 4, 60), (imb, 1, 80));
+        await Bom(fiancataLib, (tubQ30, 3.6m, 10), (filSal, 0.06m, null), (disTag, 0.1m, 10), (verPol, 0.18m, 30));
+        await Bom(libreria, (fiancataLib, 2, 30), (tavRov, 4, null), (verAcq, 0.3m, 20), (vit, 16, 30), (pie, 4, 30), (imb, 1, 50));
 
         // ---- Routings --------------------------------------------------------------------------------
         // Each step: (operation number, segment, column, row, setup override, run override, notes).
         // Column/row give the diagram position (left to right, parallel branches on separate rows).
         // The edges refer to operation numbers.
         var pendingEdges = new List<(RoutingStep, RoutingStep)>();
+        var allSteps = new List<RoutingStep>();
 
         async Task Routing(Material material,
             (int op, ProcessSegment segment, int column, int row, decimal? setup, decimal? run, string? notes)[] defs,
@@ -149,6 +163,7 @@ public class MasterDataDevelopmentSeeder(IUnitOfWork unitOfWork)
                     CreatedAt = now, UpdatedAt = now
                 };
                 byOp[d.op] = step;
+                allSteps.Add(step);
                 await Save(stepRepo.AddAsync(step));
             }
 
@@ -189,8 +204,34 @@ public class MasterDataDevelopmentSeeder(IUnitOfWork unitOfWork)
             (80, imbSeg, 6, 0, null, null, null)
         ], (10, 30), (20, 30), (30, 40), (40, 50), (50, 60), (60, 70), (70, 80));
 
+        // Intermediate with its own routing, consumed by the bookshelf at its third step.
+        await Routing(fiancataLib,
+        [
+            (10, tagTub, 0, 0, null, 4m, "Due montanti e quattro traversi"),
+            (20, sal, 1, 0, null, null, null),
+            (30, verPolSeg, 2, 0, 40m, null, "Lotto minimo di 10 pezzi per cottura in forno")
+        ], (10, 20), (20, 30));
+
+        // Finished good with four sequential steps: the side panels (child order) are needed only at assembly.
+        await Routing(libreria,
+        [
+            (10, freLeg, 0, 0, null, 6m, "Quattro ripiani da tavola in rovere"),
+            (20, finLeg, 1, 0, null, null, "Una mano di vernice acquosa per ripiano"),
+            (30, ass, 2, 0, null, 14m, "Montaggio delle due fiancate e dei ripiani"),
+            (40, col, 3, 0, null, null, "Controllo della planarità dei ripiani"),
+            (50, imbSeg, 4, 0, null, null, null)
+        ], (10, 20), (20, 30), (30, 40), (40, 50));
+
         foreach (var (pred, succ) in pendingEdges)
             await Save(dependencyRepo.AddAsync(new RoutingStepDependency { PredecessorStepId = pred.Id, SuccessorStepId = succ.Id }));
+
+        // ---- BOM links: where each component is consumed ------------------------------------------------
+        foreach (var (row, parent, op) in bomRows.Where(r => r.op is not null))
+        {
+            var step = allSteps.Single(x => x.MaterialId == parent.Id && x.OperationNumber == op);
+            row.ConsumedInStepId = step.Id;
+            await Save(bomRepo.UpdateAsync(row));
+        }
     }
 
 }

@@ -38,6 +38,7 @@ public class ProductionOrderDevelopmentSeeder(
         var now = DateTime.UtcNow;
         var tavolino = await MaterialIdAsync("PF-TAV-60");
         var sedia = await MaterialIdAsync("PF-SED-01");
+        var libreria = await MaterialIdAsync("PF-LIB-01");
 
         try
         {
@@ -119,6 +120,21 @@ public class ProductionOrderDevelopmentSeeder(
             await RunAsync(aborted.Id, "PF-SED-01", 10, d.AddHours(9), [new S(10, 1, 1, "Lotto di tubolare fuori tolleranza")]);
             clock.Set(d.AddHours(11));
             Unwrap(await Orders(o => o.AbortAsync(aborted.Id, "Materiale non conforme")));
+
+            // 8. Bookshelves x6, released: the side panels (child order) feed only the assembly (op 30);
+            // shelf milling is done, shelf finishing and the panel cutting are in progress.
+            d = today.AddDays(-1);
+            clock.Set(d.AddHours(13));
+            var shelves = await CreateAsync(libreria, 6, 2, d, today.AddDays(8), "Librerie per ufficio: le fiancate servono solo al montaggio");
+            clock.Set(d.AddHours(13).AddMinutes(10));
+            await ReleaseAsync(shelves.Id);
+            await RunAsync(shelves.Id, "PF-LIB-01", 10, d.AddHours(14), [new S(44, 6, 0)]);
+            await RunAsync(shelves.Id, "SL-LIB-FIA", 10, d.AddHours(15), [new S(30, 6, 0)]);
+            clock.Set(now.AddMinutes(-25));
+            var shelfFinish = await FindAsync(shelves.Id, "PF-LIB-01", 20);
+            Unwrap(await WorkOrders(w => w.StartAsync(shelfFinish)));
+            var panelWeld = await FindAsync(shelves.Id, "SL-LIB-FIA", 20);
+            Unwrap(await WorkOrders(w => w.StartAsync(panelWeld)));
         }
         finally
         {

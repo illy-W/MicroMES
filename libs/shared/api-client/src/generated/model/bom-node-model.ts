@@ -4,6 +4,8 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { BomEffectiveStepModel } from './bom-effective-step-model';
+import type { BomStepModel } from './bom-step-model';
 import type { MaterialType } from './material-type';
 import type { UnitOfMeasure } from './unit-of-measure';
 
@@ -15,6 +17,10 @@ export interface BomNodeModel {
   type: MaterialType;
   unitOfMeasure: UnitOfMeasure;
   quantity: number;
+  /** @nullable */
+  consumedInStepId?: number | null;
+  consumedInStep?: null | BomStepModel;
+  effectiveStep?: null | BomEffectiveStepModel;
   isActive: boolean;
   children: BomNodeModel[];
 }
