@@ -43,7 +43,8 @@
       "@spartan-ng/helm/alert": ["./libs/ui/alert/src/index.ts"],
       "@spartan-ng/helm/tabs": ["./libs/ui/tabs/src/index.ts"],
       "@spartan-ng/helm/card": ["./libs/ui/card/src/index.ts"],
-      "@spartan-ng/helm/sonner": ["./libs/ui/sonner/src/index.ts"]
+      "@spartan-ng/helm/sonner": ["./libs/ui/sonner/src/index.ts"],
+      "@spartan-ng/helm/progress": ["./libs/ui/progress/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
