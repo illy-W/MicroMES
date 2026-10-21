@@ -4,6 +4,7 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { PlanStatus } from './plan-status';
 import type { WorkOrderStatus } from './work-order-status';
 
 export type GetWorkOrdersParams = {
@@ -11,4 +12,6 @@ status?: WorkOrderStatus;
 productionOrderId?: number;
 search?: string;
 equipmentId?: number;
+sort?: string;
+planStatus?: PlanStatus;
 };

@@ -4,6 +4,7 @@ using MicroMES.ApiFeatures.BomFeature;
 using MicroMES.ApiFeatures.EquipmentFeature;
 using MicroMES.ApiFeatures.MaterialFeature;
 using MicroMES.ApiFeatures.ProcessSegmentFeature;
+using MicroMES.ApiFeatures.PlanningFeature;
 using MicroMES.ApiFeatures.ProductionOrderFeature;
 using MicroMES.ApiFeatures.ScrapFeature;
 using MicroMES.ApiFeatures.RoutingFeature;
@@ -40,6 +41,7 @@ public abstract class BaseFeatureFixture : IDisposable
         services.AddRoutingFeature();
         services.AddScrapFeature();
         services.AddProductionOrderFeature();
+        services.AddPlanningFeature();
         _provider = services.BuildServiceProvider();
 
         using var scope = _provider.CreateScope();

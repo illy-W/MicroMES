@@ -98,12 +98,40 @@ public class ProductionData(TimeProvider timeProvider)
 
     public static string CodeOf(ProductionOrder order, WorkOrder wo) => $"{order.Code}/{wo.OperationNumber}";
 
+    // ---- plan --------------------------------------------------------------------------------------
+
+    /// <summary>Plan status of a work order from the data in memory (see <see cref="PlanStatusCalculator"/>).</summary>
+    public PlanStatus PlanStatusOf(WorkOrder wo)
+    {
+        var order = Orders[wo.ProductionOrderId];
+        var predecessorEnds = PredecessorIds(wo.Id).Select(id => WorkOrders[id])
+            .Select(p => p.EndedAt ?? p.PlannedEndAt).Where(d => d is not null).Select(d => d!.Value).ToList();
+        var machineUsable = wo.AssignedEquipmentId is not { } eid
+            || (Equipment.TryGetValue(eid, out var e) && e.IsActive && EquipmentLinks.Contains((eid, wo.ProcessSegmentId)));
+        return PlanStatusCalculator.Of(new WorkPlanFacts(
+            wo.Status, wo.PlannedStartAt, wo.PlannedEndAt, order.RequestedEnd, predecessorEnds, machineUsable,
+            timeProvider.GetUtcNow().UtcDateTime));
+    }
+
+    /// <summary>Aggregated plan (min start, max end, status) of the open work orders of the order and its descendants.</summary>
+    public (DateTime? Start, DateTime? End, PlanStatus Status) PlanOf(int orderId)
+    {
+        var ids = Subtree(orderId).Select(o => o.Id).ToHashSet();
+        var open = WorkOrders.Values.Where(w => ids.Contains(w.ProductionOrderId)
+            && w.Status is not (WorkOrderStatus.Ended or WorkOrderStatus.Aborted)).ToList();
+        var planned = open.Where(w => w.PlannedStartAt is not null && w.PlannedEndAt is not null).ToList();
+        return (planned.Count == 0 ? null : planned.Min(w => w.PlannedStartAt),
+            planned.Count == 0 ? null : planned.Max(w => w.PlannedEndAt),
+            PlanStatusCalculator.Aggregate(open.Select(PlanStatusOf)));
+    }
+
     // ---- read models --------------------------------------------------------------------------------
 
     public ProductionOrderModel ToOrderModel(ProductionOrder o)
     {
         var material = Materials[o.MaterialId];
         var produced = ProducedQuantity(o.Id);
+        var plan = PlanOf(o.Id);
         return new ProductionOrderModel
         {
             Id = o.Id,
@@ -123,6 +151,9 @@ public class ProductionData(TimeProvider timeProvider)
             ReleasedAt = o.ReleasedAt,
             StartedAt = o.StartedAt,
             EndedAt = o.EndedAt,
+            PlannedStart = plan.Start,
+            PlannedEnd = plan.End,
+            PlanStatus = plan.Status,
             ProducedQuantity = produced,
             ProgressPercent = Progress(produced, o.Quantity),
             // Child orders follow the state of their parent: no direct commands.
@@ -168,6 +199,10 @@ public class ProductionData(TimeProvider timeProvider)
             Status = wo.Status,
             StartedAt = wo.StartedAt,
             EndedAt = wo.EndedAt,
+            PlannedStartAt = wo.PlannedStartAt,
+            PlannedEndAt = wo.PlannedEndAt,
+            PlannedAt = wo.PlannedAt,
+            PlanStatus = PlanStatusOf(wo),
             Predecessors = PredecessorIds(wo.Id).Select(ToLink).OrderBy(l => l.Code, StringComparer.Ordinal).ToList(),
             Successors = SuccessorIds(wo.Id).Select(ToLink).OrderBy(l => l.Code, StringComparer.Ordinal).ToList(),
             AllowedActions = MachineOf(wo).AllowedActions.ToList()
@@ -203,7 +238,8 @@ public class ProductionData(TimeProvider timeProvider)
             GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity, ShortfallQuantity = m.ShortfallQuantity,
             Notes = m.Notes, Status = m.Status,
             AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
-            StartedAt = m.StartedAt, EndedAt = m.EndedAt, Predecessors = m.Predecessors, Successors = m.Successors,
+            StartedAt = m.StartedAt, EndedAt = m.EndedAt, PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt,
+            PlannedAt = m.PlannedAt, PlanStatus = m.PlanStatus, Predecessors = m.Predecessors, Successors = m.Successors,
             AllowedActions = m.AllowedActions,
             Sessions = SessionsOf(wo.Id).Select(s => new WorkOrderSessionModel
             {
@@ -269,7 +305,8 @@ public class ProductionData(TimeProvider timeProvider)
             Status = header.Status, Priority = header.Priority, RequestedStart = header.RequestedStart,
             RequestedEnd = header.RequestedEnd, Notes = header.Notes, ParentOrderId = header.ParentOrderId,
             ParentOrderCode = header.ParentOrderCode, ReleasedAt = header.ReleasedAt, StartedAt = header.StartedAt,
-            EndedAt = header.EndedAt, ProducedQuantity = header.ProducedQuantity, ProgressPercent = header.ProgressPercent,
+            EndedAt = header.EndedAt, PlannedStart = header.PlannedStart, PlannedEnd = header.PlannedEnd,
+            PlanStatus = header.PlanStatus, ProducedQuantity = header.ProducedQuantity, ProgressPercent = header.ProgressPercent,
             AllowedActions = header.AllowedActions, CreatedAt = header.CreatedAt, UpdatedAt = header.UpdatedAt,
             WorkOrders = own.Select(ToWorkOrderModel).ToList(),
             Dependencies = Dependencies
@@ -280,7 +317,8 @@ public class ProductionData(TimeProvider timeProvider)
             Materials = Lines.Where(l => ownIds.Contains(l.WorkOrderId)).OrderBy(l => l.Id).Select(ToMaterialModel).ToList(),
             Children = ChildrenOf(order.Id).Select(ToTree).ToList(),
             Summary = BuildSummary(order, own),
-            EstimatedEnd = ProductionEndEstimator.Estimate(this, order.Id)
+            // The plan wins over the estimate; the estimate is the fallback for orders without a plan.
+            EstimatedEnd = header.PlannedEnd ?? ProductionEndEstimator.Estimate(this, order.Id)
         };
     }
 
@@ -349,7 +387,8 @@ public class ProductionData(TimeProvider timeProvider)
                     Id = m.Id, Code = m.Code, ParentOrderId = o.Id == orderId ? null : m.ParentOrderId,
                     MaterialId = m.MaterialId, MaterialCode = m.MaterialCode, MaterialName = m.MaterialName,
                     UnitOfMeasure = m.UnitOfMeasure, Quantity = m.Quantity, Status = m.Status,
-                    ProducedQuantity = m.ProducedQuantity, ProgressPercent = m.ProgressPercent
+                    ProducedQuantity = m.ProducedQuantity, ProgressPercent = m.ProgressPercent,
+                    PlannedStart = m.PlannedStart, PlannedEnd = m.PlannedEnd, PlanStatus = m.PlanStatus
                 };
             }).ToList(),
             WorkOrders = workOrders.Select(w =>
@@ -361,7 +400,9 @@ public class ProductionData(TimeProvider timeProvider)
                     ProcessSegmentCode = m.ProcessSegmentCode, ProcessSegmentName = m.ProcessSegmentName, Status = m.Status,
                     AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
                     PlannedQuantity = m.PlannedQuantity, GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity,
-                    PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes, AllowedActions = m.AllowedActions,
+                    PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes,
+                    PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt, PlanStatus = m.PlanStatus,
+                    AllowedActions = m.AllowedActions,
                     Materials = Lines.Where(l => l.WorkOrderId == w.Id).OrderBy(l => l.Id).Select(ToMaterialModel).ToList()
                 };
             }).ToList(),
@@ -382,7 +423,7 @@ public class ProductionData(TimeProvider timeProvider)
                 CriticalPathWorkOrderIds = ProductionOrderPlanner.CriticalPath(durations, pairs),
                 WorkContentMinutes = durations.Values.Sum(),
                 WorkedMinutes = workOrders.Sum(w => WorkedMinutes(w.Id)),
-                EstimatedEnd = ProductionEndEstimator.Estimate(this, orderId)
+                EstimatedEnd = ToOrderModel(Orders[orderId]).PlannedEnd ?? ProductionEndEstimator.Estimate(this, orderId)
             },
             GeneratedAt = timeProvider.GetUtcNow().UtcDateTime
         };

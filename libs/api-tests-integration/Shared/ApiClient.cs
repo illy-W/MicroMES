@@ -6,6 +6,7 @@ using MicroMES.ApiCore.Persistence.Entities;
 using MicroMES.ApiFeatures.BomFeature.Models;
 using MicroMES.ApiFeatures.EquipmentFeature.Models;
 using MicroMES.ApiFeatures.MaterialFeature.Models;
+using MicroMES.ApiFeatures.PlanningFeature.Models;
 using MicroMES.ApiFeatures.ProcessSegmentFeature.Models;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 using MicroMES.ApiFeatures.RoutingFeature.Models;
@@ -96,6 +97,20 @@ public sealed class ApiClient(HttpClient http)
             .ToList();
         return (await PutRoutingAsync(materialId, new UpdateRoutingRequest { Steps = steps, Dependencies = dependencies })).Ok;
     }
+
+    // ---- planning -------------------------------------------------------------------------------------
+
+    public Task<ApiResult<PlanningPreviewModel>> PreviewPlanAsync(PlanningScope scope, int? orderId = null)
+        => PostAsync<PlanningPreviewModel>("/api/planning/preview", new PlanningRequest { Scope = scope, ProductionOrderId = orderId });
+
+    public Task<ApiResult<PlanningApplyModel>> ApplyPlanAsync(PlanningScope scope, int? orderId = null, string? previewToken = null)
+        => PostAsync<PlanningApplyModel>("/api/planning/apply",
+            new PlanningRequest { Scope = scope, ProductionOrderId = orderId, PreviewToken = previewToken });
+
+    public Task<ApiResult<RemovePlanModel>> RemovePlanAsync(int orderId)
+        => SendAsync<RemovePlanModel>(HttpMethod.Delete, $"/api/planning/orders/{orderId}");
+
+    public Task<ApiResult<PlanAlertsModel>> GetPlanAlertsAsync() => GetAsync<PlanAlertsModel>("/api/planning/alerts");
 
     // ---- production ----------------------------------------------------------------------------------
 

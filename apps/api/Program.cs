@@ -9,6 +9,8 @@ using MicroMES.ApiFeatures.CalendarFeature.Seeding;
 using MicroMES.ApiFeatures.EquipmentFeature;
 using MicroMES.ApiFeatures.MaterialFeature;
 using MicroMES.ApiFeatures.ProcessSegmentFeature;
+using MicroMES.ApiFeatures.PlanningFeature;
+using MicroMES.ApiFeatures.PlanningFeature.Seeding;
 using MicroMES.ApiFeatures.ProductionOrderFeature;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Seeding;
 using MicroMES.ApiFeatures.RoutingFeature;
@@ -80,6 +82,7 @@ builder.Services.AddEquipmentFeature();
 builder.Services.AddScrapFeature();
 builder.Services.AddRoutingFeature();
 builder.Services.AddProductionOrderFeature();
+builder.Services.AddPlanningFeature();
 builder.Services.AddSampleDataFeature();
 
 var app = builder.Build();
@@ -95,6 +98,9 @@ if (app.Environment.IsDevelopment() && !isOpenApiEnabled)
     using (var calendarScope = app.Services.CreateScope())
         calendarScope.ServiceProvider.GetRequiredService<CalendarDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
     scope.ServiceProvider.GetRequiredService<ProductionOrderDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
+    // After calendars and orders; own scope (the unit of work cannot reopen a transaction within the same scope).
+    using (var planningScope = app.Services.CreateScope())
+        planningScope.ServiceProvider.GetRequiredService<PlanningDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
 }
 
 // Configure the HTTP request pipeline.

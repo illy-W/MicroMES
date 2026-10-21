@@ -4,6 +4,7 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { PlanStatus } from './plan-status';
 import type { ProductionOrderStatus } from './production-order-status';
 import type { UnitOfMeasure } from './unit-of-measure';
 import type { WorkOrderEquipmentModel } from './work-order-equipment-model';
@@ -45,6 +46,13 @@ export interface WorkOrderDetailModel {
   startedAt?: string | null;
   /** @nullable */
   endedAt?: string | null;
+  /** @nullable */
+  plannedStartAt?: string | null;
+  /** @nullable */
+  plannedEndAt?: string | null;
+  /** @nullable */
+  plannedAt?: string | null;
+  planStatus: PlanStatus;
   predecessors: WorkOrderLinkModel[];
   successors: WorkOrderLinkModel[];
   allowedActions: string[];

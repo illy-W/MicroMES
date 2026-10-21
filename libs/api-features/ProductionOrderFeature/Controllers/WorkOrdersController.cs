@@ -1,5 +1,6 @@
 using MicroMES.ApiCore.Persistence.Entities;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
+using MicroMES.ApiFeatures.ProductionOrderFeature.Planning;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -14,12 +15,15 @@ public class WorkOrdersController(WorkOrderService service) : ControllerBase
 {
     [HttpGet(Name = "GetWorkOrders")]
     [ProducesResponseType<List<WorkOrderModel>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> GetWorkOrders(
         [FromQuery] WorkOrderStatus? status,
         [FromQuery] int? productionOrderId,
         [FromQuery] string? search,
-        [FromQuery] int? equipmentId)
-        => ToResponse(await service.GetAllAsync(status, productionOrderId, search, equipmentId));
+        [FromQuery] int? equipmentId,
+        [FromQuery] string? sort,
+        [FromQuery] PlanStatus? planStatus)
+        => ToResponse(await service.GetAllAsync(status, productionOrderId, search, equipmentId, sort, planStatus));
 
     [HttpGet("{id:int}", Name = "GetWorkOrder")]
     [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]

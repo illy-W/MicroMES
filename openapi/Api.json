@@ -950,6 +950,20 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "planStatus",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PlanStatus"
+            }
           }
         ],
         "responses": {
@@ -962,6 +976,16 @@
                   "items": {
                     "$ref": "#/components/schemas/WorkOrderModel"
                   }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
                 }
               }
             }
@@ -1885,6 +1909,298 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planning/preview": {
+      "post": {
+        "tags": [
+          "Planning"
+        ],
+        "operationId": "PreviewPlan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanningRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanningRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanningRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningPreviewModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planning/apply": {
+      "post": {
+        "tags": [
+          "Planning"
+        ],
+        "operationId": "ApplyPlan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanningRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanningRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanningRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningApplyModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planning/orders/{id}": {
+      "delete": {
+        "tags": [
+          "Planning"
+        ],
+        "operationId": "RemoveOrderPlan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovePlanModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planning/alerts": {
+      "get": {
+        "tags": [
+          "Planning"
+        ],
+        "operationId": "GetPlanAlerts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanAlertsModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planning/timeline": {
+      "get": {
+        "tags": [
+          "Planning"
+        ],
+        "operationId": "GetPlanningTimeline",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "equipmentId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/WorkOrderStatus"
+            }
+          },
+          {
+            "name": "productionOrderId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
                 }
               }
             }
@@ -5161,6 +5477,533 @@
           }
         }
       },
+      "PlanAlertModel": {
+        "required": [
+          "type",
+          "severity",
+          "message",
+          "suggestion"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/PlanAlertType"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/PlanAlertSeverity"
+          },
+          "productionOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "productionOrderCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "workOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "workOrderCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "equipmentCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "causeWorkOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "date": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lateDays": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "loadPercent": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "message": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      },
+      "PlanAlertSeverity": {
+        "enum": [
+          "Warning",
+          "Critical"
+        ]
+      },
+      "PlanAlertsModel": {
+        "required": [
+          "alerts",
+          "criticalCount",
+          "warningCount",
+          "generatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "alerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanAlertModel"
+            }
+          },
+          "criticalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warningCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PlanAlertType": {
+        "enum": [
+          "Late",
+          "Unplannable",
+          "StalePlan",
+          "MachineOverloaded",
+          "InactiveOrDisabledMachine"
+        ]
+      },
+      "PlanChangeKind": {
+        "enum": [
+          "New",
+          "Moved",
+          "Unchanged"
+        ]
+      },
+      "PlanningApplyModel": {
+        "required": [
+          "scope",
+          "items",
+          "unplanned",
+          "summary",
+          "token",
+          "appliedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/PlanningScope"
+          },
+          "productionOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningItemModel"
+            }
+          },
+          "unplanned": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningUnplannedModel"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PlanningSummaryModel"
+          },
+          "token": {
+            "type": "string"
+          },
+          "differsFromPreview": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PlanningItemModel": {
+        "required": [
+          "workOrderId",
+          "code",
+          "productionOrderId",
+          "productionOrderCode",
+          "processSegmentCode",
+          "processSegmentName",
+          "change",
+          "proposedStart",
+          "proposedEnd",
+          "assignsEquipment",
+          "isLate",
+          "lateDays",
+          "reasons"
+        ],
+        "type": "object",
+        "properties": {
+          "workOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "productionOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productionOrderCode": {
+            "type": "string"
+          },
+          "processSegmentCode": {
+            "type": "string"
+          },
+          "processSegmentName": {
+            "type": "string"
+          },
+          "change": {
+            "$ref": "#/components/schemas/PlanChangeKind"
+          },
+          "proposedEquipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
+            ]
+          },
+          "proposedStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proposedEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currentEquipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
+            ]
+          },
+          "currentStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "currentEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "assignsEquipment": {
+            "type": "boolean"
+          },
+          "requestedEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "isLate": {
+            "type": "boolean"
+          },
+          "lateDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningReasonModel"
+            }
+          }
+        }
+      },
+      "PlanningPreviewModel": {
+        "required": [
+          "scope",
+          "items",
+          "unplanned",
+          "summary",
+          "token",
+          "generatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/PlanningScope"
+          },
+          "productionOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningItemModel"
+            }
+          },
+          "unplanned": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningUnplannedModel"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PlanningSummaryModel"
+          },
+          "token": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PlanningReasonCode": {
+        "enum": [
+          "WaitsForPredecessor",
+          "WaitsForRequestedStart",
+          "CalendarClosed",
+          "MachineBusy",
+          "AssignedMachineNotEnabled"
+        ]
+      },
+      "PlanningReasonModel": {
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/PlanningReasonCode"
+          },
+          "message": {
+            "type": "string"
+          },
+          "until": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "relatedWorkOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "relatedEquipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "PlanningRequest": {
+        "required": [
+          "scope"
+        ],
+        "type": "object",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/PlanningScope"
+          },
+          "productionOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "previewToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PlanningScope": {
+        "enum": [
+          "Order",
+          "Unplanned",
+          "All"
+        ]
+      },
+      "PlanningSummaryModel": {
+        "required": [
+          "considered",
+          "planned",
+          "new",
+          "moved",
+          "unchanged",
+          "lateOrders",
+          "maxLateDays",
+          "unplanned"
+        ],
+        "type": "object",
+        "properties": {
+          "considered": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "planned": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "new": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "moved": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lateOrders": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxLateDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unplanned": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "PlanningUnplannedModel": {
+        "required": [
+          "workOrderId",
+          "code",
+          "productionOrderId",
+          "productionOrderCode",
+          "reason",
+          "message",
+          "hadPlan"
+        ],
+        "type": "object",
+        "properties": {
+          "workOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "productionOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productionOrderCode": {
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/UnplannedReasonCode"
+          },
+          "message": {
+            "type": "string"
+          },
+          "relatedWorkOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "hadPlan": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PlanStatus": {
+        "enum": [
+          "Unplanned",
+          "Planned",
+          "Late",
+          "Stale"
+        ]
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -5298,6 +6141,7 @@
           "quantity",
           "status",
           "priority",
+          "planStatus",
           "producedQuantity",
           "progressPercent",
           "allowedActions",
@@ -5425,6 +6269,23 @@
             ],
             "format": "date-time"
           },
+          "plannedStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "plannedEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
           "producedQuantity": {
             "type": "number",
             "format": "double"
@@ -5460,6 +6321,7 @@
           "quantity",
           "status",
           "priority",
+          "planStatus",
           "producedQuantity",
           "progressPercent",
           "allowedActions",
@@ -5553,6 +6415,23 @@
             ],
             "format": "date-time"
           },
+          "plannedStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "plannedEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
           "producedQuantity": {
             "type": "number",
             "format": "double"
@@ -5625,7 +6504,8 @@
           "quantity",
           "status",
           "producedQuantity",
-          "progressPercent"
+          "progressPercent",
+          "planStatus"
         ],
         "type": "object",
         "properties": {
@@ -5670,6 +6550,23 @@
           "progressPercent": {
             "type": "number",
             "format": "double"
+          },
+          "plannedStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "plannedEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
           }
         }
       },
@@ -5733,6 +6630,7 @@
           "scrapQuantity",
           "plannedMinutes",
           "workedMinutes",
+          "planStatus",
           "allowedActions",
           "materials"
         ],
@@ -5801,6 +6699,23 @@
           "workedMinutes": {
             "type": "number",
             "format": "double"
+          },
+          "plannedStartAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "plannedEndAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
           },
           "allowedActions": {
             "type": "array",
@@ -5914,6 +6829,23 @@
             "items": {
               "$ref": "#/components/schemas/ProductionOrderTreeModel"
             }
+          }
+        }
+      },
+      "RemovePlanModel": {
+        "required": [
+          "productionOrderId",
+          "clearedWorkOrders"
+        ],
+        "type": "object",
+        "properties": {
+          "productionOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "clearedWorkOrders": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -6431,6 +7363,284 @@
           }
         }
       },
+      "TimelineEquipmentModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "capacity",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TimelineLoadModel": {
+        "required": [
+          "equipmentId",
+          "periodStart",
+          "periodEnd",
+          "capacityMinutes",
+          "busyMinutes",
+          "loadPercent"
+        ],
+        "type": "object",
+        "properties": {
+          "equipmentId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "capacityMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "busyMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "loadPercent": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "TimelineModel": {
+        "required": [
+          "from",
+          "to",
+          "timeZoneId",
+          "loadPeriod",
+          "equipment",
+          "workOrders",
+          "nonWorking",
+          "load",
+          "generatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timeZoneId": {
+            "type": "string"
+          },
+          "loadPeriod": {
+            "$ref": "#/components/schemas/TimelinePeriod"
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineEquipmentModel"
+            }
+          },
+          "workOrders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineWorkOrderModel"
+            }
+          },
+          "nonWorking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineNonWorkingModel"
+            }
+          },
+          "load": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineLoadModel"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TimelineNonWorkingKind": {
+        "enum": [
+          "Weekly",
+          "CalendarException",
+          "MachineException"
+        ]
+      },
+      "TimelineNonWorkingModel": {
+        "required": [
+          "start",
+          "end",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TimelineNonWorkingKind"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "TimelinePeriod": {
+        "enum": [
+          "Day",
+          "Week"
+        ]
+      },
+      "TimelineWorkOrderModel": {
+        "required": [
+          "id",
+          "code",
+          "productionOrderId",
+          "productionOrderCode",
+          "materialName",
+          "processSegmentCode",
+          "processSegmentName",
+          "status",
+          "planStatus",
+          "isLate",
+          "lateDays",
+          "predecessorIds",
+          "lane",
+          "priority"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "productionOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productionOrderCode": {
+            "type": "string"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "processSegmentCode": {
+            "type": "string"
+          },
+          "processSegmentName": {
+            "type": "string"
+          },
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "plannedStartAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "plannedEndAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "actualStartAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "actualEndAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/WorkOrderStatus"
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
+          "isLate": {
+            "type": "boolean"
+          },
+          "lateDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "predecessorIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "lane": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "TimeSlotModel": {
         "required": [
           "startTime",
@@ -6478,6 +7688,15 @@
           "Kilogram",
           "Meter",
           "Liter"
+        ]
+      },
+      "UnplannedReasonCode": {
+        "enum": [
+          "NoWorkingTime",
+          "HorizonExceeded",
+          "NoCandidateMachine",
+          "CyclicDependency",
+          "PredecessorUnplanned"
         ]
       },
       "UpcomingClosureModel": {
@@ -7269,6 +8488,7 @@
           "scrapQuantity",
           "shortfallQuantity",
           "status",
+          "planStatus",
           "predecessors",
           "successors",
           "allowedActions"
@@ -7405,6 +8625,30 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "plannedStartAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "plannedEndAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "plannedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
           },
           "predecessors": {
             "type": "array",
@@ -7554,6 +8798,7 @@
           "scrapQuantity",
           "shortfallQuantity",
           "status",
+          "planStatus",
           "predecessors",
           "successors",
           "allowedActions"
@@ -7678,6 +8923,30 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "plannedStartAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "plannedEndAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "plannedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
           },
           "predecessors": {
             "type": "array",
@@ -7886,6 +9155,9 @@
     },
     {
       "name": "ProcessSegments"
+    },
+    {
+      "name": "Planning"
     },
     {
       "name": "Materials"

@@ -1,4 +1,5 @@
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.ProductionOrderFeature.Planning;
 
 namespace MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 
@@ -22,6 +23,12 @@ public class ProductionOrderModel
     public DateTime? ReleasedAt { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }
+    /// <summary>Earliest planned start (UTC) of the open work orders of the order and its descendants; null when none is planned.</summary>
+    public DateTime? PlannedStart { get; set; }
+    /// <summary>Latest planned end (UTC) of the same work orders; null when none is planned.</summary>
+    public DateTime? PlannedEnd { get; set; }
+    /// <summary>Derived plan status of the order, aggregated over its open work orders and its descendants.</summary>
+    public required PlanStatus PlanStatus { get; set; }
     /// <summary>Sum of the good quantity of the final work order(s) of this order.</summary>
     public required decimal ProducedQuantity { get; set; }
     /// <summary>Produced / quantity as a percentage, capped to 100.</summary>

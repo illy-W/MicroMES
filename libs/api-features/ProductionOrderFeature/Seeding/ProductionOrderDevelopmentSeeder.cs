@@ -119,7 +119,8 @@ public class ProductionOrderDevelopmentSeeder(
             // 6. Coffee tables x8, released: the oak top milling was paused (work order Interrupted).
             d = today.AddDays(-2);
             clock.Set(d.AddHours(8));
-            var paused = await CreateAsync(tavolino, 8, 4, d, today.AddDays(9), "Fresatura piani sospesa: manca la fresa da 12 mm");
+            // Requested end already passed (today 00:00): it is the late order of the planning demo.
+            var paused = await CreateAsync(tavolino, 8, 4, d, today, "Fresatura piani sospesa: manca la fresa da 12 mm");
             clock.Set(d.AddHours(8).AddMinutes(10));
             await ReleaseAsync(paused.Id);
             var milling = await FindAsync(paused.Id, "SL-TAV-PIA", 10);

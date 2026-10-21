@@ -1,4 +1,5 @@
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.ProductionOrderFeature.Planning;
 
 namespace MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 
@@ -109,6 +110,12 @@ public class WorkOrderModel
     public required WorkOrderStatus Status { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }
+    /// <summary>Planned start/end (UTC) and the moment of planning; null when not planned.</summary>
+    public DateTime? PlannedStartAt { get; set; }
+    public DateTime? PlannedEndAt { get; set; }
+    public DateTime? PlannedAt { get; set; }
+    /// <summary>Derived (never stored): Unplanned, Planned, Late (planned end after the requested end of the order), Stale (plan no longer coherent).</summary>
+    public required PlanStatus PlanStatus { get; set; }
     public required List<WorkOrderLinkModel> Predecessors { get; set; }
     public required List<WorkOrderLinkModel> Successors { get; set; }
     /// <summary>Commands the UI may offer now: Start, Pause, Resume, Stop, Abort.</summary>

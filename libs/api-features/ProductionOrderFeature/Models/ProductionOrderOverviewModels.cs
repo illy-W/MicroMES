@@ -1,4 +1,5 @@
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.ProductionOrderFeature.Planning;
 
 namespace MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 
@@ -16,6 +17,9 @@ public class ProductionOrderOverviewOrderModel
     public required ProductionOrderStatus Status { get; set; }
     public required decimal ProducedQuantity { get; set; }
     public required decimal ProgressPercent { get; set; }
+    public DateTime? PlannedStart { get; set; }
+    public DateTime? PlannedEnd { get; set; }
+    public required PlanStatus PlanStatus { get; set; }
 }
 
 /// <summary>Work order of the family shown in the overview.</summary>
@@ -36,6 +40,9 @@ public class ProductionOrderOverviewWorkOrderModel
     public required decimal ScrapQuantity { get; set; }
     public required decimal PlannedMinutes { get; set; }
     public required decimal WorkedMinutes { get; set; }
+    public DateTime? PlannedStartAt { get; set; }
+    public DateTime? PlannedEndAt { get; set; }
+    public required PlanStatus PlanStatus { get; set; }
     /// <summary>Commands the UI may offer now: Start, Pause, Resume, Stop, Abort.</summary>
     public required List<string> AllowedActions { get; set; }
     /// <summary>Materials consumed by this work order (ChildProductionOrderId set for intermediates made by a child order).</summary>
@@ -65,7 +72,7 @@ public class ProductionOrderOverviewSummaryModel
     public required decimal WorkContentMinutes { get; set; }
     /// <summary>Sum of the closed sessions of the family.</summary>
     public required decimal WorkedMinutes { get; set; }
-    /// <summary>Indicative end (UTC) of the requested order and its children (same rule as the order detail); null when not available.</summary>
+    /// <summary>Planned end when the order has a plan, otherwise the indicative end (UTC) of the requested order and its children (same rule as the order detail); null when not available.</summary>
     public DateTime? EstimatedEnd { get; set; }
 }
 

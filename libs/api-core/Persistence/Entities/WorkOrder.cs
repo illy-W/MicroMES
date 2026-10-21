@@ -27,6 +27,11 @@ public class WorkOrder : IEntity<int>
     public string? Notes { get; set; }
     /// <summary>Planned machine (ISA-95 equipment requirement); null = not assigned. SetNull when the machine goes away.</summary>
     public int? AssignedEquipmentId { get; set; }
+    /// <summary>Planned start/end (UTC) written by the planning; null = not planned. The planned machine is <see cref="AssignedEquipmentId"/>.</summary>
+    public DateTime? PlannedStartAt { get; set; }
+    public DateTime? PlannedEndAt { get; set; }
+    /// <summary>When the plan was written (UTC); null = not planned.</summary>
+    public DateTime? PlannedAt { get; set; }
     public WorkOrderStatus Status { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }

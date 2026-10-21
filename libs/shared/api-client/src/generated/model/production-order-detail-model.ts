@@ -4,6 +4,7 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { PlanStatus } from './plan-status';
 import type { ProductionOrderStatus } from './production-order-status';
 import type { ProductionOrderSummaryModel } from './production-order-summary-model';
 import type { ProductionOrderTreeModel } from './production-order-tree-model';
@@ -45,6 +46,11 @@ export interface ProductionOrderDetailModel {
   startedAt?: string | null;
   /** @nullable */
   endedAt?: string | null;
+  /** @nullable */
+  plannedStart?: string | null;
+  /** @nullable */
+  plannedEnd?: string | null;
+  planStatus: PlanStatus;
   producedQuantity: number;
   progressPercent: number;
   allowedActions: string[];

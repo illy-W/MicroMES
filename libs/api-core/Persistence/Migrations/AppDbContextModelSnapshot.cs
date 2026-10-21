@@ -736,9 +736,18 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.Property<int>("OperationNumber")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("PlannedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PlannedEndAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<decimal>("PlannedQuantity")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime?>("PlannedStartAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ProcessSegmentCode")
                         .IsRequired()

@@ -4,6 +4,7 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { PlanStatus } from './plan-status';
 import type { WorkOrderEquipmentModel } from './work-order-equipment-model';
 import type { WorkOrderMaterialModel } from './work-order-material-model';
 import type { WorkOrderStatus } from './work-order-status';
@@ -23,6 +24,11 @@ export interface ProductionOrderOverviewWorkOrderModel {
   scrapQuantity: number;
   plannedMinutes: number;
   workedMinutes: number;
+  /** @nullable */
+  plannedStartAt?: string | null;
+  /** @nullable */
+  plannedEndAt?: string | null;
+  planStatus: PlanStatus;
   allowedActions: string[];
   materials: WorkOrderMaterialModel[];
 }

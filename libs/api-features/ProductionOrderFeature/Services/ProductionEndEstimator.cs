@@ -67,7 +67,7 @@ public static class ProductionEndEstimator
             : wo.AssignedEquipmentId;
 
     /// <summary>Standard minutes still to do: all of them, or the rest for work already started (never negative).</summary>
-    private static decimal RemainingMinutes(ProductionData data, WorkOrder wo, DateTime now)
+    public static decimal RemainingMinutes(ProductionData data, WorkOrder wo, DateTime now)
     {
         var planned = ProductionData.PlannedMinutes(wo);
         if (wo.Status is not (WorkOrderStatus.Running or WorkOrderStatus.Interrupted)) return planned;

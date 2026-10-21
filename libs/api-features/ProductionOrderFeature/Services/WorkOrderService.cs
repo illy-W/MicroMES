@@ -3,6 +3,7 @@ using MicroMES.ApiCore.Persistence.Entities;
 using MicroMES.ApiFeatures.EquipmentFeature.Services;
 using MicroMES.ApiFeatures.ProductionOrderFeature.MachineStates;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
+using MicroMES.ApiFeatures.ProductionOrderFeature.Planning;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Repositories;
 
 namespace MicroMES.ApiFeatures.ProductionOrderFeature.Services;
@@ -21,8 +22,11 @@ public class WorkOrderService(
     private IWorkOrderResponseCorrectionRepository CorrectionRows => unitOfWork.GetRepository<IWorkOrderResponseCorrectionRepository>();
 
     public async Task<ProductionOrderResult<List<WorkOrderModel>>> GetAllAsync(
-        WorkOrderStatus? status, int? productionOrderId, string? search, int? equipmentId = null)
+        WorkOrderStatus? status, int? productionOrderId, string? search, int? equipmentId = null,
+        string? sort = null, PlanStatus? planStatus = null)
     {
+        if (!string.IsNullOrWhiteSpace(sort) && !sort.Equals("plannedStart", StringComparison.OrdinalIgnoreCase) && !sort.Equals("code", StringComparison.OrdinalIgnoreCase))
+            return ProductionOrderResult<List<WorkOrderModel>>.Invalid($"Ordinamento '{sort}' non valido: usa 'code' (predefinito) o 'plannedStart'.");
         var data = await loader.LoadAllAsync();
         var term = search?.Trim();
 
@@ -31,12 +35,16 @@ public class WorkOrderService(
                         && (productionOrderId is null || w.ProductionOrderId == productionOrderId)
                         && (equipmentId is null || w.AssignedEquipmentId == equipmentId))
             .Select(data.ToWorkOrderModel)
+            .Where(m => planStatus is null || m.PlanStatus == planStatus)
             .Where(m => string.IsNullOrEmpty(term)
                         || Contains(m.Code, term) || Contains(m.ProcessSegmentCode, term) || Contains(m.ProcessSegmentName, term)
-                        || Contains(m.MaterialCode, term) || Contains(m.MaterialName, term))
-            .OrderBy(m => m.ProductionOrderCode, StringComparer.Ordinal).ThenBy(m => m.OperationNumber)
-            .ToList();
-        return ProductionOrderResult<List<WorkOrderModel>>.Ok(items);
+                        || Contains(m.MaterialCode, term) || Contains(m.MaterialName, term));
+        // plannedStart: the queue of the machines (earliest planned start first, work orders without a plan last); same order code/operation otherwise.
+        var ordered = string.Equals(sort, "plannedStart", StringComparison.OrdinalIgnoreCase)
+            ? items.OrderBy(m => m.PlannedStartAt is null).ThenBy(m => m.PlannedStartAt)
+                .ThenBy(m => m.ProductionOrderCode, StringComparer.Ordinal).ThenBy(m => m.OperationNumber)
+            : items.OrderBy(m => m.ProductionOrderCode, StringComparer.Ordinal).ThenBy(m => m.OperationNumber);
+        return ProductionOrderResult<List<WorkOrderModel>>.Ok(ordered.ToList());
     }
 
     public async Task<ProductionOrderResult<WorkOrderDetailModel>> GetAsync(int id)
