@@ -42,7 +42,7 @@ const MAX_QUANTITY = 99999999999999;
             @if (!item()) {
               <div class="grid gap-1.5">
                 <label hlmLabel for="b-comp">Componente *</label>
-                <hlm-select formControlName="componentId">
+                <hlm-select formControlName="componentId" [itemToString]="componentLabel">
                   <hlm-select-trigger class="w-full" buttonId="b-comp">
                     <hlm-select-value [placeholder]="materials.loading() ? 'Caricamento…' : 'Seleziona'" />
                   </hlm-select-trigger>
@@ -106,6 +106,11 @@ export class BomItemDialogComponent implements OnInit {
     const selfId = this.store.material()?.id;
     return this.materials.materials().filter((m) => m.isActive && m.id !== selfId);
   });
+
+  protected readonly componentLabel = (id: number): string => {
+    const m = this.candidates().find((c) => c.id === id);
+    return m ? `${m.code} - ${m.name}` : String(id);
+  };
 
   protected readonly form = this.fb.group({
     componentId: this.fb.control<number | null>(null),

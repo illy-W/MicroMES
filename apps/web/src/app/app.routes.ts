@@ -28,6 +28,20 @@ export const appRoutes: Route[] = [
           import('./features/process-segments/process-segments.component').then((m) => m.ProcessSegmentsComponent),
       },
       {
+        path: 'production-orders/:id',
+        loadComponent: () =>
+          import('./features/production-orders/production-order-detail.component').then((m) => m.ProductionOrderDetailComponent),
+      },
+      {
+        path: 'production-orders',
+        loadComponent: () =>
+          import('./features/production-orders/production-orders.component').then((m) => m.ProductionOrdersComponent),
+      },
+      {
+        path: 'work-orders',
+        loadComponent: () => import('./features/work-orders/work-orders.component').then((m) => m.WorkOrdersComponent),
+      },
+      {
         path: 'materials',
         loadComponent: () =>
           import('./features/materials/materials.component').then((m) => m.MaterialsComponent),

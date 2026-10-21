@@ -68,7 +68,7 @@ import { MaterialsStore, toFailure } from './materials.service';
               <legend class="col-span-2 text-sm font-medium">Classificazione</legend>
               <div class="grid gap-1.5">
                 <label hlmLabel for="m-type">Tipo *</label>
-                <hlm-select formControlName="type">
+                <hlm-select formControlName="type" [itemToString]="typeLabel">
                   <hlm-select-trigger class="w-full" buttonId="m-type">
                     <hlm-select-value placeholder="Seleziona" />
                   </hlm-select-trigger>
@@ -84,7 +84,7 @@ import { MaterialsStore, toFailure } from './materials.service';
               </div>
               <div class="grid gap-1.5">
                 <label hlmLabel for="m-unit">Unità *</label>
-                <hlm-select formControlName="unitOfMeasure">
+                <hlm-select formControlName="unitOfMeasure" [itemToString]="unitOptionLabel">
                   <hlm-select-trigger class="w-full" buttonId="m-unit">
                     <hlm-select-value placeholder="Seleziona" />
                   </hlm-select-trigger>
@@ -145,6 +145,8 @@ export class MaterialFormDialogComponent implements OnInit {
 
   protected readonly types = MATERIAL_TYPE_OPTIONS;
   protected readonly units = UNIT_OPTIONS;
+  protected readonly typeLabel = (value: string): string => this.types.find((o) => o.value === value)?.label ?? String(value);
+  protected readonly unitOptionLabel = (value: string): string => this.units.find((o) => o.value === value)?.label ?? String(value);
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
   private readonly serverErrors = signal<Record<string, string>>({});

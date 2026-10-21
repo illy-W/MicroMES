@@ -1,0 +1,452 @@
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import {
+  lucideCalendarClock,
+  lucideChevronRight,
+  lucideCircleCheck,
+  lucideCircleDot,
+  lucideCircleOff,
+  lucideClock,
+  lucideFileQuestion,
+  lucideOctagonX,
+  lucidePause,
+  lucidePlay,
+  lucideSend,
+  lucideTriangleAlert,
+} from '@ng-icons/lucide';
+import {
+  columnVisibilityFeature,
+  createColumnHelper,
+  createExpandedRowModel,
+  type ExpandedState,
+  injectTable,
+  rowExpandingFeature,
+  tableFeatures,
+} from '@tanstack/angular-table';
+import type {
+  ProductionOrderDetailModel,
+  ProductionOrderTreeModel,
+  WorkOrderLinkModel,
+} from '@micromes/api-client/models';
+import { HlmBadge } from '@spartan-ng/helm/badge';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmEmptyImports } from '@spartan-ng/helm/empty';
+import { HlmProgressImports } from '@spartan-ng/helm/progress';
+import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
+import { HlmTableImports } from '@spartan-ng/helm/table';
+import { HlmTabsImports } from '@spartan-ng/helm/tabs';
+import { map } from 'rxjs';
+import { unitLabel } from '../materials/material-labels';
+import { toFailure } from '../materials/materials.service';
+import { formatMinutes } from '../routing/routing-metrics';
+import { ProductionOrderConfirmDialogComponent } from './production-order-confirm-dialog.component';
+import { ProductionOrderFormDialogComponent } from './production-order-form-dialog.component';
+import { ACTIONS, canEditOrder, formatDate, formatQty, orderStatus, workStatus } from './production-order-labels';
+import { ProductionOrdersStore } from './production-orders.store';
+
+const features = tableFeatures({
+  columnVisibilityFeature,
+  rowExpandingFeature,
+  expandedRowModel: createExpandedRowModel(),
+});
+const columnHelper = createColumnHelper<typeof features, ProductionOrderTreeModel>();
+const columns = columnHelper.columns([
+  columnHelper.accessor('code', { id: 'code', header: 'Ordine' }),
+  columnHelper.accessor('materialCode', { id: 'material', header: 'Materiale' }),
+  columnHelper.accessor('quantity', { id: 'quantity', header: 'Quantità' }),
+  columnHelper.accessor('status', { id: 'status', header: 'Stato' }),
+  columnHelper.accessor('progressPercent', { id: 'progress', header: 'Avanzamento' }),
+]);
+
+@Component({
+  selector: 'app-production-order-detail',
+  imports: [
+    RouterLink,
+    HlmTableImports,
+    HlmEmptyImports,
+    HlmProgressImports,
+    HlmTabsImports,
+    HlmBadge,
+    HlmButton,
+    HlmSkeleton,
+    NgIcon,
+    ProductionOrderFormDialogComponent,
+    ProductionOrderConfirmDialogComponent,
+  ],
+  providers: [
+    provideIcons({
+      lucideCalendarClock,
+      lucideChevronRight,
+      lucideCircleCheck,
+      lucideCircleDot,
+      lucideCircleOff,
+      lucideClock,
+      lucideFileQuestion,
+      lucideOctagonX,
+      lucidePause,
+      lucidePlay,
+      lucideSend,
+      lucideTriangleAlert,
+    }),
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div class="flex flex-col gap-4 p-4">
+      <a hlmBtn variant="link" size="sm" class="h-auto w-fit p-0" routerLink="/production-orders">← Ordini</a>
+
+      @if (loading() && !order()) {
+        <div class="flex flex-col gap-2" aria-busy="true" aria-label="Caricamento ordine">
+          <hlm-skeleton class="h-8 w-80" />
+          <hlm-skeleton class="h-20 w-full" />
+          <hlm-skeleton class="h-40 w-full" />
+        </div>
+      } @else if (notFound()) {
+        <hlm-empty>
+          <hlm-empty-header>
+            <hlm-empty-media variant="icon"><ng-icon name="lucideFileQuestion" /></hlm-empty-media>
+            <div hlmEmptyTitle>Ordine non trovato</div>
+            <div hlmEmptyDescription>L’ordine richiesto non esiste o è stato rimosso.</div>
+          </hlm-empty-header>
+          <hlm-empty-content>
+            <a hlmBtn variant="outline" routerLink="/production-orders">Torna agli ordini</a>
+          </hlm-empty-content>
+        </hlm-empty>
+      } @else if (loadError()) {
+        <hlm-empty>
+          <hlm-empty-header>
+            <hlm-empty-media variant="icon"><ng-icon name="lucideTriangleAlert" /></hlm-empty-media>
+            <div hlmEmptyTitle>Impossibile caricare l’ordine</div>
+            <div hlmEmptyDescription>{{ loadError() }}</div>
+          </hlm-empty-header>
+          <hlm-empty-content>
+            <button hlmBtn type="button" (click)="reload()">Riprova</button>
+          </hlm-empty-content>
+        </hlm-empty>
+      } @else if (order(); as o) {
+        @let st = status(o.status);
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div class="flex flex-col gap-1">
+            <h1 class="flex flex-wrap items-center gap-3 text-xl font-semibold">
+              {{ o.code }}
+              <span hlmBadge variant="outline" class="px-1.5" [class]="st.tone"><ng-icon [name]="st.icon" /> {{ st.label }}</span>
+            </h1>
+            <p class="text-sm">
+              <span class="font-medium">{{ o.materialCode }}</span>
+              <span class="text-muted-foreground"> {{ o.materialName }}</span>
+            </p>
+            <p class="text-muted-foreground text-sm tabular-nums">
+              Priorità {{ o.priority }} · Inizio richiesto {{ date(o.requestedStart) }} · Fine richiesta {{ date(o.requestedEnd) }}
+            </p>
+            @if (o.parentOrderId) {
+              <p class="text-muted-foreground text-sm">
+                Ordine figlio di
+                <a class="text-primary hover:underline" [routerLink]="['/production-orders', o.parentOrderId]">{{ o.parentOrderCode }}</a>
+              </p>
+            }
+            @if (o.notes) {
+              <p class="text-muted-foreground text-sm">{{ o.notes }}</p>
+            }
+          </div>
+          <div class="flex flex-wrap gap-2">
+            @if (canEdit()) {
+              <button hlmBtn size="sm" variant="outline" type="button" (click)="formOpen.set(true)">Modifica</button>
+            }
+            @if (can('Release')) {
+              <button hlmBtn size="sm" type="button" (click)="confirm.set('Release')">Rilascia</button>
+            }
+            @if (can('Cancel')) {
+              <button hlmBtn size="sm" variant="destructive" type="button" (click)="confirm.set('Cancel')">Annulla</button>
+            }
+            @if (can('Abort')) {
+              <button hlmBtn size="sm" variant="destructive" type="button" (click)="confirm.set('Abort')">Interrompi</button>
+            }
+          </div>
+        </div>
+
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-4 rounded-md border p-4 md:grid-cols-3 lg:grid-cols-5">
+          <div class="flex flex-col gap-1">
+            <dt class="text-muted-foreground text-xs">Quantità richiesta</dt>
+            <dd class="text-sm font-medium tabular-nums">{{ qty(o.quantity) }} {{ unit(o.unitOfMeasure) }}</dd>
+          </div>
+          <div class="flex flex-col gap-1">
+            <dt class="text-muted-foreground text-xs">Quantità prodotta</dt>
+            <dd class="flex items-center gap-2 text-sm font-medium tabular-nums">
+              {{ qty(o.summary.producedQuantity) }} {{ unit(o.unitOfMeasure) }}
+              <hlm-progress class="w-16" [value]="o.progressPercent" aria-label="Avanzamento ordine">
+                <hlm-progress-indicator />
+              </hlm-progress>
+              <span class="text-muted-foreground text-xs">{{ o.progressPercent }}%</span>
+            </dd>
+          </div>
+          <div class="flex flex-col gap-1">
+            <dt class="text-muted-foreground text-xs">Contenuto di lavoro</dt>
+            <dd class="text-sm font-medium tabular-nums">{{ minutes(o.summary.workContentMinutes) }}</dd>
+          </div>
+          <div class="flex flex-col gap-1">
+            <dt class="text-muted-foreground text-xs">Durata minima</dt>
+            <dd class="text-sm font-medium tabular-nums">{{ minutes(o.summary.minimumDurationMinutes) }}</dd>
+          </div>
+          <div class="flex flex-col gap-1">
+            <dt class="text-muted-foreground text-xs">Tempo lavorato · Scarti</dt>
+            <dd class="text-sm font-medium tabular-nums">
+              {{ minutes(o.summary.workedMinutes) }} · {{ qty(o.summary.scrapQuantity) }} {{ unit(o.unitOfMeasure) }}
+            </dd>
+          </div>
+        </dl>
+
+        <hlm-tabs tab="work">
+          <hlm-tabs-list aria-label="Sezioni dell’ordine">
+            <button hlmTabsTrigger="work" type="button">Lavori ({{ o.workOrders.length }})</button>
+            <button hlmTabsTrigger="materials" type="button">Materiali richiesti ({{ o.materials.length }})</button>
+            <button hlmTabsTrigger="children" type="button">Ordini figli ({{ o.children.length }})</button>
+          </hlm-tabs-list>
+
+          <div hlmTabsContent="work" class="pt-4">
+            @if (!o.workOrders.length) {
+              <p class="text-muted-foreground text-sm">Nessun lavoro: i lavori vengono generati al rilascio dell’ordine.</p>
+            } @else {
+              <div class="mb-2 flex justify-end">
+                <a hlmBtn variant="outline" size="sm" [routerLink]="['/work-orders']" [queryParams]="{ order: o.id }">Apri in Ordini di lavoro</a>
+              </div>
+              <div class="w-full overflow-auto rounded-md border">
+                <div hlmTableContainer>
+                  <table hlmTable>
+                    <thead hlmTHead class="bg-muted">
+                      <tr hlmTr>
+                        <th hlmTh>Lavoro</th>
+                        <th hlmTh>Fase</th>
+                        <th hlmTh class="text-right">Pianificato</th>
+                        <th hlmTh>Stato</th>
+                        <th hlmTh class="text-right">Buono / Scarto</th>
+                        <th hlmTh class="text-right">Lavorato</th>
+                        <th hlmTh>Predecessori</th>
+                        <th hlmTh>Successori</th>
+                      </tr>
+                    </thead>
+                    <tbody hlmTBody>
+                      @for (w of o.workOrders; track w.id) {
+                        @let ws = workStatus(w.status);
+                        <tr hlmTr>
+                          <td hlmTd class="font-medium">{{ w.code }}</td>
+                          <td hlmTd>{{ w.processSegmentName }}</td>
+                          <td hlmTd class="text-right tabular-nums">{{ minutes(w.plannedMinutes) }}</td>
+                          <td hlmTd>
+                            <span hlmBadge variant="outline" class="px-1.5" [class]="ws.tone"><ng-icon [name]="ws.icon" /> {{ ws.label }}</span>
+                          </td>
+                          <td hlmTd class="text-right tabular-nums">{{ qty(w.goodQuantity) }} / {{ qty(w.scrapQuantity) }}</td>
+                          <td hlmTd class="text-right tabular-nums">{{ minutes(w.workedMinutes) }}</td>
+                          <td hlmTd class="text-muted-foreground">{{ links(w.predecessors) }}</td>
+                          <td hlmTd class="text-muted-foreground">{{ links(w.successors) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div hlmTabsContent="materials" class="pt-4">
+            @if (!o.materials.length) {
+              <p class="text-muted-foreground text-sm">Nessun materiale richiesto.</p>
+            } @else {
+              <div class="w-full overflow-auto rounded-md border">
+                <div hlmTableContainer>
+                  <table hlmTable>
+                    <thead hlmTHead class="bg-muted">
+                      <tr hlmTr>
+                        <th hlmTh>Materiale</th>
+                        <th hlmTh>Lavoro</th>
+                        <th hlmTh class="text-right">Quantità</th>
+                        <th hlmTh>Ordine figlio</th>
+                      </tr>
+                    </thead>
+                    <tbody hlmTBody>
+                      @for (m of o.materials; track m.id) {
+                        <tr hlmTr>
+                          <td hlmTd>
+                            <span class="font-medium">{{ m.materialCode }}</span>
+                            <span class="text-muted-foreground"> {{ m.materialName }}</span>
+                          </td>
+                          <td hlmTd class="text-muted-foreground">{{ m.workOrderCode }}</td>
+                          <td hlmTd class="text-right tabular-nums">{{ qty(m.requiredQuantity) }} {{ unit(m.unitOfMeasure) }}</td>
+                          <td hlmTd>
+                            @if (m.childProductionOrderId) {
+                              <a class="text-primary hover:underline" [routerLink]="['/production-orders', m.childProductionOrderId]">{{ m.childProductionOrderCode }}</a>
+                            } @else {
+                              —
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div hlmTabsContent="children" class="pt-4">
+            @if (!o.children.length) {
+              <p class="text-muted-foreground text-sm">Questo ordine non ha ordini figli.</p>
+            } @else {
+              <div class="w-full overflow-auto rounded-md border">
+                <div hlmTableContainer>
+                  <table hlmTable>
+                    <thead hlmTHead class="bg-muted">
+                      @for (hg of table.getHeaderGroups(); track hg.id) {
+                        <tr hlmTr>
+                          @for (h of hg.headers; track h.id) {
+                            <th hlmTh [class.text-right]="h.column.id === 'quantity'">{{ h.column.columnDef.header }}</th>
+                          }
+                        </tr>
+                      }
+                    </thead>
+                    <tbody hlmTBody>
+                      @for (row of table.getRowModel().rows; track row.id) {
+                        @let c = row.original;
+                        @let cs = status(c.status);
+                        <tr hlmTr>
+                          <td hlmTd>
+                            <div class="flex items-center gap-1" [style.padding-left.rem]="row.depth * 1.5">
+                              @if (row.getCanExpand()) {
+                                <button
+                                  hlmBtn
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  type="button"
+                                  [attr.aria-expanded]="row.getIsExpanded()"
+                                  [attr.aria-label]="(row.getIsExpanded() ? 'Comprimi ' : 'Espandi ') + c.code"
+                                  (click)="row.toggleExpanded()"
+                                >
+                                  <ng-icon name="lucideChevronRight" class="transition-transform" [class.rotate-90]="row.getIsExpanded()" />
+                                </button>
+                              } @else {
+                                <span class="inline-block size-7 shrink-0" aria-hidden="true"></span>
+                              }
+                              <a class="font-medium hover:underline" [routerLink]="['/production-orders', c.id]">{{ c.code }}</a>
+                            </div>
+                          </td>
+                          <td hlmTd>
+                            <span class="font-medium">{{ c.materialCode }}</span>
+                            <span class="text-muted-foreground"> {{ c.materialName }}</span>
+                          </td>
+                          <td hlmTd class="text-right tabular-nums">{{ qty(c.quantity) }} {{ unit(c.unitOfMeasure) }}</td>
+                          <td hlmTd>
+                            <span hlmBadge variant="outline" class="px-1.5" [class]="cs.tone"><ng-icon [name]="cs.icon" /> {{ cs.label }}</span>
+                          </td>
+                          <td hlmTd>
+                            <div class="flex min-w-36 items-center gap-2">
+                              <hlm-progress class="flex-1" [value]="c.progressPercent" [attr.aria-label]="'Avanzamento ' + c.code">
+                                <hlm-progress-indicator />
+                              </hlm-progress>
+                              <span class="text-muted-foreground w-10 text-right text-xs tabular-nums">{{ c.progressPercent }}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          </div>
+        </hlm-tabs>
+
+        @if (formOpen()) {
+          <app-production-order-form-dialog [order]="o" (saved)="formOpen.set(false); reload()" (closed)="formOpen.set(false)" />
+        }
+        @if (confirm(); as action) {
+          <app-production-order-confirm-dialog
+            [order]="o"
+            [action]="action"
+            (done)="confirm.set(null); reload()"
+            (closed)="confirm.set(null)"
+          />
+        }
+      }
+    </div>
+  `,
+})
+export class ProductionOrderDetailComponent {
+  private readonly store = inject(ProductionOrdersStore);
+
+  private readonly orderId = toSignal(inject(ActivatedRoute).paramMap.pipe(map((p) => Number(p.get('id')))), {
+    initialValue: 0,
+  });
+
+  protected readonly order = signal<ProductionOrderDetailModel | null>(null);
+  protected readonly loading = signal(false);
+  protected readonly loadError = signal<string | null>(null);
+  protected readonly notFound = signal(false);
+  protected readonly formOpen = signal(false);
+  protected readonly confirm = signal<string | null>(null);
+
+  protected readonly status = orderStatus;
+  protected readonly workStatus = workStatus;
+  protected readonly qty = formatQty;
+  protected readonly unit = unitLabel;
+  protected readonly date = formatDate;
+  protected readonly minutes = formatMinutes;
+  protected readonly actions = ACTIONS;
+
+  protected readonly canEdit = computed(() => {
+    const o = this.order();
+    return !!o && canEditOrder(o);
+  });
+
+  private readonly expanded = signal<ExpandedState>({});
+
+  protected readonly table = injectTable(() => ({
+    features,
+    columns,
+    data: this.order()?.children ?? [],
+    getSubRows: (r: ProductionOrderTreeModel) => r.children,
+    autoResetExpanded: false,
+    state: { expanded: this.expanded() },
+    onExpandedChange: (updater) => {
+      this.expanded.set(typeof updater === 'function' ? updater(this.expanded()) : updater);
+    },
+    getRowId: (r: ProductionOrderTreeModel) => String(r.id),
+  }));
+
+  constructor() {
+    effect(() => {
+      const id = this.orderId();
+      untracked(() => {
+        this.order.set(null);
+        this.expanded.set({});
+        if (id) void this.load(id);
+      });
+    });
+  }
+
+  protected can(action: string): boolean {
+    return !!this.order()?.allowedActions.includes(action);
+  }
+
+  protected links(items: WorkOrderLinkModel[]): string {
+    return items.length ? items.map((i) => i.code).join(', ') : '—';
+  }
+
+  protected reload(): void {
+    void this.load(this.orderId());
+  }
+
+  private async load(id: number): Promise<void> {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.notFound.set(false);
+    try {
+      this.order.set(await this.store.get(id));
+    } catch (e) {
+      const f = toFailure(e);
+      if (f.status === 404) this.notFound.set(true);
+      else this.loadError.set(f.message);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+}
