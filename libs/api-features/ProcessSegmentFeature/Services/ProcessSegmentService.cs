@@ -53,6 +53,8 @@ public class ProcessSegmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinke
         var equipmentIds = request.EquipmentIds?.Distinct().ToList();
         if (equipmentIds is not null && await linker.ValidateEquipmentAsync(null, equipmentIds) is { IsSuccess: false } invalid)
             return FromOutcome(invalid);
+        if (equipmentIds is not null && await linker.ValidateDefaultAsync(null, equipmentIds, request.DefaultEquipmentId) is { IsSuccess: false } badDefault)
+            return FromOutcome(badDefault);
 
         var now = DateTime.UtcNow;
         var segment = new ProcessSegment
@@ -68,7 +70,7 @@ public class ProcessSegmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinke
         };
 
         var added = await Repo.AddAsync(segment);
-        return await AfterSaveAsync(added.IsSuccessful, added.Errors, added.Data, equipmentIds);
+        return await AfterSaveAsync(added.IsSuccessful, added.Errors, added.Data, equipmentIds, request.DefaultEquipmentId);
     });
 
     public Task<ProcessSegmentResult<ProcessSegmentModel>> UpdateAsync(int id, UpdateProcessSegmentRequest request)
@@ -83,6 +85,8 @@ public class ProcessSegmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinke
         var equipmentIds = request.EquipmentIds?.Distinct().ToList();
         if (equipmentIds is not null && await linker.ValidateEquipmentAsync(id, equipmentIds) is { IsSuccess: false } invalid)
             return FromOutcome(invalid);
+        if (equipmentIds is not null && await linker.ValidateDefaultAsync(id, equipmentIds, request.DefaultEquipmentId) is { IsSuccess: false } badDefault)
+            return FromOutcome(badDefault);
 
         segment.Code = code;
         segment.Name = request.Name.Trim();
@@ -93,7 +97,7 @@ public class ProcessSegmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinke
         segment.UpdatedAt = DateTime.UtcNow;
 
         var updated = await Repo.UpdateAsync(segment);
-        return await AfterSaveAsync(updated.IsSuccessful, updated.Errors, updated.Data, equipmentIds);
+        return await AfterSaveAsync(updated.IsSuccessful, updated.Errors, updated.Data, equipmentIds, request.DefaultEquipmentId);
     });
 
     /// <summary>Soft-delete: sets IsActive = false and keeps the links. Idempotent.</summary>
@@ -108,16 +112,16 @@ public class ProcessSegmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinke
         segment.IsActive = false;
         segment.UpdatedAt = DateTime.UtcNow;
         var updated = await Repo.UpdateAsync(segment);
-        return await AfterSaveAsync(updated.IsSuccessful, updated.Errors, updated.Data, null);
+        return await AfterSaveAsync(updated.IsSuccessful, updated.Errors, updated.Data, null, null);
     });
 
     private async Task<ProcessSegmentResult<ProcessSegmentModel>> AfterSaveAsync(
-        bool ok, IReadOnlyCollection<string> errors, ProcessSegment? data, List<int>? equipmentIds)
+        bool ok, IReadOnlyCollection<string> errors, ProcessSegment? data, List<int>? equipmentIds, int? defaultEquipmentId)
     {
         if (!ok || data is null) return SaveFailed(errors);
         if (equipmentIds is not null)
         {
-            var linked = await linker.ReplaceEquipmentOfSegmentAsync(data.Id, equipmentIds);
+            var linked = await linker.ReplaceEquipmentOfSegmentAsync(data.Id, equipmentIds, defaultEquipmentId);
             if (!linked.IsSuccess) return FromOutcome(linked);
         }
         return Ok(await ReloadAsync(data));
@@ -147,8 +151,9 @@ public class ProcessSegmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinke
 
     private static ProcessSegmentModel ToModel(ProcessSegment s, List<EquipmentProcessSegment> links, Dictionary<int, Equipment> equipment)
         => ProcessSegmentModel.FromEntity(s, links.Where(l => l.ProcessSegmentId == s.Id && equipment.ContainsKey(l.EquipmentId))
-            .Select(l => equipment[l.EquipmentId])
-            .Select(e => new ProcessSegmentEquipmentModel { Id = e.Id, Code = e.Code, Name = e.Name, IsActive = e.IsActive })
+            .Select(l => (Equipment: equipment[l.EquipmentId], l.IsDefault))
+            .Select(x => new ProcessSegmentEquipmentModel
+                { Id = x.Equipment.Id, Code = x.Equipment.Code, Name = x.Equipment.Name, IsActive = x.Equipment.IsActive, IsDefault = x.IsDefault })
             .OrderBy(e => e.Code, StringComparer.Ordinal).ToList());
 
     private static string NormalizeCode(string code) => code.Trim().ToUpperInvariant();

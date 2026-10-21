@@ -10,4 +10,5 @@ export type GetWorkOrdersParams = {
 status?: WorkOrderStatus;
 productionOrderId?: number;
 search?: string;
+equipmentId?: number;
 };

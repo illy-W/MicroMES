@@ -50,6 +50,11 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
         segmentsWithMachines.Single(s => s.Code == "TAG-TUB").Equipment.Select(e => e.Code).Should().Equal("TAG-TUB-1", "TAG-TUB-2");
         segmentsWithMachines.Single(s => s.Code == "SAL").Equipment.Select(e => e.Code).Should().Equal("SAL-1", "SAL-2");
 
+        segmentsWithMachines.Single(s => s.Code == "TAG-TUB").Equipment.Single(e => e.IsDefault).Code.Should().Be("TAG-TUB-1");
+        segmentsWithMachines.Single(s => s.Code == "SAL").Equipment.Single(e => e.IsDefault).Code.Should().Be("SAL-1");
+        var noDefault = segmentsWithMachines.Single(s => s.Code == "TAG-LAM");
+        noDefault.Equipment.Should().HaveCountGreaterThan(1).And.OnlyContain(e => !e.IsDefault, "a multi-machine segment without default shows the manual choice");
+
         var topLevel = (await api.GetOrdersAsync(includeChildren: false)).Ok;
         topLevel.Select(o => o.Status).Should().BeEquivalentTo(new[]
         {
@@ -67,6 +72,21 @@ public class MigrationsAndSeedersTests(ApiFixture fixture)
 
         var running = (await api.GetAsync<List<WorkOrderModel>>($"/api/work-orders?status={WorkOrderStatus.Running}")).Ok;
         running.Should().HaveCount(4, "frame, chair cutting, bookshelf shelf finishing and bookshelf side-panel welding");
+
+        // Machines: every running work order is on a machine; the chair plate cut on TAG-TUB-2, also the candidate of a Ready one.
+        running.Should().OnlyContain(w => w.CurrentEquipment != null && w.AssignedEquipment != null && w.CurrentEquipment.Id == w.AssignedEquipment.Id);
+        var inUse = running.Single(w => w.ProcessSegmentCode == "TAG-LAM");
+        inUse.CurrentEquipment!.Code.Should().Be("TAG-TUB-2");
+        var ready = (await api.GetAsync<List<WorkOrderModel>>($"/api/work-orders?status={WorkOrderStatus.Ready}&equipmentId={inUse.CurrentEquipment.Id}")).Ok;
+        ready.Should().ContainSingle(w => w.ProcessSegmentCode == "TAG-TUB");
+
+        // Sessions of the completed order carry the machine; welding ran on SAL-2 first, the work order ended assigned to SAL-1.
+        var doneOrder = topLevel.Single(o => o.Status == ProductionOrderStatus.Completed);
+        var welding = (await api.GetWorkOrderAsync((await api.GetWorkOrdersAsync(doneOrder.Id)).Ok.Single(w => w.OperationNumber == 30).Id)).Ok;
+        welding.AssignedEquipment!.Code.Should().Be("SAL-1");
+        welding.Sessions.Select(s => s.EquipmentCode).Should().Equal("SAL-2", "SAL-1");
+        var cutting = (await api.GetWorkOrdersAsync(doneOrder.Id)).Ok.Single(w => w.OperationNumber == 20);
+        cutting.AssignedEquipment!.Code.Should().Be("TAG-LAM-1");
     }
 
     [Fact]

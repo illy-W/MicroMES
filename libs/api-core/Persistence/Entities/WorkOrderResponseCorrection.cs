@@ -16,4 +16,9 @@ public class WorkOrderResponseCorrection : IEntity<int>
     public decimal NewGoodQuantity { get; set; }
     public decimal NewScrapQuantity { get; set; }
     public string? NewScrapDetail { get; set; }
+    /// <summary>Machine of the session before and after the correction (snapshots; null = none).</summary>
+    public string? PreviousEquipmentCode { get; set; }
+    public string? PreviousEquipmentName { get; set; }
+    public string? NewEquipmentCode { get; set; }
+    public string? NewEquipmentName { get; set; }
 }

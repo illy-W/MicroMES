@@ -6,6 +6,7 @@
  */
 
 export * from './abort-request';
+export * from './assign-equipment-request';
 export * from './bom-effective-step-model';
 export * from './bom-item-model';
 export * from './bom-node-model';
@@ -29,6 +30,7 @@ export * from './get-scrap-report-params';
 export * from './get-work-orders-params';
 export * from './material-model';
 export * from './material-type';
+export * from './open-session-request';
 export * from './problem-details';
 export * from './process-segment-equipment-model';
 export * from './process-segment-model';
@@ -68,6 +70,7 @@ export * from './validation-problem-details';
 export * from './work-order-correction-model';
 export * from './work-order-dependency-model';
 export * from './work-order-detail-model';
+export * from './work-order-equipment-model';
 export * from './work-order-link-model';
 export * from './work-order-material-model';
 export * from './work-order-model';

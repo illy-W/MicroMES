@@ -17,8 +17,9 @@ public class WorkOrdersController(WorkOrderService service) : ControllerBase
     public async Task<IActionResult> GetWorkOrders(
         [FromQuery] WorkOrderStatus? status,
         [FromQuery] int? productionOrderId,
-        [FromQuery] string? search)
-        => ToResponse(await service.GetAllAsync(status, productionOrderId, search));
+        [FromQuery] string? search,
+        [FromQuery] int? equipmentId)
+        => ToResponse(await service.GetAllAsync(status, productionOrderId, search, equipmentId));
 
     [HttpGet("{id:int}", Name = "GetWorkOrder")]
     [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
@@ -30,8 +31,9 @@ public class WorkOrdersController(WorkOrderService service) : ControllerBase
     [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> StartWorkOrder(int id)
-        => ToResponse(await service.StartAsync(id));
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> StartWorkOrder(int id, [FromBody] OpenSessionRequest? request)
+        => ToResponse(await service.StartAsync(id, request));
 
     [HttpPost("{id:int}/pause", Name = "PauseWorkOrder")]
     [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
@@ -45,8 +47,9 @@ public class WorkOrdersController(WorkOrderService service) : ControllerBase
     [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> ResumeWorkOrder(int id)
-        => ToResponse(await service.ResumeAsync(id));
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> ResumeWorkOrder(int id, [FromBody] OpenSessionRequest? request)
+        => ToResponse(await service.ResumeAsync(id, request));
 
     [HttpPost("{id:int}/stop", Name = "StopWorkOrder")]
     [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
@@ -55,6 +58,15 @@ public class WorkOrdersController(WorkOrderService service) : ControllerBase
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> StopWorkOrder(int id, [FromBody] CloseSessionRequest request)
         => ToResponse(await service.StopAsync(id, request));
+
+    /// <summary>Assigns the planned machine (null removes it). Only for Waiting, Ready and Interrupted work orders (409 otherwise); not a state transition.</summary>
+    [HttpPut("{id:int}/equipment", Name = "AssignWorkOrderEquipment")]
+    [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> AssignWorkOrderEquipment(int id, [FromBody] AssignEquipmentRequest request)
+        => ToResponse(await service.AssignEquipmentAsync(id, request));
 
     [HttpPost("{id:int}/abort", Name = "AbortWorkOrder")]
     [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]

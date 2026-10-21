@@ -1,5 +1,6 @@
 using illyW.Framework.Core.RepositoryPattern;
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.EquipmentFeature.Services;
 using MicroMES.ApiFeatures.ProductionOrderFeature.MachineStates;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Repositories;
@@ -10,6 +11,7 @@ public class WorkOrderService(
     ProductionDataLoader loader,
     ProductionOrderStatusUpdater orderStatus,
     ScrapEntryResolver scrapResolver,
+    EquipmentSelector selector,
     IUnitOfWork unitOfWork)
 {
     // Repositories always come from the unit of work (same scope, same DbContext, same transaction).
@@ -19,14 +21,15 @@ public class WorkOrderService(
     private IWorkOrderResponseCorrectionRepository CorrectionRows => unitOfWork.GetRepository<IWorkOrderResponseCorrectionRepository>();
 
     public async Task<ProductionOrderResult<List<WorkOrderModel>>> GetAllAsync(
-        WorkOrderStatus? status, int? productionOrderId, string? search)
+        WorkOrderStatus? status, int? productionOrderId, string? search, int? equipmentId = null)
     {
         var data = await loader.LoadAllAsync();
         var term = search?.Trim();
 
         var items = data.WorkOrders.Values
             .Where(w => (status is null || w.Status == status)
-                        && (productionOrderId is null || w.ProductionOrderId == productionOrderId))
+                        && (productionOrderId is null || w.ProductionOrderId == productionOrderId)
+                        && (equipmentId is null || w.AssignedEquipmentId == equipmentId))
             .Select(data.ToWorkOrderModel)
             .Where(m => string.IsNullOrEmpty(term)
                         || Contains(m.Code, term) || Contains(m.ProcessSegmentCode, term) || Contains(m.ProcessSegmentName, term)
@@ -44,14 +47,14 @@ public class WorkOrderService(
             : ProductionOrderResult<WorkOrderDetailModel>.Ok(data.ToWorkOrderDetail(wo));
     }
 
-    public Task<ProductionOrderResult<WorkOrderDetailModel>> StartAsync(int id)
-        => ExecuteAsync(id, WorkOrderTrigger.Start, m => m.Start());
+    public Task<ProductionOrderResult<WorkOrderDetailModel>> StartAsync(int id, OpenSessionRequest? request = null)
+        => ExecuteAsync(id, WorkOrderTrigger.Start, m => m.Start(), open: request ?? new OpenSessionRequest());
 
     public Task<ProductionOrderResult<WorkOrderDetailModel>> PauseAsync(int id, CloseSessionRequest request)
         => ExecuteAsync(id, WorkOrderTrigger.Pause, m => m.Pause(request.GoodQuantity, request.ScrapQuantity, request.Notes), request);
 
-    public Task<ProductionOrderResult<WorkOrderDetailModel>> ResumeAsync(int id)
-        => ExecuteAsync(id, WorkOrderTrigger.Resume, m => m.Resume());
+    public Task<ProductionOrderResult<WorkOrderDetailModel>> ResumeAsync(int id, OpenSessionRequest? request = null)
+        => ExecuteAsync(id, WorkOrderTrigger.Resume, m => m.Resume(), open: request ?? new OpenSessionRequest());
 
     public Task<ProductionOrderResult<WorkOrderDetailModel>> StopAsync(int id, CloseSessionRequest request)
         => ExecuteAsync(id, WorkOrderTrigger.Stop, m => m.Stop(request.GoodQuantity, request.ScrapQuantity, request.Notes), request);
@@ -60,7 +63,8 @@ public class WorkOrderService(
         => ExecuteAsync(id, WorkOrderTrigger.Abort, m => m.Abort(notes));
 
     private async Task<ProductionOrderResult<WorkOrderDetailModel>> ExecuteAsync(
-        int id, WorkOrderTrigger trigger, Action<WorkOrderMachineState> fire, CloseSessionRequest? close = null)
+        int id, WorkOrderTrigger trigger, Action<WorkOrderMachineState> fire,
+        CloseSessionRequest? close = null, OpenSessionRequest? open = null)
     {
         var data = await loader.LoadFamilyByWorkOrderAsync(id);
         if (data is null || !data.WorkOrders.TryGetValue(id, out var wo))
@@ -78,10 +82,19 @@ public class WorkOrderService(
             scrap = resolution.Entries;
         }
 
+        // Start and resume open a session: the machine is chosen (and validated) before anything is written.
+        Equipment? equipment = null;
+        if (open is not null)
+        {
+            var choice = await ChooseMachineAsync(data, wo, trigger, open.EquipmentId);
+            if (choice.Error is not null) return ProductionOrderResult<WorkOrderDetailModel>.Invalid(choice.Error);
+            equipment = choice.Equipment;
+        }
+
         try
         {
             unitOfWork.BeginTransaction();
-            await ApplyAsync(data, wo, fire, scrap);
+            await ApplyAsync(data, wo, fire, scrap, equipment);
             unitOfWork.Commit();
         }
         catch (Exception ex)
@@ -94,14 +107,95 @@ public class WorkOrderService(
     }
 
     /// <summary>
+    /// Machine of the session being opened: the requested one (validated), else the assigned one (start) or the one of the
+    /// last session (resume, fallback assigned) when still enabled. Required only when the phase has active linked machines.
+    /// </summary>
+    private async Task<(Equipment? Equipment, string? Error)> ChooseMachineAsync(
+        ProductionData data, WorkOrder wo, WorkOrderTrigger trigger, int? requested)
+    {
+        if (requested is { } id) return await selector.ValidateAsync(wo.ProcessSegmentId, id);
+
+        var machines = await selector.MachinesOfSegmentAsync(wo.ProcessSegmentId);
+        var inferred = trigger == WorkOrderTrigger.Resume
+            ? data.SessionsOf(wo.Id).LastOrDefault()?.EquipmentId ?? wo.AssignedEquipmentId
+            : wo.AssignedEquipmentId;
+        if (inferred is { } known && EquipmentSelector.IsEnabled(machines, known))
+            return (machines.First(m => m.Equipment.Id == known).Equipment, null);
+        if (!EquipmentSelector.RequiresMachine(machines)) return (null, null);
+
+        var stale = inferred is { } old ? machines.FirstOrDefault(m => m.Equipment.Id == old)?.Equipment : null;
+        return (null, stale is null
+            ? EquipmentSelector.ChooseMachineMessage
+            : $"Scegli la macchina: {stale.Code} non è più abilitata per questa fase.");
+    }
+
+    /// <summary>
+    /// Assigns (or removes, with a null machine) the planned machine of a work order that is Waiting, Ready or Interrupted.
+    /// Not a state transition: the work order status does not change.
+    /// </summary>
+    public async Task<ProductionOrderResult<WorkOrderDetailModel>> AssignEquipmentAsync(int id, AssignEquipmentRequest request)
+    {
+        var data = await loader.LoadFamilyByWorkOrderAsync(id);
+        if (data is null || !data.WorkOrders.TryGetValue(id, out var wo))
+            return ProductionOrderResult<WorkOrderDetailModel>.NotFound("Ordine di lavoro non trovato.");
+        if (wo.Status is not (WorkOrderStatus.Waiting or WorkOrderStatus.Ready or WorkOrderStatus.Interrupted))
+            return ProductionOrderResult<WorkOrderDetailModel>.Conflict(
+                $"Il lavoro è in stato '{WorkOrderMachineState.StatusLabel(wo.Status)}': la macchina si assegna solo a un lavoro In attesa, Pronto o Interrotto.");
+
+        Equipment? equipment = null;
+        if (request.EquipmentId is { } equipmentId)
+        {
+            var choice = await selector.ValidateAsync(wo.ProcessSegmentId, equipmentId);
+            if (choice.Error is not null) return ProductionOrderResult<WorkOrderDetailModel>.Invalid(choice.Error);
+            equipment = choice.Equipment;
+        }
+
+        try
+        {
+            unitOfWork.BeginTransaction();
+            wo.AssignedEquipmentId = equipment?.Id;
+            wo.UpdatedAt = data.TimeProvider.GetUtcNow().UtcDateTime;
+            Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile aggiornare l'ordine di lavoro.");
+            unitOfWork.Commit();
+        }
+        catch (Exception ex)
+        {
+            try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
+            return ProductionOrderResult<WorkOrderDetailModel>.Failed(ProductionOrderFailure.None, $"Impossibile assegnare la macchina: {ex.Message}");
+        }
+
+        if (equipment is not null) Remember(data, wo, equipment);
+        return ProductionOrderResult<WorkOrderDetailModel>.Ok(data.ToWorkOrderDetail(wo));
+    }
+
+    private static void Remember(ProductionData data, WorkOrder wo, Equipment equipment)
+    {
+        data.Equipment[equipment.Id] = equipment;
+        data.EquipmentLinks.Add((equipment.Id, wo.ProcessSegmentId));
+    }
+
+    /// <summary>
     /// Fires a transition through the machine and persists its effects (work order, sessions, unlocked successors,
     /// order status). The caller owns the transaction and has already checked CanFire.
     /// </summary>
     public async Task ApplyAsync(ProductionData data, WorkOrder wo, Action<WorkOrderMachineState> fire,
-        IReadOnlyList<ResolvedScrapEntry>? scrap = null)
+        IReadOnlyList<ResolvedScrapEntry>? scrap = null, Equipment? equipment = null)
     {
         var machine = data.MachineOf(wo);
         fire(machine);
+
+        // The session records the machine used; the work order's assignment follows the reality.
+        if (equipment is not null)
+        {
+            wo.AssignedEquipmentId = equipment.Id;
+            Remember(data, wo, equipment);
+            if (machine.OpenedSession is { } session)
+            {
+                session.EquipmentId = equipment.Id;
+                session.EquipmentCode = equipment.Code;
+                session.EquipmentName = equipment.Name;
+            }
+        }
 
         Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile aggiornare l'ordine di lavoro.");
         if (machine.OpenedSession is { } opened)
@@ -165,6 +259,14 @@ public class WorkOrderService(
         var resolution = await scrapResolver.ResolveAsync(request.ScrapQuantity, request.ScrapEntries, wo.ProcessSegmentId);
         if (!resolution.IsValid) return ProductionOrderResult<WorkOrderDetailModel>.Invalid(resolution.Error!);
 
+        Equipment? newEquipment = null;
+        if (request.EquipmentId is { } requestedEquipment && requestedEquipment != session.EquipmentId)
+        {
+            var choice = await selector.ValidateAsync(wo.ProcessSegmentId, requestedEquipment);
+            if (choice.Error is not null) return ProductionOrderResult<WorkOrderDetailModel>.Invalid(choice.Error);
+            newEquipment = choice.Equipment;
+        }
+
         var oldRows = data.Scraps.Where(e => e.WorkOrderResponseId == session.Id).ToList();
         var trace = new WorkOrderResponseCorrection
         {
@@ -176,7 +278,11 @@ public class WorkOrderService(
             PreviousScrapDetail = ScrapEntryRules.Describe(oldRows.Select(r => (r.ReasonName, r.Quantity))),
             NewGoodQuantity = request.GoodQuantity,
             NewScrapQuantity = request.ScrapQuantity,
-            NewScrapDetail = ScrapEntryRules.Describe(resolution.Entries.Select(r => (r.ReasonName, r.Quantity)))
+            NewScrapDetail = ScrapEntryRules.Describe(resolution.Entries.Select(r => (r.ReasonName, r.Quantity))),
+            PreviousEquipmentCode = session.EquipmentCode,
+            PreviousEquipmentName = session.EquipmentName,
+            NewEquipmentCode = newEquipment is null ? session.EquipmentCode : newEquipment.Code,
+            NewEquipmentName = newEquipment is null ? session.EquipmentName : newEquipment.Name
         };
 
         try
@@ -184,6 +290,13 @@ public class WorkOrderService(
             unitOfWork.BeginTransaction();
             session.GoodQuantity = request.GoodQuantity;
             session.ScrapQuantity = request.ScrapQuantity;
+            if (newEquipment is not null)
+            {
+                session.EquipmentId = newEquipment.Id;
+                session.EquipmentCode = newEquipment.Code;
+                session.EquipmentName = newEquipment.Name;
+                Remember(data, wo, newEquipment);
+            }
             Persist.Ensure(await Sessions.UpdateAsync(session), "Impossibile aggiornare la sessione di lavoro.");
             foreach (var row in oldRows)
             {

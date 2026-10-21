@@ -138,8 +138,9 @@ public class EquipmentService(IUnitOfWork unitOfWork, EquipmentSegmentLinker lin
     {
         Id = e.Id, Code = e.Code, Name = e.Name, Description = e.Description, IsActive = e.IsActive,
         ProcessSegments = links.Where(l => l.EquipmentId == e.Id && segments.ContainsKey(l.ProcessSegmentId))
-            .Select(l => segments[l.ProcessSegmentId])
-            .Select(s => new EquipmentSegmentModel { Id = s.Id, Code = s.Code, Name = s.Name, IsActive = s.IsActive })
+            .Select(l => (Segment: segments[l.ProcessSegmentId], l.IsDefault))
+            .Select(x => new EquipmentSegmentModel
+                { Id = x.Segment.Id, Code = x.Segment.Code, Name = x.Segment.Name, IsActive = x.Segment.IsActive, IsDefault = x.IsDefault })
             .OrderBy(s => s.Code, StringComparer.Ordinal).ToList(),
         CreatedAt = e.CreatedAt, UpdatedAt = e.UpdatedAt
     };

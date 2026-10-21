@@ -1,4 +1,5 @@
 using MicroMES.ApiCore.Persistence.Entities;
+using MicroMES.ApiFeatures.EquipmentFeature.Repositories;
 using MicroMES.ApiFeatures.MaterialFeature.Repositories;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Repositories;
 
@@ -14,6 +15,8 @@ public class ProductionDataLoader(
     IWorkOrderResponseScrapRepository scraps,
     IWorkOrderResponseCorrectionRepository corrections,
     IMaterialRepository materials,
+    IEquipmentRepository equipment,
+    IEquipmentProcessSegmentRepository equipmentLinks,
     TimeProvider timeProvider)
 {
     /// <summary>Every order (list pages).</summary>
@@ -72,6 +75,15 @@ public class ProductionDataLoader(
 
         var materialIds = data.Orders.Values.Select(o => o.MaterialId).Concat(data.Lines.Select(l => l.MaterialId)).Distinct().ToList();
         await foreach (var m in materials.FetchAsync(x => materialIds.Contains(x.Id))) data.Materials[m.Id] = m;
+
+        // Machines assigned or used, and the links of the segments involved (to tell whether they are still enabled).
+        var equipmentIds = data.WorkOrders.Values.Select(w => w.AssignedEquipmentId)
+            .Concat(data.Sessions.Select(s => s.EquipmentId))
+            .OfType<int>().Distinct().ToList();
+        await foreach (var e in equipment.FetchAsync(x => equipmentIds.Contains(x.Id))) data.Equipment[e.Id] = e;
+        var segmentIds = data.WorkOrders.Values.Select(w => w.ProcessSegmentId).Distinct().ToList();
+        await foreach (var l in equipmentLinks.FetchAsync(x => segmentIds.Contains(x.ProcessSegmentId)))
+            data.EquipmentLinks.Add((l.EquipmentId, l.ProcessSegmentId));
 
         return data;
     }

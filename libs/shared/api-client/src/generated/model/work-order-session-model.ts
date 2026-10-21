@@ -17,6 +17,12 @@ export interface WorkOrderSessionModel {
   /** @nullable */
   notes?: string | null;
   /** @nullable */
+  equipmentId?: number | null;
+  /** @nullable */
+  equipmentCode?: string | null;
+  /** @nullable */
+  equipmentName?: string | null;
+  /** @nullable */
   minutes?: number | null;
   scrapEntries: WorkOrderScrapEntryModel[];
   isCorrected: boolean;

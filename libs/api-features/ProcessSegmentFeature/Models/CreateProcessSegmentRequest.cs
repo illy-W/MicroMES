@@ -23,4 +23,10 @@ public class CreateProcessSegmentRequest
     /// Machines enabled for the segment. Missing (null) = links unchanged; present (even empty) = replaces the set.
     /// </summary>
     public List<int>? EquipmentIds { get; set; }
+
+    /// <summary>
+    /// Default machine of the segment. Used only when <see cref="EquipmentIds"/> is present: it then replaces the current default
+    /// (null = no default) and must be one of the listed machines (422 otherwise). Ignored when EquipmentIds is omitted (default unchanged).
+    /// </summary>
+    public int? DefaultEquipmentId { get; set; }
 }

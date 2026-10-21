@@ -19,6 +19,9 @@ public class ProductionData(TimeProvider timeProvider)
     public List<WorkOrderResponseScrap> Scraps { get; } = [];
     public List<WorkOrderResponseCorrection> Corrections { get; } = [];
     public Dictionary<int, Material> Materials { get; } = [];
+    public Dictionary<int, Equipment> Equipment { get; } = [];
+    /// <summary>(machine, process segment) pairs of the machines linked to the segments of the loaded work orders.</summary>
+    public HashSet<(int EquipmentId, int ProcessSegmentId)> EquipmentLinks { get; } = [];
 
     public TimeProvider TimeProvider => timeProvider;
 
@@ -155,6 +158,9 @@ public class ProductionData(TimeProvider timeProvider)
             ShortfallQuantity = wo.Status == WorkOrderStatus.Ended
                 ? Math.Max(0m, wo.PlannedQuantity - sessions.Sum(s => s.GoodQuantity)) : 0m,
             Notes = wo.Notes,
+            AssignedEquipment = ToEquipmentModel(wo.AssignedEquipmentId, wo.ProcessSegmentId),
+            CurrentEquipment = wo.Status == WorkOrderStatus.Running
+                ? ToEquipmentModel(sessions.LastOrDefault(s => s.EndedAt is null)?.EquipmentId, wo.ProcessSegmentId) : null,
             Status = wo.Status,
             StartedAt = wo.StartedAt,
             EndedAt = wo.EndedAt,
@@ -163,6 +169,15 @@ public class ProductionData(TimeProvider timeProvider)
             AllowedActions = MachineOf(wo).AllowedActions.ToList()
         };
     }
+
+    public WorkOrderEquipmentModel? ToEquipmentModel(int? equipmentId, int processSegmentId)
+        => equipmentId is { } id && Equipment.TryGetValue(id, out var e)
+            ? new WorkOrderEquipmentModel
+            {
+                Id = e.Id, Code = e.Code, Name = e.Name, IsActive = e.IsActive,
+                IsEnabled = e.IsActive && EquipmentLinks.Contains((e.Id, processSegmentId))
+            }
+            : null;
 
     private WorkOrderLinkModel ToLink(int workOrderId)
     {
@@ -183,6 +198,7 @@ public class ProductionData(TimeProvider timeProvider)
             PlannedQuantity = m.PlannedQuantity, PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes,
             GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity, ShortfallQuantity = m.ShortfallQuantity,
             Notes = m.Notes, Status = m.Status,
+            AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
             StartedAt = m.StartedAt, EndedAt = m.EndedAt, Predecessors = m.Predecessors, Successors = m.Successors,
             AllowedActions = m.AllowedActions,
             Sessions = SessionsOf(wo.Id).Select(s => new WorkOrderSessionModel
@@ -193,6 +209,7 @@ public class ProductionData(TimeProvider timeProvider)
                 GoodQuantity = s.GoodQuantity,
                 ScrapQuantity = s.ScrapQuantity,
                 Notes = s.Notes,
+                EquipmentId = s.EquipmentId, EquipmentCode = s.EquipmentCode, EquipmentName = s.EquipmentName,
                 Minutes = s.EndedAt is null ? null : Minutes(s),
                 ScrapEntries = Scraps.Where(e => e.WorkOrderResponseId == s.Id).OrderBy(e => e.Id)
                     .Select(e => new WorkOrderScrapEntryModel
@@ -207,7 +224,9 @@ public class ProductionData(TimeProvider timeProvider)
                         Id = c.Id, CorrectedAt = c.CorrectedAt, Notes = c.Notes,
                         PreviousGoodQuantity = c.PreviousGoodQuantity, PreviousScrapQuantity = c.PreviousScrapQuantity,
                         PreviousScrapDetail = c.PreviousScrapDetail, NewGoodQuantity = c.NewGoodQuantity,
-                        NewScrapQuantity = c.NewScrapQuantity, NewScrapDetail = c.NewScrapDetail
+                        NewScrapQuantity = c.NewScrapQuantity, NewScrapDetail = c.NewScrapDetail,
+                        PreviousEquipmentCode = c.PreviousEquipmentCode, PreviousEquipmentName = c.PreviousEquipmentName,
+                        NewEquipmentCode = c.NewEquipmentCode, NewEquipmentName = c.NewEquipmentName
                     }).ToList()
             }).ToList(),
             Materials = Lines.Where(l => l.WorkOrderId == wo.Id).OrderBy(l => l.Id).Select(ToMaterialModel).ToList()
@@ -335,6 +354,7 @@ public class ProductionData(TimeProvider timeProvider)
                 {
                     Id = m.Id, ProductionOrderId = m.ProductionOrderId, Code = m.Code, OperationNumber = m.OperationNumber,
                     ProcessSegmentCode = m.ProcessSegmentCode, ProcessSegmentName = m.ProcessSegmentName, Status = m.Status,
+                    AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
                     PlannedQuantity = m.PlannedQuantity, GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity,
                     PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes, AllowedActions = m.AllowedActions,
                     Materials = Lines.Where(l => l.WorkOrderId == w.Id).OrderBy(l => l.Id).Select(ToMaterialModel).ToList()

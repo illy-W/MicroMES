@@ -41,6 +41,23 @@ public class AbortRequest
     public string? Notes { get; set; }
 }
 
+/// <summary>Optional body of start and resume: the machine used by the new session.</summary>
+public class OpenSessionRequest
+{
+    /// <summary>
+    /// Machine of the session. Missing: start uses the assigned machine, resume the one of the last session
+    /// (fallback: the assigned one). Required (422) when the phase has active linked machines and none can be inferred.
+    /// </summary>
+    public int? EquipmentId { get; set; }
+}
+
+/// <summary>Body of the assignment of a machine to a work order.</summary>
+public class AssignEquipmentRequest
+{
+    /// <summary>The machine (active and linked to the phase) or null to remove the assignment.</summary>
+    public int? EquipmentId { get; set; }
+}
+
 /// <summary>Body of pause and stop: quantities of the session being closed.</summary>
 public class CloseSessionRequest
 {
@@ -78,6 +95,9 @@ public class CorrectSessionRequest
     public decimal ScrapQuantity { get; set; }
 
     public List<ScrapEntryRequest>? ScrapEntries { get; set; }
+
+    /// <summary>New machine of the session (active and linked to the phase). Missing: the machine is unchanged.</summary>
+    public int? EquipmentId { get; set; }
 
     /// <summary>Why the session is corrected (mandatory).</summary>
     [Required, StringLength(1000, MinimumLength = 1)]

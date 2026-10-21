@@ -121,6 +121,9 @@ public class MasterDataDevelopmentSeeder(IUnitOfWork unitOfWork)
         var equipmentRepo = unitOfWork.GetRepository<IEquipmentRepository>();
         var equipmentLinkRepo = unitOfWork.GetRepository<IEquipmentProcessSegmentRepository>();
 
+        // Default machine of a segment (one per segment): TAG-LAM has two machines and no default, to show the manual choice.
+        var defaults = new HashSet<(string Machine, string Segment)> { ("TAG-TUB-1", "TAG-TUB"), ("SAL-1", "SAL") };
+
         async Task Machine(string code, string name, string? description, params ProcessSegment[] linked)
         {
             var machine = await Save(equipmentRepo.AddAsync(new Equipment
@@ -128,11 +131,14 @@ public class MasterDataDevelopmentSeeder(IUnitOfWork unitOfWork)
                 Code = code, Name = name, Description = description, IsActive = true, CreatedAt = now, UpdatedAt = now
             }));
             foreach (var segment in linked)
-                await Save(equipmentLinkRepo.AddAsync(new EquipmentProcessSegment { EquipmentId = machine.Id, ProcessSegmentId = segment.Id }));
+                await Save(equipmentLinkRepo.AddAsync(new EquipmentProcessSegment
+                {
+                    EquipmentId = machine.Id, ProcessSegmentId = segment.Id, IsDefault = defaults.Contains((code, segment.Code))
+                }));
         }
 
         await Machine("TAG-TUB-1", "Troncatrice a disco 1", "Troncatrice principale per tubolare", tagTub);
-        await Machine("TAG-TUB-2", "Troncatrice a disco 2", "Seconda troncatrice, usata nei picchi", tagTub);
+        await Machine("TAG-TUB-2", "Troncatrice a disco 2", "Seconda troncatrice, usata nei picchi e per le piastre di lamiera", tagTub, tagLam);
         await Machine("TAG-LAM-1", "Cesoia e piegatrice lamiera", "Cesoia con piegatrice a controllo numerico", tagLam);
         await Machine("SAL-1", "Postazione di saldatura 1", "Saldatrice MIG con dima per telai", sal);
         await Machine("SAL-2", "Postazione di saldatura 2", "Saldatrice MIG; usata anche per la sbavatura dei cordoni", sal, sba);

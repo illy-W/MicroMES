@@ -10,4 +10,5 @@ export interface ProcessSegmentEquipmentModel {
   code: string;
   name: string;
   isActive: boolean;
+  isDefault: boolean;
 }

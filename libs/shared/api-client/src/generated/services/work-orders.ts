@@ -24,9 +24,11 @@ import type {
 
 import type {
   AbortRequest,
+  AssignEquipmentRequest,
   CloseSessionRequest,
   CorrectSessionRequest,
   GetWorkOrdersParams,
+  OpenSessionRequest,
   WorkOrderDetailModel,
   WorkOrderModel
 } from '../model';
@@ -218,15 +220,19 @@ export class WorkOrdersService {
       }
     );
   }
- startWorkOrder<TData = WorkOrderDetailModel>(id: number, options?: HttpClientBodyOptions): Observable<TData>;
- startWorkOrder<TData = WorkOrderDetailModel>(id: number, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
- startWorkOrder<TData = WorkOrderDetailModel>(id: number, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+ startWorkOrder<TData = WorkOrderDetailModel>(id: number,
+    nullOpenSessionRequest?: null | OpenSessionRequest, options?: HttpClientBodyOptions): Observable<TData>;
+ startWorkOrder<TData = WorkOrderDetailModel>(id: number,
+    nullOpenSessionRequest?: null | OpenSessionRequest, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ startWorkOrder<TData = WorkOrderDetailModel>(id: number,
+    nullOpenSessionRequest?: null | OpenSessionRequest, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
   startWorkOrder<TData = WorkOrderDetailModel>(
-    id: number, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    id: number,
+    nullOpenSessionRequest?: null | OpenSessionRequest, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
     if (options?.observe === 'events') {
       return this.http.post<TData>(
       `/api/work-orders/${id}/start`,
-      undefined,{
+      nullOpenSessionRequest,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'events',
       }
@@ -236,7 +242,7 @@ export class WorkOrdersService {
     if (options?.observe === 'response') {
       return this.http.post<TData>(
       `/api/work-orders/${id}/start`,
-      undefined,{
+      nullOpenSessionRequest,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'response',
       }
@@ -245,7 +251,7 @@ export class WorkOrdersService {
 
     return this.http.post<TData>(
       `/api/work-orders/${id}/start`,
-      undefined,{
+      nullOpenSessionRequest,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'body',
       }
@@ -288,15 +294,19 @@ export class WorkOrdersService {
       }
     );
   }
- resumeWorkOrder<TData = WorkOrderDetailModel>(id: number, options?: HttpClientBodyOptions): Observable<TData>;
- resumeWorkOrder<TData = WorkOrderDetailModel>(id: number, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
- resumeWorkOrder<TData = WorkOrderDetailModel>(id: number, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+ resumeWorkOrder<TData = WorkOrderDetailModel>(id: number,
+    nullOpenSessionRequest?: null | OpenSessionRequest, options?: HttpClientBodyOptions): Observable<TData>;
+ resumeWorkOrder<TData = WorkOrderDetailModel>(id: number,
+    nullOpenSessionRequest?: null | OpenSessionRequest, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ resumeWorkOrder<TData = WorkOrderDetailModel>(id: number,
+    nullOpenSessionRequest?: null | OpenSessionRequest, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
   resumeWorkOrder<TData = WorkOrderDetailModel>(
-    id: number, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    id: number,
+    nullOpenSessionRequest?: null | OpenSessionRequest, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
     if (options?.observe === 'events') {
       return this.http.post<TData>(
       `/api/work-orders/${id}/resume`,
-      undefined,{
+      nullOpenSessionRequest,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'events',
       }
@@ -306,7 +316,7 @@ export class WorkOrdersService {
     if (options?.observe === 'response') {
       return this.http.post<TData>(
       `/api/work-orders/${id}/resume`,
-      undefined,{
+      nullOpenSessionRequest,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'response',
       }
@@ -315,7 +325,7 @@ export class WorkOrdersService {
 
     return this.http.post<TData>(
       `/api/work-orders/${id}/resume`,
-      undefined,{
+      nullOpenSessionRequest,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'body',
       }
@@ -353,6 +363,43 @@ export class WorkOrdersService {
     return this.http.post<TData>(
       `/api/work-orders/${id}/stop`,
       closeSessionRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+      }
+    );
+  }
+ assignWorkOrderEquipment<TData = WorkOrderDetailModel>(id: number,
+    assignEquipmentRequest: AssignEquipmentRequest, options?: HttpClientBodyOptions): Observable<TData>;
+ assignWorkOrderEquipment<TData = WorkOrderDetailModel>(id: number,
+    assignEquipmentRequest: AssignEquipmentRequest, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ assignWorkOrderEquipment<TData = WorkOrderDetailModel>(id: number,
+    assignEquipmentRequest: AssignEquipmentRequest, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  assignWorkOrderEquipment<TData = WorkOrderDetailModel>(
+    id: number,
+    assignEquipmentRequest: AssignEquipmentRequest, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    if (options?.observe === 'events') {
+      return this.http.put<TData>(
+      `/api/work-orders/${id}/equipment`,
+      assignEquipmentRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+      }
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.put<TData>(
+      `/api/work-orders/${id}/equipment`,
+      assignEquipmentRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+      }
+    );
+    }
+
+    return this.http.put<TData>(
+      `/api/work-orders/${id}/equipment`,
+      assignEquipmentRequest,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'body',
       }

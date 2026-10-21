@@ -29,6 +29,8 @@ public class ProductionOrderOverviewWorkOrderModel
     public required string ProcessSegmentCode { get; set; }
     public required string ProcessSegmentName { get; set; }
     public required WorkOrderStatus Status { get; set; }
+    public WorkOrderEquipmentModel? AssignedEquipment { get; set; }
+    public WorkOrderEquipmentModel? CurrentEquipment { get; set; }
     public required decimal PlannedQuantity { get; set; }
     public required decimal GoodQuantity { get; set; }
     public required decimal ScrapQuantity { get; set; }

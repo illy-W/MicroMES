@@ -17,6 +17,7 @@ public static class Registrar
         if (!services.Any(d => d.ServiceType == typeof(IUnitOfWork)))
             services.AddUnitOfWork<AppDbContext>();
         services.AddScoped<EquipmentSegmentLinker>();
+        services.AddScoped<EquipmentSelector>();
         services.AddScoped<EquipmentService>();
         return services;
     }

@@ -10,4 +10,5 @@ export interface EquipmentSegmentModel {
   code: string;
   name: string;
   isActive: boolean;
+  isDefault: boolean;
 }

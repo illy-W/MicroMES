@@ -19,6 +19,8 @@ export interface CorrectSessionRequest {
   scrapQuantity?: number;
   /** @nullable */
   scrapEntries?: ScrapEntryRequest[] | null;
+  /** @nullable */
+  equipmentId?: number | null;
   /**
      * @minLength 1
      * @maxLength 1000

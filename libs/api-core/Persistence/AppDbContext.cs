@@ -112,6 +112,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(x => new { x.ProductionOrderId, x.OperationNumber }).IsUnique();
             entity.HasOne<ProductionOrder>().WithMany().HasForeignKey(x => x.ProductionOrderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ProcessSegment>().WithMany().HasForeignKey(x => x.ProcessSegmentId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Equipment>().WithMany().HasForeignKey(x => x.AssignedEquipmentId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<WorkOrderDependency>(entity =>
@@ -140,7 +141,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.GoodQuantity).HasPrecision(18, 4);
             entity.Property(x => x.ScrapQuantity).HasPrecision(18, 4);
             entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Property(x => x.EquipmentCode).HasMaxLength(50);
+            entity.Property(x => x.EquipmentName).HasMaxLength(200);
             entity.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Equipment>().WithMany().HasForeignKey(x => x.EquipmentId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ScrapReason>(entity =>
@@ -178,7 +182,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             entity.ToTable("EquipmentProcessSegments");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.IsDefault).HasDefaultValue(false);
             entity.HasIndex(x => new { x.EquipmentId, x.ProcessSegmentId }).IsUnique();
+            // At most one default machine per segment.
+            entity.HasIndex(x => x.ProcessSegmentId).IsUnique()
+                .HasDatabaseName("IX_EquipmentProcessSegments_ProcessSegmentId_Default")
+                .HasFilter("\"IsDefault\" = TRUE");
             entity.HasOne<Equipment>().WithMany().HasForeignKey(x => x.EquipmentId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<ProcessSegment>().WithMany().HasForeignKey(x => x.ProcessSegmentId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -206,6 +215,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.NewGoodQuantity).HasPrecision(18, 4);
             entity.Property(x => x.NewScrapQuantity).HasPrecision(18, 4);
             entity.Property(x => x.NewScrapDetail).HasMaxLength(1000);
+            entity.Property(x => x.PreviousEquipmentCode).HasMaxLength(50);
+            entity.Property(x => x.PreviousEquipmentName).HasMaxLength(200);
+            entity.Property(x => x.NewEquipmentCode).HasMaxLength(50);
+            entity.Property(x => x.NewEquipmentName).HasMaxLength(200);
             entity.HasIndex(x => x.WorkOrderResponseId);
             entity.HasOne<WorkOrderResponse>().WithMany().HasForeignKey(x => x.WorkOrderResponseId).OnDelete(DeleteBehavior.Restrict);
         });

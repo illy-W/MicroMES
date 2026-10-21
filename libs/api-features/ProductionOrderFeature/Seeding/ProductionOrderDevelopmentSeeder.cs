@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using MicroMES.ApiFeatures.EquipmentFeature.Repositories;
 using MicroMES.ApiFeatures.MaterialFeature.Repositories;
 using MicroMES.ApiFeatures.ScrapFeature.Repositories;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
@@ -30,10 +31,22 @@ public class ProductionOrderDevelopmentSeeder(
         return await call(scope.ServiceProvider.GetRequiredService<WorkOrderService>());
     }
 
+    private Dictionary<string, int> _machines = [];
+
+    private int EquipmentOf(string code)
+        => _machines.TryGetValue(code, out var id) ? id : throw new InvalidOperationException($"Macchina {code} non trovata: eseguire prima il seeder dei dati anagrafici.");
+
     public async Task SeedAsync()
     {
         var existing = Unwrap(await Orders(o => o.GetAllAsync(null, null, null, true)));
         if (existing.Count > 0) return;
+
+        using (var scope = scopes.CreateScope())
+        {
+            var equipment = scope.ServiceProvider.GetRequiredService<IEquipmentRepository>();
+            _machines = [];
+            await foreach (var e in equipment.FetchAsync(_ => true)) _machines[e.Code] = e.Id;
+        }
 
         var today = DateTime.UtcNow.Date;
         var now = DateTime.UtcNow;
@@ -51,8 +64,10 @@ public class ProductionOrderDevelopmentSeeder(
             await ReleaseAsync(done.Id);
             var t = d.AddHours(8);
             t = await RunAsync(done.Id, "PF-SED-01", 10, t, [new S(24, 4, 2, null, [new E("MISURA", 1), new E("MAT-DIF", 1)])]);
-            t = await RunAsync(done.Id, "PF-SED-01", 20, t, [new S(46, 4, 1, "Una piastra tagliata fuori squadra, rifatta", [new E("FUORI-SQ", 1)])]);
-            t = await RunAsync(done.Id, "PF-SED-01", 30, t.AddMinutes(10), [new S(44, 0, 0, "Pausa pranzo"), new S(38, 4, 1, null, [new E("SAL-INC", 1)])]);
+            t = await RunAsync(done.Id, "PF-SED-01", 20, t, [new S(46, 4, 1, "Una piastra tagliata fuori squadra, rifatta", [new E("FUORI-SQ", 1)])], assign: "TAG-LAM-1");
+            // Welding: the first session ran on SAL-2 (SAL-1 was busy), after lunch the work moved back to SAL-1.
+            t = await RunAsync(done.Id, "PF-SED-01", 30, t.AddMinutes(10),
+                [new S(44, 0, 0, "Pausa pranzo", Machine: "SAL-2"), new S(38, 4, 1, null, [new E("SAL-INC", 1)], Machine: "SAL-1")]);
             t = await RunAsync(done.Id, "PF-SED-01", 40, t, [new S(18, 4, 0)]);
             t = await RunAsync(done.Id, "PF-SED-01", 50, t.AddDays(1).Date.AddHours(8), [new S(58, 4, 1, null, [new E("VER-DIF", 1)])]);
             t = await RunAsync(done.Id, "PF-SED-01", 60, t, [new S(52, 4, 1)]);
@@ -93,7 +108,8 @@ public class ProductionOrderDevelopmentSeeder(
             await RunAsync(sed.Id, "PF-SED-01", 10, d.AddHours(9), [new S(55, 12, 1, null, [new E("MAT-DIF", 1)])]);
             clock.Set(now.AddMinutes(-40));
             var chairCut = await FindAsync(sed.Id, "PF-SED-01", 20);
-            Unwrap(await WorkOrders(w => w.StartAsync(chairCut)));
+            // The plate cut runs on the second saw (TAG-LAM has no default machine).
+            Unwrap(await WorkOrders(w => w.StartAsync(chairCut, new OpenSessionRequest { EquipmentId = EquipmentOf("TAG-TUB-2") })));
 
             // 5. Coffee tables x10, planned (not released).
             clock.Set(today.AddDays(-1).AddHours(16));
@@ -111,6 +127,12 @@ public class ProductionOrderDevelopmentSeeder(
             Unwrap(await WorkOrders(w => w.StartAsync(milling)));
             clock.Set(d.AddHours(9).AddMinutes(50));
             Unwrap(await WorkOrders(w => w.PauseAsync(milling, new CloseSessionRequest { GoodQuantity = 3, ScrapQuantity = 0, Notes = "Fresa da sostituire" })));
+
+            // The frame cutting of the x8 order is Ready: the manager planned it on the second saw, which the x12
+            // chair plate cut is using right now (the "in use" warning).
+            clock.Set(d.AddHours(9).AddMinutes(55));
+            var readyCut = await FindAsync(paused.Id, "SL-TAV-STR", 10);
+            Unwrap(await WorkOrders(w => w.AssignEquipmentAsync(readyCut, new AssignEquipmentRequest { EquipmentId = EquipmentOf("TAG-TUB-2") })));
 
             // 7. Chairs x2, aborted after the first cut (order and work orders Aborted).
             d = today.AddDays(-1);
@@ -157,7 +179,8 @@ public class ProductionOrderDevelopmentSeeder(
     }
 
     /// <summary>Session to close: minutes, good, scrap, notes and scrap split by reason code (none = "no reason").</summary>
-    private sealed record S(int Min, decimal Good, decimal Scrap, string? Notes = null, E[]? Entries = null);
+    /// <remarks>Machine: code of the machine used when it differs from the assigned one (null = the assigned / previous one).</remarks>
+    private sealed record S(int Min, decimal Good, decimal Scrap, string? Notes = null, E[]? Entries = null, string? Machine = null);
 
     private sealed record E(string ReasonCode, decimal Quantity);
 
@@ -168,14 +191,20 @@ public class ProductionOrderDevelopmentSeeder(
     /// the last session stops it. When setupExtra is given, the first session is extended by it.
     /// </summary>
     private async Task<DateTime> RunAsync(int orderId, string materialCode, int op, DateTime start,
-        S[] sessions, int setupExtra = 0)
+        S[] sessions, int setupExtra = 0, string? assign = null)
     {
         var id = await FindAsync(orderId, materialCode, op);
+        if (assign is not null)
+        {
+            clock.Set(start.AddMinutes(-5));
+            Unwrap(await WorkOrders(w => w.AssignEquipmentAsync(id, new AssignEquipmentRequest { EquipmentId = EquipmentOf(assign) })));
+        }
         var t = start;
         for (var i = 0; i < sessions.Length; i++)
         {
             clock.Set(t);
-            Unwrap(i == 0 ? await WorkOrders(w => w.StartAsync(id)) : await WorkOrders(w => w.ResumeAsync(id)));
+            var body = sessions[i].Machine is { } machine ? new OpenSessionRequest { EquipmentId = EquipmentOf(machine) } : null;
+            Unwrap(i == 0 ? await WorkOrders(w => w.StartAsync(id, body)) : await WorkOrders(w => w.ResumeAsync(id, body)));
             t = t.AddMinutes(sessions[i].Min + (i == 0 ? setupExtra : 0));
             clock.Set(t);
             var close = new CloseSessionRequest

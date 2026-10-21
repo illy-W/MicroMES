@@ -25,6 +25,7 @@ public sealed record ConstraintViolation(ConstraintViolationKind Kind, string? C
         ("IX_ScrapReasons_Code", "Esiste già un motivo di scarto con questo codice."),
         ("IX_ScrapReasonProcessSegments_", "La fase è già collegata a questo motivo di scarto."),
         ("IX_Equipment_Code", "Esiste già una macchina o postazione con questo codice."),
+        ("IX_EquipmentProcessSegments_ProcessSegmentId_Default", "La fase ha già una macchina predefinita."),
         ("IX_EquipmentProcessSegments_", "La macchina è già collegata a questa fase di processo."),
         ("IX_ProductionOrders_Code", "Esiste già un ordine di produzione con questo codice."),
         ("IX_BomItems_ParentMaterialId_ComponentMaterialId", "Il componente è già presente nella distinta."),

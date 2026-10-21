@@ -12,4 +12,9 @@ public class WorkOrderResponse : IEntity<int>
     public decimal GoodQuantity { get; set; }
     public decimal ScrapQuantity { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Machine actually used (ISA-95 equipment actual); null when the phase has no machines.</summary>
+    public int? EquipmentId { get; set; }
+    /// <summary>Snapshot taken when the session was opened (or corrected): history survives renames.</summary>
+    public string? EquipmentCode { get; set; }
+    public string? EquipmentName { get; set; }
 }

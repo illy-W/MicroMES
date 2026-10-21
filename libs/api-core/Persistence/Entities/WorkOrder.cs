@@ -25,6 +25,8 @@ public class WorkOrder : IEntity<int>
     public decimal RunMinutesPerUnit { get; set; }
     public decimal PlannedQuantity { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Planned machine (ISA-95 equipment requirement); null = not assigned. SetNull when the machine goes away.</summary>
+    public int? AssignedEquipmentId { get; set; }
     public WorkOrderStatus Status { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }

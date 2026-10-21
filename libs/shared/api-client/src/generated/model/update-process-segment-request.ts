@@ -36,4 +36,6 @@ export interface UpdateProcessSegmentRequest {
   isActive: boolean | null;
   /** @nullable */
   equipmentIds?: number[] | null;
+  /** @nullable */
+  defaultEquipmentId?: number | null;
 }

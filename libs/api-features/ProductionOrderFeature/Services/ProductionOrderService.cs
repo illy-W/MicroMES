@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using illyW.Framework.Core.RepositoryPattern;
 using MicroMES.ApiCore.Persistence.Entities;
 using MicroMES.ApiFeatures.BomFeature.Repositories;
+using MicroMES.ApiFeatures.EquipmentFeature.Services;
 using MicroMES.ApiFeatures.MaterialFeature.Repositories;
 using MicroMES.ApiFeatures.ProcessSegmentFeature.Repositories;
 using MicroMES.ApiFeatures.ProductionOrderFeature.MachineStates;
@@ -15,6 +16,7 @@ namespace MicroMES.ApiFeatures.ProductionOrderFeature.Services;
 public class ProductionOrderService(
     ProductionDataLoader loader,
     WorkOrderService workOrderService,
+    EquipmentSelector selector,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
@@ -157,7 +159,8 @@ public class ProductionOrderService(
         {
             unitOfWork.BeginTransaction();
             var created = new Dictionary<PlannedWorkOrder, WorkOrder>();
-            await PersistPlanAsync(data, plan.Order, order, created);
+            var machines = await selector.MachinesBySegmentAsync();
+            await PersistPlanAsync(data, plan.Order, order, created, machines);
             await ReadyStartStepsAsync(data, created.Values);
             data.MachineOf(order).Fire(ProductionOrderTrigger.Release);
             Persist.Ensure(await Orders.UpdateAsync(order), "Impossibile aggiornare l'ordine di produzione.");
@@ -225,13 +228,18 @@ public class ProductionOrderService(
 
     /// <summary>Creates work orders, child orders, materials and dependencies of a planned order (recursive).</summary>
     private async Task PersistPlanAsync(
-        ProductionData data, PlannedOrder plan, ProductionOrder order, Dictionary<PlannedWorkOrder, WorkOrder> created)
+        ProductionData data, PlannedOrder plan, ProductionOrder order, Dictionary<PlannedWorkOrder, WorkOrder> created,
+        Dictionary<int, List<SegmentMachine>> machines)
     {
         var now = Now();
         foreach (var planned in plan.WorkOrders)
         {
+            // Planned machine: the default of the phase, else its only active machine, else none (no arbitrary choice).
+            var machinesOfPhase = machines.GetValueOrDefault(planned.Step.ProcessSegmentId);
+            var assigned = EquipmentSelector.Pick(machinesOfPhase);
             var wo = Persist.Ensure(await WorkOrders.AddAsync(new WorkOrder
             {
+                AssignedEquipmentId = assigned?.Id,
                 ProductionOrderId = order.Id,
                 OperationNumber = planned.OperationNumber,
                 ProcessSegmentId = planned.Step.ProcessSegmentId,
@@ -247,6 +255,9 @@ public class ProductionOrderService(
             }), "Impossibile creare un ordine di lavoro.");
             created[planned] = wo;
             data.WorkOrders[wo.Id] = wo;
+            foreach (var m in machinesOfPhase ?? [])
+                data.EquipmentLinks.Add((m.Equipment.Id, wo.ProcessSegmentId));
+            if (assigned is not null) data.Equipment[assigned.Id] = assigned;
         }
 
         // Child orders (recursive): created as Planned, then released through the machine.
@@ -271,7 +282,7 @@ public class ProductionOrderService(
                 data.Materials[child.MaterialId] = (await Materials.GetSingleAsync(child.MaterialId))!;
             childEntities[childPlan] = child;
 
-            await PersistPlanAsync(data, childPlan, child, created);
+            await PersistPlanAsync(data, childPlan, child, created, machines);
 
             data.MachineOf(child).Fire(ProductionOrderTrigger.Release);
             Persist.Ensure(await Orders.UpdateAsync(child), "Impossibile aggiornare un ordine figlio.");

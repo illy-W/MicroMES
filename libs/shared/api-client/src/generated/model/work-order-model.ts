@@ -6,6 +6,7 @@
  */
 import type { ProductionOrderStatus } from './production-order-status';
 import type { UnitOfMeasure } from './unit-of-measure';
+import type { WorkOrderEquipmentModel } from './work-order-equipment-model';
 import type { WorkOrderLinkModel } from './work-order-link-model';
 import type { WorkOrderStatus } from './work-order-status';
 
@@ -33,6 +34,8 @@ export interface WorkOrderModel {
   shortfallQuantity: number;
   /** @nullable */
   notes?: string | null;
+  assignedEquipment?: null | WorkOrderEquipmentModel;
+  currentEquipment?: null | WorkOrderEquipmentModel;
   status: WorkOrderStatus;
   /** @nullable */
   startedAt?: string | null;

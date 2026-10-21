@@ -8,4 +8,6 @@ public class EquipmentProcessSegment : IEntity<int>
     public int Id { get; set; }
     public int EquipmentId { get; set; }
     public int ProcessSegmentId { get; set; }
+    /// <summary>The usual machine of the segment (at most one per segment); the flag drops with the link.</summary>
+    public bool IsDefault { get; set; }
 }

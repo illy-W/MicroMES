@@ -10,6 +10,18 @@ public class WorkOrderLinkModel
     public required WorkOrderStatus Status { get; set; }
 }
 
+/// <summary>Machine of a work order as seen now (code and name are live values).</summary>
+public class WorkOrderEquipmentModel
+{
+    public required int Id { get; set; }
+    public required string Code { get; set; }
+    public required string Name { get; set; }
+    /// <summary>False when the machine has been deactivated.</summary>
+    public required bool IsActive { get; set; }
+    /// <summary>True when the machine is active and still linked to the process segment of the work order.</summary>
+    public required bool IsEnabled { get; set; }
+}
+
 public class WorkOrderSessionModel
 {
     public required int Id { get; set; }
@@ -18,6 +30,10 @@ public class WorkOrderSessionModel
     public required decimal GoodQuantity { get; set; }
     public required decimal ScrapQuantity { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Machine used (null when the phase has no machines); code and name are the snapshot taken with the session.</summary>
+    public int? EquipmentId { get; set; }
+    public string? EquipmentCode { get; set; }
+    public string? EquipmentName { get; set; }
     /// <summary>Minutes of the session; null while it is still open.</summary>
     public decimal? Minutes { get; set; }
     /// <summary>Scrap by reason (a row with null reason = "no reason"); the quantities add up to ScrapQuantity.</summary>
@@ -50,6 +66,11 @@ public class WorkOrderCorrectionModel
     public required decimal NewGoodQuantity { get; set; }
     public required decimal NewScrapQuantity { get; set; }
     public string? NewScrapDetail { get; set; }
+    /// <summary>Machine of the session before and after the correction (null = none).</summary>
+    public string? PreviousEquipmentCode { get; set; }
+    public string? PreviousEquipmentName { get; set; }
+    public string? NewEquipmentCode { get; set; }
+    public string? NewEquipmentName { get; set; }
 }
 
 /// <summary>Work order as listed (also the header of the detail).</summary>
@@ -81,6 +102,10 @@ public class WorkOrderModel
     /// <summary>Planned minus good pieces when the work order is Ended and the good pieces fall short; otherwise 0.</summary>
     public required decimal ShortfallQuantity { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Planned machine; null when not assigned.</summary>
+    public WorkOrderEquipmentModel? AssignedEquipment { get; set; }
+    /// <summary>Machine of the open session (only while Running); null otherwise.</summary>
+    public WorkOrderEquipmentModel? CurrentEquipment { get; set; }
     public required WorkOrderStatus Status { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }

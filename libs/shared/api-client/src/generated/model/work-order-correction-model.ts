@@ -17,4 +17,12 @@ export interface WorkOrderCorrectionModel {
   newScrapQuantity: number;
   /** @nullable */
   newScrapDetail?: string | null;
+  /** @nullable */
+  previousEquipmentCode?: string | null;
+  /** @nullable */
+  previousEquipmentName?: string | null;
+  /** @nullable */
+  newEquipmentCode?: string | null;
+  /** @nullable */
+  newEquipmentName?: string | null;
 }

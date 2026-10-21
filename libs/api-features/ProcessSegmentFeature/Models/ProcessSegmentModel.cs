@@ -8,6 +8,8 @@ public class ProcessSegmentEquipmentModel
     public required string Code { get; set; }
     public required string Name { get; set; }
     public required bool IsActive { get; set; }
+    /// <summary>True when this machine is the default one of the segment (at most one per segment).</summary>
+    public required bool IsDefault { get; set; }
 }
 
 public class ProcessSegmentModel

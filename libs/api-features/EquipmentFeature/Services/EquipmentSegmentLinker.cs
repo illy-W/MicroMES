@@ -79,16 +79,37 @@ public class EquipmentSegmentLinker(IUnitOfWork unitOfWork)
             : new LinkOutcome(true, $"{label} disattivate, non collegabili: {string.Join(", ", inactive)}.", []);
     }
 
+    /// <summary>Replaces the segments of a machine; the links that survive keep their default flag, new links are not default.</summary>
     public Task<LinkOutcome> ReplaceSegmentsOfEquipmentAsync(int equipmentId, List<int> segmentIds)
         => ReplaceAsync(x => x.EquipmentId == equipmentId, l => l.ProcessSegmentId, segmentIds,
-            id => new EquipmentProcessSegment { EquipmentId = equipmentId, ProcessSegmentId = id });
+            id => new EquipmentProcessSegment { EquipmentId = equipmentId, ProcessSegmentId = id }, applyDefault: false, null);
 
-    public Task<LinkOutcome> ReplaceEquipmentOfSegmentAsync(int segmentId, List<int> equipmentIds)
+    /// <summary>Replaces the machines of a segment; the default becomes <paramref name="defaultEquipmentId"/> (null = none).</summary>
+    public Task<LinkOutcome> ReplaceEquipmentOfSegmentAsync(int segmentId, List<int> equipmentIds, int? defaultEquipmentId = null)
         => ReplaceAsync(x => x.ProcessSegmentId == segmentId, l => l.EquipmentId, equipmentIds,
-            id => new EquipmentProcessSegment { EquipmentId = id, ProcessSegmentId = segmentId });
+            id => new EquipmentProcessSegment { EquipmentId = id, ProcessSegmentId = segmentId, IsDefault = id == defaultEquipmentId },
+            applyDefault: true, defaultEquipmentId);
+
+    /// <summary>
+    /// The default of a segment must be one of the new machines and, unless it already is the default, active (422 otherwise).
+    /// </summary>
+    public async Task<LinkOutcome> ValidateDefaultAsync(int? segmentId, List<int> equipmentIds, int? defaultEquipmentId)
+    {
+        if (defaultEquipmentId is not { } id) return LinkOutcome.Success;
+        if (!equipmentIds.Contains(id))
+            return new LinkOutcome(true, "La macchina predefinita deve essere una delle macchine collegate alla fase.", []);
+        if (segmentId is not null)
+            await foreach (var _ in Links.FetchAsync(x => x.ProcessSegmentId == segmentId && x.EquipmentId == id && x.IsDefault))
+                return LinkOutcome.Success; // already the default: kept even if deactivated since
+        var machine = await EquipmentItems.GetSingleAsync(id);
+        return machine is { IsActive: true }
+            ? LinkOutcome.Success
+            : new LinkOutcome(true, "La macchina predefinita deve esistere ed essere attiva.", []);
+    }
 
     private async Task<LinkOutcome> ReplaceAsync(System.Linq.Expressions.Expression<Func<EquipmentProcessSegment, bool>> owner,
-        Func<EquipmentProcessSegment, int> otherSide, List<int> wanted, Func<int, EquipmentProcessSegment> create)
+        Func<EquipmentProcessSegment, int> otherSide, List<int> wanted, Func<int, EquipmentProcessSegment> create,
+        bool applyDefault, int? defaultId)
     {
         var current = new List<EquipmentProcessSegment>();
         await foreach (var l in Links.FetchAsync(owner)) current.Add(l);
@@ -96,6 +117,22 @@ public class EquipmentSegmentLinker(IUnitOfWork unitOfWork)
         {
             var deleted = await Links.DeleteAsync(l);
             if (!deleted.IsSuccessful) return new LinkOutcome(false, "Impossibile salvare i collegamenti.", deleted.Errors);
+        }
+        if (applyDefault)
+        {
+            // The old default goes first: the filtered unique index allows one default per segment at any time.
+            foreach (var l in current.Where(l => wanted.Contains(otherSide(l)) && l.IsDefault && otherSide(l) != defaultId))
+            {
+                l.IsDefault = false;
+                var cleared = await Links.UpdateAsync(l);
+                if (!cleared.IsSuccessful) return new LinkOutcome(false, "Impossibile salvare i collegamenti.", cleared.Errors);
+            }
+            foreach (var l in current.Where(l => !l.IsDefault && otherSide(l) == defaultId))
+            {
+                l.IsDefault = true;
+                var set = await Links.UpdateAsync(l);
+                if (!set.IsSuccessful) return new LinkOutcome(false, "Impossibile salvare i collegamenti.", set.Errors);
+            }
         }
         foreach (var id in wanted.Where(id => current.All(l => otherSide(l) != id)))
         {

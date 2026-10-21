@@ -34,4 +34,6 @@ export interface CreateProcessSegmentRequest {
   runMinutesPerUnit?: number;
   /** @nullable */
   equipmentIds?: number[] | null;
+  /** @nullable */
+  defaultEquipmentId?: number | null;
 }

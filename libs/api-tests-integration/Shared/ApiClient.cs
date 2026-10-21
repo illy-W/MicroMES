@@ -124,15 +124,18 @@ public sealed class ApiClient(HttpClient http)
     public Task<ApiResult<WorkOrderDetailModel>> GetWorkOrderAsync(int id)
         => GetAsync<WorkOrderDetailModel>($"/api/work-orders/{id}");
 
-    public Task<ApiResult<WorkOrderDetailModel>> StartAsync(int workOrderId)
-        => PostAsync<WorkOrderDetailModel>($"/api/work-orders/{workOrderId}/start");
+    /// <summary>Without a machine the request has no body (as the old client).</summary>
+    public Task<ApiResult<WorkOrderDetailModel>> StartAsync(int workOrderId, int? equipmentId = null)
+        => PostAsync<WorkOrderDetailModel>($"/api/work-orders/{workOrderId}/start",
+            equipmentId is null ? null : new OpenSessionRequest { EquipmentId = equipmentId });
 
     public Task<ApiResult<WorkOrderDetailModel>> PauseAsync(int workOrderId, decimal good = 0, decimal scrap = 0, string? notes = null)
         => PostAsync<WorkOrderDetailModel>($"/api/work-orders/{workOrderId}/pause",
             new CloseSessionRequest { GoodQuantity = good, ScrapQuantity = scrap, Notes = notes });
 
-    public Task<ApiResult<WorkOrderDetailModel>> ResumeAsync(int workOrderId)
-        => PostAsync<WorkOrderDetailModel>($"/api/work-orders/{workOrderId}/resume");
+    public Task<ApiResult<WorkOrderDetailModel>> ResumeAsync(int workOrderId, int? equipmentId = null)
+        => PostAsync<WorkOrderDetailModel>($"/api/work-orders/{workOrderId}/resume",
+            equipmentId is null ? null : new OpenSessionRequest { EquipmentId = equipmentId });
 
     public Task<ApiResult<WorkOrderDetailModel>> StopAsync(int workOrderId, decimal good = 0, decimal scrap = 0, string? notes = null)
         => PostAsync<WorkOrderDetailModel>($"/api/work-orders/{workOrderId}/stop",

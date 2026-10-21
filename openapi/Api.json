@@ -5,6 +5,308 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/scrap-reasons": {
+      "get": {
+        "tags": [
+          "ScrapReasons"
+        ],
+        "operationId": "GetScrapReasons",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "processSegmentId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScrapReasonModel"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ScrapReasons"
+        ],
+        "operationId": "CreateScrapReason",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScrapReasonRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScrapReasonRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScrapReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScrapReasonModel"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scrap-reasons/{id}": {
+      "get": {
+        "tags": [
+          "ScrapReasons"
+        ],
+        "operationId": "GetScrapReason",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScrapReasonModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "ScrapReasons"
+        ],
+        "operationId": "UpdateScrapReason",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScrapReasonRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScrapReasonRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScrapReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScrapReasonModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ScrapReasons"
+        ],
+        "operationId": "DeactivateScrapReason",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scrap/report": {
+      "get": {
+        "tags": [
+          "Scrap"
+        ],
+        "operationId": "GetScrapReport",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScrapReportModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/materials/{id}/routing": {
       "get": {
         "tags": [
@@ -640,6 +942,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "equipmentId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -717,6 +1027,46 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenSessionRequest"
+                  }
+                ]
+              }
+            },
+            "text/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenSessionRequest"
+                  }
+                ]
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenSessionRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -744,6 +1094,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
                 }
               }
             }
@@ -849,6 +1209,46 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenSessionRequest"
+                  }
+                ]
+              }
+            },
+            "text/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenSessionRequest"
+                  }
+                ]
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenSessionRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -876,6 +1276,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
                 }
               }
             }
@@ -915,6 +1325,87 @@
             "application/*+json": {
               "schema": {
                 "$ref": "#/components/schemas/CloseSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetailModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/work-orders/{id}/equipment": {
+      "put": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "operationId": "AssignWorkOrderEquipment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignEquipmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignEquipmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignEquipmentRequest"
               }
             }
           },
@@ -1020,6 +1511,96 @@
               }
             }
           }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetailModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/work-orders/{id}/responses/{responseId}/corrections": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "operationId": "CorrectWorkOrderSession",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "responseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectSessionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectSessionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectSessionRequest"
+              }
+            }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -1557,6 +2138,267 @@
         }
       }
     },
+    "/api/equipment": {
+      "get": {
+        "tags": [
+          "Equipment"
+        ],
+        "operationId": "GetEquipmentList",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "processSegmentId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EquipmentModel"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Equipment"
+        ],
+        "operationId": "CreateEquipment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEquipmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEquipmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEquipmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentModel"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipment/{id}": {
+      "get": {
+        "tags": [
+          "Equipment"
+        ],
+        "operationId": "GetEquipment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Equipment"
+        ],
+        "operationId": "UpdateEquipment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEquipmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEquipmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEquipmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Equipment"
+        ],
+        "operationId": "DeactivateEquipment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/materials/{id}/bom": {
       "get": {
         "tags": [
@@ -1804,6 +2646,43 @@
           }
         }
       },
+      "AssignEquipmentRequest": {
+        "type": "object",
+        "properties": {
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "BomEffectiveStepModel": {
+        "required": [
+          "id",
+          "operationNumber",
+          "processSegmentName",
+          "isAutomatic"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "operationNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "processSegmentName": {
+            "type": "string"
+          },
+          "isAutomatic": {
+            "type": "boolean"
+          }
+        }
+      },
       "BomItemModel": {
         "required": [
           "id",
@@ -1830,6 +2709,33 @@
           "quantity": {
             "type": "number",
             "format": "double"
+          },
+          "consumedInStepId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "consumedInStep": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BomStepModel"
+              }
+            ]
+          },
+          "effectiveStep": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BomEffectiveStepModel"
+              }
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -1879,6 +2785,33 @@
             "type": "number",
             "format": "double"
           },
+          "consumedInStepId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "consumedInStep": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BomStepModel"
+              }
+            ]
+          },
+          "effectiveStep": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BomEffectiveStepModel"
+              }
+            ]
+          },
           "isActive": {
             "type": "boolean"
           },
@@ -1887,6 +2820,27 @@
             "items": {
               "$ref": "#/components/schemas/BomNodeModel"
             }
+          }
+        }
+      },
+      "BomStepModel": {
+        "required": [
+          "id",
+          "operationNumber",
+          "processSegmentName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "operationNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "processSegmentName": {
+            "type": "string"
           }
         }
       },
@@ -1912,6 +2866,56 @@
               "null",
               "string"
             ]
+          },
+          "scrapEntries": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ScrapEntryRequest"
+            }
+          }
+        }
+      },
+      "CorrectSessionRequest": {
+        "required": [
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "goodQuantity": {
+            "maximum": 1000000000000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
+          },
+          "scrapQuantity": {
+            "maximum": 1000000000000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
+          },
+          "scrapEntries": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ScrapEntryRequest"
+            }
+          },
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "notes": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string"
           }
         }
       },
@@ -1937,6 +2941,50 @@
               "number"
             ],
             "format": "double"
+          },
+          "consumedInStepId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CreateEquipmentRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "processSegmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         }
       },
@@ -2041,6 +3089,23 @@
             "minimum": 0,
             "type": "number",
             "format": "double"
+          },
+          "equipmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "defaultEquipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -2092,6 +3157,118 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "CreateScrapReasonRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "processSegmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "EquipmentModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive",
+          "processSegments",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "processSegments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentSegmentModel"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EquipmentSegmentModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive",
+          "isDefault"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean"
           }
         }
       },
@@ -2163,6 +3340,18 @@
           "Consumable"
         ]
       },
+      "OpenSessionRequest": {
+        "type": "object",
+        "properties": {
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -2199,6 +3388,34 @@
           }
         }
       },
+      "ProcessSegmentEquipmentModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive",
+          "isDefault"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        }
+      },
       "ProcessSegmentModel": {
         "required": [
           "id",
@@ -2207,6 +3424,7 @@
           "setupMinutes",
           "runMinutesPerUnit",
           "isActive",
+          "equipment",
           "createdAt",
           "updatedAt"
         ],
@@ -2238,6 +3456,12 @@
           },
           "isActive": {
             "type": "boolean"
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessSegmentEquipmentModel"
+            }
           },
           "createdAt": {
             "type": "string",
@@ -2686,7 +3910,8 @@
           "scrapQuantity",
           "plannedMinutes",
           "workedMinutes",
-          "allowedActions"
+          "allowedActions",
+          "materials"
         ],
         "type": "object",
         "properties": {
@@ -2714,6 +3939,26 @@
           "status": {
             "$ref": "#/components/schemas/WorkOrderStatus"
           },
+          "assignedEquipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
+            ]
+          },
+          "currentEquipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
+            ]
+          },
           "plannedQuantity": {
             "type": "number",
             "format": "double"
@@ -2738,6 +3983,12 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderMaterialModel"
             }
           }
         }
@@ -2883,6 +4134,50 @@
             "items": {
               "$ref": "#/components/schemas/RoutingDependencyModel"
             }
+          },
+          "unassignedComponents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoutingUnassignedComponentModel"
+            }
+          }
+        }
+      },
+      "RoutingStepComponentModel": {
+        "required": [
+          "bomItemId",
+          "materialId",
+          "materialCode",
+          "materialName",
+          "unitOfMeasure",
+          "quantity",
+          "isAutomatic"
+        ],
+        "type": "object",
+        "properties": {
+          "bomItemId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "materialId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "materialCode": {
+            "type": "string"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "unitOfMeasure": {
+            "$ref": "#/components/schemas/UnitOfMeasure"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "isAutomatic": {
+            "type": "boolean"
           }
         }
       },
@@ -2967,6 +4262,297 @@
               "number"
             ],
             "format": "double"
+          },
+          "consumedComponents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoutingStepComponentModel"
+            }
+          }
+        }
+      },
+      "RoutingUnassignedComponentModel": {
+        "required": [
+          "bomItemId",
+          "materialId",
+          "materialCode",
+          "materialName",
+          "previousStepId",
+          "previousOperationNumber",
+          "previousProcessSegmentName"
+        ],
+        "type": "object",
+        "properties": {
+          "bomItemId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "materialId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "materialCode": {
+            "type": "string"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "previousStepId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "previousOperationNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "previousProcessSegmentName": {
+            "type": "string"
+          }
+        }
+      },
+      "ScrapEntryRequest": {
+        "type": "object",
+        "properties": {
+          "scrapReasonId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "quantity": {
+            "maximum": 1000000000000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ScrapReasonModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive",
+          "processSegments",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "processSegments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScrapReasonSegmentModel"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ScrapReasonSegmentModel": {
+        "required": [
+          "id",
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ScrapReportMaterialModel": {
+        "required": [
+          "materialId",
+          "code",
+          "name",
+          "goodQuantity",
+          "scrapQuantity",
+          "scrapRate"
+        ],
+        "type": "object",
+        "properties": {
+          "materialId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "goodQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapRate": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ScrapReportModel": {
+        "required": [
+          "goodQuantity",
+          "scrapQuantity",
+          "scrapRate",
+          "byReason",
+          "byProcessSegment",
+          "byMaterial"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "goodQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "byReason": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScrapReportReasonModel"
+            }
+          },
+          "byProcessSegment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScrapReportSegmentModel"
+            }
+          },
+          "byMaterial": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScrapReportMaterialModel"
+            }
+          }
+        }
+      },
+      "ScrapReportReasonModel": {
+        "required": [
+          "name",
+          "quantity",
+          "share"
+        ],
+        "type": "object",
+        "properties": {
+          "scrapReasonId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "share": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ScrapReportSegmentModel": {
+        "required": [
+          "processSegmentId",
+          "code",
+          "name",
+          "goodQuantity",
+          "scrapQuantity",
+          "scrapRate"
+        ],
+        "type": "object",
+        "properties": {
+          "processSegmentId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "goodQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapRate": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
@@ -2993,6 +4579,57 @@
               "number"
             ],
             "format": "double"
+          },
+          "consumedInStepId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "UpdateEquipmentRequest": {
+        "required": [
+          "code",
+          "name",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isActive": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "processSegmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         }
       },
@@ -3111,6 +4748,23 @@
               "null",
               "boolean"
             ]
+          },
+          "equipmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "defaultEquipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -3273,6 +4927,50 @@
           }
         }
       },
+      "UpdateScrapReasonRequest": {
+        "required": [
+          "code",
+          "name",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isActive": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "processSegmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
       "ValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -3318,6 +5016,83 @@
           }
         }
       },
+      "WorkOrderCorrectionModel": {
+        "required": [
+          "id",
+          "correctedAt",
+          "notes",
+          "previousGoodQuantity",
+          "previousScrapQuantity",
+          "newGoodQuantity",
+          "newScrapQuantity"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "correctedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "previousGoodQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "previousScrapQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "previousScrapDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newGoodQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "newScrapQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "newScrapDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousEquipmentCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousEquipmentName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newEquipmentCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newEquipmentName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "WorkOrderDependencyModel": {
         "required": [
           "predecessorWorkOrderId",
@@ -3359,6 +5134,7 @@
           "workedMinutes",
           "goodQuantity",
           "scrapQuantity",
+          "shortfallQuantity",
           "status",
           "predecessors",
           "successors",
@@ -3450,10 +5226,34 @@
             "type": "number",
             "format": "double"
           },
+          "shortfallQuantity": {
+            "type": "number",
+            "format": "double"
+          },
           "notes": {
             "type": [
               "null",
               "string"
+            ]
+          },
+          "assignedEquipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
+            ]
+          },
+          "currentEquipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
             ]
           },
           "status": {
@@ -3490,6 +5290,34 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "WorkOrderEquipmentModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive",
+          "isEnabled"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -3591,6 +5419,7 @@
           "workedMinutes",
           "goodQuantity",
           "scrapQuantity",
+          "shortfallQuantity",
           "status",
           "predecessors",
           "successors",
@@ -3670,10 +5499,34 @@
             "type": "number",
             "format": "double"
           },
+          "shortfallQuantity": {
+            "type": "number",
+            "format": "double"
+          },
           "notes": {
             "type": [
               "null",
               "string"
+            ]
+          },
+          "assignedEquipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
+            ]
+          },
+          "currentEquipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
             ]
           },
           "status": {
@@ -3713,12 +5566,51 @@
           }
         }
       },
+      "WorkOrderScrapEntryModel": {
+        "required": [
+          "id",
+          "quantity"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scrapReasonId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasonName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "WorkOrderSessionModel": {
         "required": [
           "id",
           "startedAt",
           "goodQuantity",
-          "scrapQuantity"
+          "scrapQuantity",
+          "scrapEntries",
+          "isCorrected",
+          "corrections"
         ],
         "type": "object",
         "properties": {
@@ -3751,12 +5643,46 @@
               "string"
             ]
           },
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "equipmentCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "equipmentName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "minutes": {
             "type": [
               "null",
               "number"
             ],
             "format": "double"
+          },
+          "scrapEntries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderScrapEntryModel"
+            }
+          },
+          "isCorrected": {
+            "type": "boolean"
+          },
+          "corrections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderCorrectionModel"
+            }
           }
         }
       },
@@ -3811,6 +5737,12 @@
   },
   "tags": [
     {
+      "name": "ScrapReasons"
+    },
+    {
+      "name": "Scrap"
+    },
+    {
       "name": "Routing"
     },
     {
@@ -3824,6 +5756,9 @@
     },
     {
       "name": "Materials"
+    },
+    {
+      "name": "Equipment"
     },
     {
       "name": "Bom"
