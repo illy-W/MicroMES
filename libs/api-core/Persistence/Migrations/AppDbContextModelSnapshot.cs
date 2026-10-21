@@ -168,6 +168,76 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("ProcessSegments", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.ProductionOrder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("ParentOrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Priority")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("RequestedEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("RequestedStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("ParentOrderId");
+
+                    b.ToTable("ProductionOrders", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStep", b =>
                 {
                     b.Property<int>("Id")
@@ -243,6 +313,168 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("RoutingStepDependencies", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("OperationNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PlannedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("ProcessSegmentCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("ProcessSegmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProcessSegmentName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("ProductionOrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RunMinutesPerUnit")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)");
+
+                    b.Property<decimal>("SetupMinutes")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessSegmentId");
+
+                    b.HasIndex("ProductionOrderId", "OperationNumber")
+                        .IsUnique();
+
+                    b.ToTable("WorkOrders", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderDependency", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("PredecessorWorkOrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SuccessorWorkOrderId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SuccessorWorkOrderId");
+
+                    b.HasIndex("PredecessorWorkOrderId", "SuccessorWorkOrderId")
+                        .IsUnique();
+
+                    b.ToTable("WorkOrderDependencies", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderMaterial", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("ChildProductionOrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RequiredQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildProductionOrderId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("WorkOrderMaterials", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderResponse", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("GoodQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("ScrapQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("WorkOrderResponses", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.BomItem", b =>
                 {
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
@@ -256,6 +488,20 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                         .HasForeignKey("ParentMaterialId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.ProductionOrder", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.ProductionOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ParentOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStep", b =>
@@ -284,6 +530,65 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.RoutingStep", null)
                         .WithMany()
                         .HasForeignKey("SuccessorStepId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrder", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.ProcessSegment", null)
+                        .WithMany()
+                        .HasForeignKey("ProcessSegmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.ProductionOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ProductionOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderDependency", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("PredecessorWorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("SuccessorWorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderMaterial", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.ProductionOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ChildProductionOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderResponse", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

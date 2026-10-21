@@ -4,6 +4,8 @@ using MicroMES.ApiCore.Persistence;
 using MicroMES.ApiFeatures.BomFeature;
 using MicroMES.ApiFeatures.MaterialFeature;
 using MicroMES.ApiFeatures.ProcessSegmentFeature;
+using MicroMES.ApiFeatures.ProductionOrderFeature;
+using MicroMES.ApiFeatures.ProductionOrderFeature.Seeding;
 using MicroMES.ApiFeatures.RoutingFeature;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +63,7 @@ builder.Services.AddMaterialFeature();
 builder.Services.AddBomFeature();
 builder.Services.AddProcessSegmentFeature();
 builder.Services.AddRoutingFeature();
+builder.Services.AddProductionOrderFeature();
 
 var app = builder.Build();
 
@@ -71,6 +74,7 @@ if (app.Environment.IsDevelopment() && !isOpenApiEnabled)
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
     DevelopmentDataSeeder.SeedAsync(db).GetAwaiter().GetResult();
+    scope.ServiceProvider.GetRequiredService<ProductionOrderDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
 }
 
 // Configure the HTTP request pipeline.

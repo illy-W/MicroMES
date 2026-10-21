@@ -10,6 +10,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ProcessSegment> ProcessSegments { get; set; } = null!;
     public DbSet<RoutingStep> RoutingSteps { get; set; } = null!;
     public DbSet<RoutingStepDependency> RoutingStepDependencies { get; set; } = null!;
+    public DbSet<ProductionOrder> ProductionOrders { get; set; } = null!;
+    public DbSet<WorkOrder> WorkOrders { get; set; } = null!;
+    public DbSet<WorkOrderDependency> WorkOrderDependencies { get; set; } = null!;
+    public DbSet<WorkOrderMaterial> WorkOrderMaterials { get; set; } = null!;
+    public DbSet<WorkOrderResponse> WorkOrderResponses { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +75,65 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(x => new { x.PredecessorStepId, x.SuccessorStepId }).IsUnique();
             entity.HasOne<RoutingStep>().WithMany().HasForeignKey(x => x.PredecessorStepId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<RoutingStep>().WithMany().HasForeignKey(x => x.SuccessorStepId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductionOrder>(entity =>
+        {
+            entity.ToTable("ProductionOrders");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Quantity).HasPrecision(18, 4);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(50);
+            entity.Property(x => x.Priority).HasDefaultValue(0);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasOne<Material>().WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductionOrder>().WithMany().HasForeignKey(x => x.ParentOrderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkOrder>(entity =>
+        {
+            entity.ToTable("WorkOrders");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ProcessSegmentCode).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.ProcessSegmentName).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.SetupMinutes).HasPrecision(10, 2);
+            entity.Property(x => x.RunMinutesPerUnit).HasPrecision(10, 4);
+            entity.Property(x => x.PlannedQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(50);
+            entity.HasIndex(x => new { x.ProductionOrderId, x.OperationNumber }).IsUnique();
+            entity.HasOne<ProductionOrder>().WithMany().HasForeignKey(x => x.ProductionOrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProcessSegment>().WithMany().HasForeignKey(x => x.ProcessSegmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkOrderDependency>(entity =>
+        {
+            entity.ToTable("WorkOrderDependencies");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.PredecessorWorkOrderId, x.SuccessorWorkOrderId }).IsUnique();
+            entity.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.PredecessorWorkOrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.SuccessorWorkOrderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkOrderMaterial>(entity =>
+        {
+            entity.ToTable("WorkOrderMaterials");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.RequiredQuantity).HasPrecision(18, 4);
+            entity.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Material>().WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductionOrder>().WithMany().HasForeignKey(x => x.ChildProductionOrderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkOrderResponse>(entity =>
+        {
+            entity.ToTable("WorkOrderResponses");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.GoodQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.ScrapQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
