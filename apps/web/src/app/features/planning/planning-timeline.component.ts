@@ -42,7 +42,7 @@ import { WorkOrdersStore } from '../work-orders/work-orders.store';
 import { type DepLink, PlanningWorkPanelComponent } from './planning-work-panel.component';
 import { PlanningStore } from './planning.store';
 import { CHIP_EXTRA_CODE, CHIP_EXTRA_FULL, estimateTextWidth, fitLeftChip, LABEL_INSIDE_MIN, placeLabel } from './bar-label';
-import { type Axis, buildAxis, carveAroundInstants, commonClosedRanges, type Range } from './timeline-axis';
+import { type Axis, buildAxis, carveAroundInstants, clampSpan, commonClosedRanges, type Range } from './timeline-axis';
 import { detailLevel, operationNumber, orderColor, STATUS_STYLE } from './timeline-style';
 import {
   addDays, addMonths, dayKey, daysInMonth, dayStart, formatDateTime, formatDay, formatDuration, formatMonthTitle, formatWeekday, HOUR, hourLabel, mondayOf, monthStart,
@@ -344,12 +344,12 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
               [class.opacity-70]="loading()"
               (scroll)="onScroll()"
             >
-              <div class="relative" [style.width.px]="LEFT + totalPx()">
+              <div class="relative overflow-x-clip" [style.width.px]="LEFT + totalPx()" [style.min-width.px]="LEFT + totalPx()">
                 <div class="bg-card sticky top-0 z-20 flex border-b">
                   <div class="bg-card sticky left-0 z-10 flex shrink-0 items-center border-r px-2 text-xs font-medium" [style.width.px]="LEFT" [style.height.px]="headH()">Macchina</div>
-                  <div class="relative" [style.width.px]="totalPx()" [style.height.px]="headH()">
+                  <div class="relative overflow-x-clip" [style.width.px]="totalPx()" [style.height.px]="headH()">
                     @for (d of dayCells(); track d.left) {
-                      <div class="absolute top-0 overflow-hidden border-l" [style.left.px]="d.left" [style.width.px]="d.width" [style.height.px]="DAY_H">
+                      <div class="absolute top-0 overflow-x-clip border-l" [style.left.px]="d.left" [style.width.px]="d.width" [style.height.px]="DAY_H">
                         <span class="sticky inline-block px-1.5 text-xs leading-6 font-medium whitespace-nowrap" [style.left.px]="LEFT">{{ d.label }}</span>
                       </div>
                     }
@@ -365,7 +365,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                   </div>
                 </div>
 
-                <div class="pointer-events-none absolute bottom-0" [style.left.px]="LEFT" [style.top.px]="headH()" [style.width.px]="totalPx()" aria-hidden="true">
+                <div class="pointer-events-none absolute bottom-0 overflow-x-clip" [style.left.px]="LEFT" [style.top.px]="headH()" [style.width.px]="totalPx()" aria-hidden="true">
                   @for (g of gridLines(); track $index) {
                     <div class="absolute inset-y-0 border-l" [class]="g.major ? 'border-border' : 'border-border/40'" [style.left.px]="g.left"></div>
                   }
@@ -399,7 +399,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                       </div>
                       <span class="text-muted-foreground truncate text-[11px]">{{ r.name }}{{ r.inactive ? ' (non attiva)' : '' }}</span>
                     </div>
-                    <div class="relative shrink-0" [style.width.px]="totalPx()" [style.height.px]="r.height">
+                    <div class="relative shrink-0 overflow-x-clip" [style.width.px]="totalPx()" [style.height.px]="r.height">
                       @for (b of r.bands; track $index) {
                         <div class="absolute top-0 h-full" [class]="b.cls" [style.left.px]="b.left" [style.width.px]="b.width" [title]="b.reason" aria-hidden="true"></div>
                       }
@@ -833,8 +833,9 @@ export class PlanningTimelineComponent {
       const bars = items
         .map((x): BarVm => {
           const rg = this.range(x) as { s: number; e: number };
-          const left = px(rg.s);
-          const width = Math.max(MIN_W, px(rg.e) - left);
+          const span = clampSpan(px(rg.s), Math.max(MIN_W, px(rg.e) - px(rg.s)), ax.width);
+          const left = span ? span.left : 0;
+          const width = span ? span.width : 0;
           const st = workStatus(x.status);
           const overload = r.key !== NONE_ROW && x.lane >= r.capacity;
           const late = x.isLate;
@@ -862,6 +863,7 @@ export class PlanningTimelineComponent {
             },
           };
         })
+        .filter((b) => b.width > 0 || b.w.id === this.focusId())
         .sort((a, b) => a.left - b.left);
       const bands = r.key === NONE_ROW ? [] : nw.filter((n) => n.equipmentId == null || n.equipmentId === r.key).flatMap((n) => this.band(n, ax, w));
       this.placeChips(bars, ax.width);

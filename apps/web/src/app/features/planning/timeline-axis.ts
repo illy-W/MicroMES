@@ -162,3 +162,11 @@ export function buildAxis(win: Range, collapsed: readonly Range[], pxPerHour: nu
     },
   };
 }
+
+/** Ritaglia un intervallo orizzontale `[left, left+width)` a `[0, max]`; `null` se cade interamente fuori (nessun pixel visibile). */
+export function clampSpan(left: number, width: number, max: number): { left: number; width: number } | null {
+  const l = Math.max(0, left);
+  const r = Math.min(max, left + width);
+  if (r <= l) return null;
+  return { left: l, width: r - l };
+}

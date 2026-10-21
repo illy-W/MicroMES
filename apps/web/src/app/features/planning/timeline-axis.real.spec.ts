@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAxis, carveAroundInstants, commonClosedRanges } from './timeline-axis';
+import { buildAxis, carveAroundInstants, clampSpan, commonClosedRanges } from './timeline-axis';
 import { HOUR } from './timeline-time';
 
 
@@ -39,5 +39,26 @@ describe('real week fixture', () => {
     expect(seps.some((s) => s.end - s.start >= 48 * HOUR)).toBe(true);
     // Giorno feriale: ben più corto di 24 h lineari.
     expect(axis.toX(t('2026-10-22T22:00:00Z')) - axis.toX(t('2026-10-21T22:00:00Z'))).toBeLessThan(24 * 28 - 6 * 28);
+  });
+});
+
+describe('real day window 2026-10-22: asse == estensione massima', () => {
+  const t = (s: string) => new Date(s).getTime();
+  const win = { start: t('2026-10-21T22:00:00Z'), end: t('2026-10-22T22:00:00Z') };
+  const mk = (k: string) => NW[k].map(([s, e]) => ({ start: t(s), end: t(e) }));
+  const axis = buildAxis(win, carveAroundInstants(commonClosedRanges([mk('1'), mk('6')], win), []), 56, 12);
+  it('nessuna barra ritagliata supera la larghezza dell\'asse', () => {
+    let max = 0;
+    for (const [, ps, pe] of JOBS) {
+      if (!ps || !pe) continue;
+      const l = axis.toX(t(ps));
+      const c = clampSpan(l, axis.toX(t(pe)) - l, axis.width);
+      if (c) max = Math.max(max, c.left + c.width);
+    }
+    expect(axis.width).toBeGreaterThan(0);
+    expect(max).toBeLessThanOrEqual(axis.width);
+    // Il lavoro del 23/10 (margine di prefetch) è scartato.
+    const l = axis.toX(t('2026-10-23T09:20:00Z'));
+    expect(clampSpan(l, axis.toX(t('2026-10-23T11:05:00Z')) - l, axis.width)).toBeNull();
   });
 });

@@ -123,3 +123,14 @@ describe('formatDuration', () => {
     expect(formatDuration(h(51))).toBe('2 g 3 h');
   });
 });
+
+import { clampSpan } from './timeline-axis';
+describe('clampSpan / larghezza asse', () => {
+  it('scarta ciò che è fuori e ritaglia ai bordi', () => {
+    expect(clampSpan(-50, 40, 1000)).toBeNull();
+    expect(clampSpan(1000, 40, 1000)).toBeNull();
+    expect(clampSpan(-20, 100, 1000)).toEqual({ left: 0, width: 80 });
+    expect(clampSpan(950, 100, 1000)).toEqual({ left: 950, width: 50 });
+    expect(clampSpan(10, 20, 1000)).toEqual({ left: 10, width: 20 });
+  });
+});
