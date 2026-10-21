@@ -65,6 +65,17 @@ See `AGENTS.md` for the project table and dependency direction.
 - `DevelopmentDataSeeder` (`libs/api-core/Persistence`) fills an empty database at startup with a small steel and oak furniture workshop: materials, multilevel BOM, process segments and four routings (the chair has parallel branches). It never runs outside Development or when `Materials` already has rows.
 - To reset: stop the dev server, `docker compose down -v`, then `npx nx run Api:db-up` and restart the API.
 
+### Production orders and work orders
+
+- `ProductionOrderFeature` (backend): `ProductionOrderService` and `WorkOrderService`, pure `ProductionOrderPlanner` for the release, `ProductionOrderStatusUpdater` firing `Start`/`Complete` on the order after work order commands.
+- **Release = snapshot**: copies routing steps (effective times), dependencies and BOM requirements into work orders; creates child orders for `Intermediate`/`FinishedGood` components that have a routing (depth cap 10, cyclic BOM -> 422). Changing routing or BOM later does not affect released orders.
+- **State machines (`Stateless` 5.20.1)** in `MachineStates/`, same pattern as `ptconnect-nx` (state read/written on the entity, `TimeProvider`). Status changes happen only through the machines. Internal enum with abstract superstates (`Prepared`, `Open`, `Closed`) mapped to the persisted leaf-state enums; effects (`OnEntry`) only on leaf states. Invalid transitions return 409 with an Italian message; `allowedActions` (from `GetPermittedTriggers`) is the single source for the UI commands.
+- Work order: `Waiting` -> (`PredecessorsEnded`) -> `Ready` -> `Start` -> `Running` <-> `Interrupted` (`Pause`/`Resume`); `Stop` -> `Ended`; `Abort` from any non-terminal state -> `Aborted`.
+- Production order: `Planned` -> `Release` -> `Released` -> (first `Start`) -> `InProgress` -> (`Complete`) -> `Completed`; `Cancel` from `Planned` or from `Released` with no started work order; `Abort` from `Released`/`InProgress`. Child orders follow the parent (no own actions).
+- Both machines export their graph: `ExportMermaid()` / `ExportDot()` (Stateless `MermaidGraph` / `UmlDotGraph`).
+- Frontend: `features/production-orders` (list, detail with children tree) and `features/work-orders` (operational list and commands). Pages show only the actions in `allowedActions`.
+- Sample data: `ProductionOrderDevelopmentSeeder` (Development only, empty `ProductionOrders` table, uses the services). To recreate: stop the dev server, truncate the order tables (`ProductionOrders` with `restart identity cascade`) or reset the DB (see "Local sample data") and restart the API.
+
 ### Layouts (`apps/web/src/app/core/layouts`)
 
 - `blank`: only a `router-outlet`, for pages without shell. Currently unused.

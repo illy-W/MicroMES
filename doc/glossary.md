@@ -10,6 +10,11 @@ Every feature spec that adds or renames a domain entity updates this file.
 | `ProcessSegment` | Process Segment | Fase di processo | Reusable production activity independent of the product (cutting, welding, painting...). Fields: `Code` (unique, uppercase), `Name`, `Description`, `SetupMinutes` (per order), `RunMinutesPerUnit`, `IsActive` (soft-delete). | `specs/routing` |
 | `RoutingStep` | Operations Segment (product segment) | Passo | A step of the routing of an `Intermediate`/`FinishedGood` material: refers to a `ProcessSegment`, has `OperationNumber` (unique per material), optional `SetupMinutes`/`RunMinutesPerUnit` overriding the segment standard, `Notes`, and the diagram position `PositionX`/`PositionY` (nullable). | `specs/routing` |
 | `RoutingStepDependency` | Segment Dependency | Dipendenza | Edge between two steps (predecessor -> successor, finish-to-start). The routing is a graph: parallel branches allowed, acyclic, connected, exactly one final step. | `specs/routing` |
+| `ProductionOrder` | Production Request (Work Request) | Ordine di produzione | Request to produce a quantity of an `Intermediate`/`FinishedGood` material. Code `OP-{year}-{nnnn}` (children `{parent}-{n}`), `Quantity`, `Priority` (higher = more urgent), `RequestedStart`/`RequestedEnd`, `Notes`, `ParentOrderId`. Status: `Planned`, `Released`, `InProgress`, `Completed`, `Cancelled`, `Aborted`. Releasing it takes a snapshot of routing and BOM. | `specs/production-order` |
+| `WorkOrder` | Job Order (Segment Requirement) | Ordine di lavoro | Unit of work of one routing step of a production order: segment snapshot, setup and run-per-unit minutes, planned quantity. Status: `Waiting`, `Ready`, `Running`, `Interrupted`, `Ended`, `Aborted`. Code `{order}/{operation}`. | `specs/production-order` |
+| `WorkOrderDependency` | Segment Dependency | Dipendenza | Predecessor -> successor between work orders (copy of the routing edges, plus last step of a child order -> start steps of the parent). | `specs/production-order` |
+| `WorkOrderMaterial` | Material Requirement (*material consumed*) | Materiale richiesto | Required quantity of a BOM component for a work order; links to the child order that produces it, if any. | `specs/production-order` |
+| `WorkOrderResponse` | Job Response | Registrazione | One work session of a work order: start/end, good and scrap quantity, notes. A work order can have several; totals are the sums. | `specs/production-order` |
 
 ## Planned (not adopted yet)
 
@@ -19,7 +24,21 @@ Every feature spec that adds or renames a domain entity updates this file.
 | Material Lot / Sublot | Traceable physical instance of a material. |
 | Product Definition | How a material is produced. BOM adopted as `BomItem`, routing as `RoutingStep`/`RoutingStepDependency` with `ProcessSegment`; BOM-step link (consumption phase) and resources still planned. |
 | Equipment, Personnel | Resources. |
-| Process Segment, Work Order | Production activities and orders. |
+| Equipment/Personnel requirements, lots, parameters | Resource requirements and actuals of work orders; material actuals (consumption), lots and traceability. |
+
+### State mapping to ISA-95 Part 4 (OPC UA job order states)
+
+| ISA-95 / OPC UA | `WorkOrderStatus` |
+|---|---|
+| *NotAllowedToStart* (stored, not released) | no equivalent: work orders are created at release |
+| *AllowedToStart* / *Waiting* | `Waiting` (predecessors not ended) |
+| *AllowedToStart* / *Ready* | `Ready` |
+| *Running* | `Running` |
+| *Interrupted* (*Suspended*/*Held*) | `Interrupted` |
+| *Ended* | `Ended` |
+| *Aborted* | `Aborted` |
+
+Commands: `Start`, `Pause`, `Resume`, `Stop` (end before the planned quantity is allowed), `Abort`; `Cancel` applies to the production order only. Source: *OPC UA for ISA-95 Part 4: Job Control* v2.00.0.
 
 ## Deviations from ISA-95
 
@@ -28,5 +47,6 @@ Every feature spec that adds or renames a domain entity updates this file.
 - `Material` is never physically deleted: `IsActive = false` (soft-delete).
 - `BomItem`: no BOM header and no versioning (the BOM is the set of lines of a material); no cycle check (only component != parent, tree read capped at 10 levels); quantity per 1 unit without scrap; lines are physically deleted (they are relations, not master data).
 - `RoutingStep`: no routing header and no versioning (the routing is the set of steps of a material); a single dependency type (finish-to-start) without lag; standard times live on the segment and can be overridden per step; no required resources (equipment, personnel); exactly one final step; diagram position stored on the step.
+- Production orders: no Work Schedule container; a single request level (the order) with child orders for intermediates; work orders are born `Waiting`/`Ready` at release (no separate *NotAllowedToStart*); all BOM materials are assigned to the first start step and every start step of the parent waits for the child orders until a BOM-step link exists; one `WorkOrderResponse` per work session instead of a single Job Response per job order; no lots, resources, parameters or actual material consumption yet.
 
 Record here every further deliberate difference from the standard, with the reason.
