@@ -22,27 +22,29 @@ public class RoutingResult<T> : Result<T>
 }
 
 public class RoutingService(
-    IRoutingStepRepository steps,
-    IRoutingStepDependencyRepository dependencies,
-    IMaterialRepository materials,
-    IProcessSegmentRepository segments,
     IUnitOfWork unitOfWork)
 {
+    // Repositories always come from the unit of work (same scope, same DbContext, same transaction).
+    private IRoutingStepRepository Steps => unitOfWork.GetRepository<IRoutingStepRepository>();
+    private IRoutingStepDependencyRepository Dependencies => unitOfWork.GetRepository<IRoutingStepDependencyRepository>();
+    private IMaterialRepository Materials => unitOfWork.GetRepository<IMaterialRepository>();
+    private IProcessSegmentRepository Segments => unitOfWork.GetRepository<IProcessSegmentRepository>();
+
     public async Task<RoutingResult<RoutingModel>> GetAsync(int materialId)
     {
-        if (await materials.GetSingleAsync(materialId) is null) return Failed(RoutingFailure.NotFound, "Material not found.");
+        if (await Materials.GetSingleAsync(materialId) is null) return Failed(RoutingFailure.NotFound, "Material not found.");
         return Succeeded(await LoadModelAsync(materialId));
     }
 
     public async Task<RoutingResult<RoutingModel>> ReplaceAsync(int materialId, UpdateRoutingRequest request)
     {
-        var material = await materials.GetSingleAsync(materialId);
+        var material = await Materials.GetSingleAsync(materialId);
         if (material is null) return Failed(RoutingFailure.NotFound, "Material not found.");
         if (material.Type is not (MaterialType.Intermediate or MaterialType.FinishedGood))
             return Failed(RoutingFailure.Invalid, "Only Intermediate or FinishedGood materials can have a routing.");
 
         var existing = new Dictionary<int, RoutingStep>();
-        await foreach (var s in steps.FetchAsync(x => x.MaterialId == materialId)) existing[s.Id] = s;
+        await foreach (var s in Steps.FetchAsync(x => x.MaterialId == materialId)) existing[s.Id] = s;
 
         // Shape validation (keys, ids, operation numbers).
         var errors = new List<string>();
@@ -65,7 +67,7 @@ public class RoutingService(
         // Process segments: must exist; must be active when new or changed.
         var segmentIds = request.Steps.Select(s => s.ProcessSegmentId!.Value).Distinct().ToList();
         var segmentMap = new Dictionary<int, ProcessSegment>();
-        await foreach (var seg in segments.FetchAsync(x => segmentIds.Contains(x.Id))) segmentMap[seg.Id] = seg;
+        await foreach (var seg in Segments.FetchAsync(x => segmentIds.Contains(x.Id))) segmentMap[seg.Id] = seg;
         foreach (var s in request.Steps)
         {
             if (!segmentMap.TryGetValue(s.ProcessSegmentId!.Value, out var seg))
@@ -119,14 +121,14 @@ public class RoutingService(
         // 1. Remove all existing dependencies of this routing; they are recreated from the request.
         var existingIds = existing.Keys.ToList();
         var oldDeps = new List<RoutingStepDependency>();
-        await foreach (var d in dependencies.FetchAsync(x => existingIds.Contains(x.PredecessorStepId) || existingIds.Contains(x.SuccessorStepId)))
+        await foreach (var d in Dependencies.FetchAsync(x => existingIds.Contains(x.PredecessorStepId) || existingIds.Contains(x.SuccessorStepId)))
             oldDeps.Add(d);
         foreach (var d in oldDeps)
-            if (!(await dependencies.DeleteAsync(d)).IsSuccessful) return "Unable to remove a dependency.";
+            if (!(await Dependencies.DeleteAsync(d)).IsSuccessful) return "Unable to remove a dependency.";
 
         // 2. Remove missing steps.
         foreach (var id in removedIds)
-            if (!(await steps.DeleteAsync(existing[id])).IsSuccessful) return "Unable to remove a step.";
+            if (!(await Steps.DeleteAsync(existing[id])).IsSuccessful) return "Unable to remove a step.";
 
         // 3. Park the operation numbers that change on unique negative values (allows swaps).
         var now = DateTime.UtcNow;
@@ -135,7 +137,7 @@ public class RoutingService(
         {
             var e = existing[s.Id!.Value];
             e.OperationNumber = -e.Id;
-            if (!(await steps.UpdateAsync(e)).IsSuccessful) return "Unable to update a step.";
+            if (!(await Steps.UpdateAsync(e)).IsSuccessful) return "Unable to update a step.";
         }
 
         // 4. Update existing steps, create new ones; remember the final id of each key.
@@ -145,14 +147,14 @@ public class RoutingService(
             var e = existing[s.Id!.Value];
             Apply(e, s);
             e.UpdatedAt = now;
-            if (!(await steps.UpdateAsync(e)).IsSuccessful) return "Unable to update a step.";
+            if (!(await Steps.UpdateAsync(e)).IsSuccessful) return "Unable to update a step.";
             keyToId[s.Key] = e.Id;
         }
         foreach (var s in request.Steps.Where(s => s.Id is null))
         {
             var e = new RoutingStep { MaterialId = materialId, CreatedAt = now, UpdatedAt = now };
             Apply(e, s);
-            var added = await steps.AddAsync(e);
+            var added = await Steps.AddAsync(e);
             if (!added.IsSuccessful || added.Data is null) return "Unable to create a step.";
             keyToId[s.Key] = added.Data.Id;
         }
@@ -160,7 +162,7 @@ public class RoutingService(
         // 5. Create the dependencies.
         foreach (var (pred, succ) in edges)
         {
-            var added = await dependencies.AddAsync(new RoutingStepDependency
+            var added = await Dependencies.AddAsync(new RoutingStepDependency
             {
                 PredecessorStepId = keyToId[pred],
                 SuccessorStepId = keyToId[succ]
@@ -219,15 +221,15 @@ public class RoutingService(
     private async Task<RoutingModel> LoadModelAsync(int materialId)
     {
         var stepList = new List<RoutingStep>();
-        await foreach (var s in steps.FetchAsync(x => x.MaterialId == materialId)) stepList.Add(s);
+        await foreach (var s in Steps.FetchAsync(x => x.MaterialId == materialId)) stepList.Add(s);
 
         var stepIds = stepList.Select(s => s.Id).ToList();
         var segmentIds = stepList.Select(s => s.ProcessSegmentId).Distinct().ToList();
         var segmentMap = new Dictionary<int, ProcessSegment>();
-        await foreach (var seg in segments.FetchAsync(x => segmentIds.Contains(x.Id))) segmentMap[seg.Id] = seg;
+        await foreach (var seg in Segments.FetchAsync(x => segmentIds.Contains(x.Id))) segmentMap[seg.Id] = seg;
 
         var depList = new List<RoutingStepDependency>();
-        await foreach (var d in dependencies.FetchAsync(x => stepIds.Contains(x.PredecessorStepId))) depList.Add(d);
+        await foreach (var d in Dependencies.FetchAsync(x => stepIds.Contains(x.PredecessorStepId))) depList.Add(d);
 
         return new RoutingModel
         {

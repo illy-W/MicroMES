@@ -15,20 +15,21 @@ namespace MicroMES.ApiFeatures.ProductionOrderFeature.Services;
 public class ProductionOrderService(
     ProductionDataLoader loader,
     WorkOrderService workOrderService,
-    IProductionOrderRepository orders,
-    IWorkOrderRepository workOrders,
-    IWorkOrderDependencyRepository dependencies,
-    IWorkOrderMaterialRepository lines,
-    IMaterialRepository materials,
-    IBomItemRepository bomItems,
-    IRoutingStepRepository routingSteps,
-    IRoutingStepDependencyRepository routingDependencies,
-    IProcessSegmentRepository segments,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
-    private const int MaxCodeAttempts = 5;
     private const string NotFoundMessage = "Ordine di produzione non trovato.";
+
+    // Repositories always come from the unit of work (same scope, same DbContext, same transaction).
+    private IProductionOrderRepository Orders => unitOfWork.GetRepository<IProductionOrderRepository>();
+    private IWorkOrderRepository WorkOrders => unitOfWork.GetRepository<IWorkOrderRepository>();
+    private IWorkOrderDependencyRepository Dependencies => unitOfWork.GetRepository<IWorkOrderDependencyRepository>();
+    private IWorkOrderMaterialRepository Lines => unitOfWork.GetRepository<IWorkOrderMaterialRepository>();
+    private IMaterialRepository Materials => unitOfWork.GetRepository<IMaterialRepository>();
+    private IBomItemRepository BomItems => unitOfWork.GetRepository<IBomItemRepository>();
+    private IRoutingStepRepository RoutingSteps => unitOfWork.GetRepository<IRoutingStepRepository>();
+    private IRoutingStepDependencyRepository RoutingDependencies => unitOfWork.GetRepository<IRoutingStepDependencyRepository>();
+    private IProcessSegmentRepository Segments => unitOfWork.GetRepository<IProcessSegmentRepository>();
 
     // ---- queries ------------------------------------------------------------------------------------
 
@@ -64,7 +65,7 @@ public class ProductionOrderService(
 
     public async Task<ProductionOrderResult<ProductionOrderDetailModel>> CreateAsync(CreateProductionOrderRequest request)
     {
-        var material = await materials.GetSingleAsync(request.MaterialId!.Value);
+        var material = await Materials.GetSingleAsync(request.MaterialId!.Value);
         if (material is null) return ProductionOrderResult<ProductionOrderDetailModel>.NotFound("Materiale non trovato.");
         if (!material.IsActive) return ProductionOrderResult<ProductionOrderDetailModel>.Invalid("Il materiale non è attivo.");
         if (material.Type is not (MaterialType.Intermediate or MaterialType.FinishedGood))
@@ -75,57 +76,42 @@ public class ProductionOrderService(
         if (start is not null && end is not null && end < start)
             return ProductionOrderResult<ProductionOrderDetailModel>.Invalid("La fine richiesta non può precedere l'inizio richiesto.");
 
-        // The code is max+1: two concurrent creations can pick the same one and the unique index rejects the
-        // loser. A fresh attempt re-reads the max (now including the winner), so retry a bounded number of times.
-        ProductionOrder? order = null;
-        string? lastError = null;
-        var codeTaken = false;
-        for (var attempt = 1; attempt <= MaxCodeAttempts && order is null; attempt++)
+        // The code is max+1, computed inside the transaction. Two concurrent creations can still pick the same
+        // one: the unique index rejects the loser, which fails cleanly (the request scope is not reused, so no
+        // retry here) and is answered 409 "riprova" by the constraint-violation mapping.
+        ProductionOrder order;
+        try
         {
-            string? code = null;
-            try
+            unitOfWork.BeginTransaction();
+            var now = Now();
+            var code = await NextCodeAsync();
+            order = Persist.Ensure(await Orders.AddAsync(new ProductionOrder
             {
-                unitOfWork.BeginTransaction();
-                var now = Now();
-                code = await NextCodeAsync();
-                order = Persist.Ensure(await orders.AddAsync(new ProductionOrder
-                {
-                    Code = code,
-                    MaterialId = material.Id,
-                    Quantity = request.Quantity!.Value,
-                    Status = ProductionOrderStatus.Planned,
-                    Priority = request.Priority,
-                    RequestedStart = start,
-                    RequestedEnd = end,
-                    Notes = request.Notes,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                }), "Impossibile creare l'ordine di produzione.");
-                unitOfWork.Commit();
-            }
-            catch (Exception ex)
-            {
-                order = null;
-                try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
-                orders.DiscardPendingChanges();
-                lastError = ex.Message;
-                // Retry only when the attempted code was taken meanwhile; any other failure is final.
-                codeTaken = code is not null && await CodeExistsAsync(code);
-                if (!codeTaken) break;
-            }
+                Code = code,
+                MaterialId = material.Id,
+                Quantity = request.Quantity!.Value,
+                Status = ProductionOrderStatus.Planned,
+                Priority = request.Priority,
+                RequestedStart = start,
+                RequestedEnd = end,
+                Notes = request.Notes,
+                CreatedAt = now,
+                UpdatedAt = now
+            }), "Impossibile creare l'ordine di produzione.");
+            unitOfWork.Commit();
         }
-
-        if (order is null)
-            return codeTaken
-                ? ProductionOrderResult<ProductionOrderDetailModel>.Conflict("Impossibile assegnare un codice univoco all'ordine: riprovare.")
-                : ProductionOrderResult<ProductionOrderDetailModel>.Failed(ProductionOrderFailure.None, lastError ?? "Impossibile creare l'ordine di produzione.");
+        catch (Exception ex)
+        {
+            try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
+            return ProductionOrderResult<ProductionOrderDetailModel>.Failed(ProductionOrderFailure.None, ex.Message);
+        }
 
         return await GetAsync(order.Id);
     }
 
     public async Task<ProductionOrderResult<ProductionOrderDetailModel>> UpdateAsync(int id, UpdateProductionOrderRequest request)
     {
-        var order = await orders.GetSingleAsync(id);
+        var order = await Orders.GetSingleAsync(id);
         if (order is null) return ProductionOrderResult<ProductionOrderDetailModel>.NotFound(NotFoundMessage);
         if (ChildGuard(order) is { } childError) return childError;
         if (order.Status != ProductionOrderStatus.Planned)
@@ -144,7 +130,7 @@ public class ProductionOrderService(
         order.Notes = request.Notes;
         order.UpdatedAt = Now();
 
-        var saved = await orders.UpdateAsync(order);
+        var saved = await Orders.UpdateAsync(order);
         if (!saved.IsSuccessful)
             return ProductionOrderResult<ProductionOrderDetailModel>.Failed(ProductionOrderFailure.None, string.Join("; ", saved.Errors));
         return await GetAsync(id);
@@ -174,7 +160,7 @@ public class ProductionOrderService(
             await PersistPlanAsync(data, plan.Order, order, created);
             await ReadyStartStepsAsync(data, created.Values);
             data.MachineOf(order).Fire(ProductionOrderTrigger.Release);
-            Persist.Ensure(await orders.UpdateAsync(order), "Impossibile aggiornare l'ordine di produzione.");
+            Persist.Ensure(await Orders.UpdateAsync(order), "Impossibile aggiornare l'ordine di produzione.");
             unitOfWork.Commit();
         }
         catch (Exception ex)
@@ -189,7 +175,7 @@ public class ProductionOrderService(
     private async Task<PlannerCatalog> LoadCatalogAsync(int rootMaterialId)
     {
         var bom = new Dictionary<int, List<BomItem>>();
-        await foreach (var b in bomItems.FetchAsync(_ => true))
+        await foreach (var b in BomItems.FetchAsync(_ => true))
         {
             if (!bom.TryGetValue(b.ParentMaterialId, out var list)) bom[b.ParentMaterialId] = list = [];
             list.Add(b);
@@ -207,19 +193,19 @@ public class ProductionOrderService(
         var ids = reachable.ToList();
 
         var catalog = new PlannerCatalog();
-        await foreach (var m in materials.FetchAsync(x => ids.Contains(x.Id)))
+        await foreach (var m in Materials.FetchAsync(x => ids.Contains(x.Id)))
             catalog.Materials[m.Id] = new PlannerMaterial(m.Id, m.Code, m.Type, m.IsActive);
         foreach (var (parent, items) in bom.Where(kv => reachable.Contains(kv.Key)))
             catalog.Bom[parent] = items.OrderBy(i => i.Id).Select(i => new PlannerBomLine(i.ComponentMaterialId, i.Quantity)).ToList();
 
         var steps = new List<RoutingStep>();
-        await foreach (var s in routingSteps.FetchAsync(x => ids.Contains(x.MaterialId))) steps.Add(s);
+        await foreach (var s in RoutingSteps.FetchAsync(x => ids.Contains(x.MaterialId))) steps.Add(s);
         var stepIds = steps.Select(s => s.Id).ToList();
         var segmentIds = steps.Select(s => s.ProcessSegmentId).Distinct().ToList();
         var segmentMap = new Dictionary<int, ProcessSegment>();
-        await foreach (var seg in segments.FetchAsync(x => segmentIds.Contains(x.Id))) segmentMap[seg.Id] = seg;
+        await foreach (var seg in Segments.FetchAsync(x => segmentIds.Contains(x.Id))) segmentMap[seg.Id] = seg;
         var deps = new List<RoutingStepDependency>();
-        await foreach (var d in routingDependencies.FetchAsync(x => stepIds.Contains(x.PredecessorStepId))) deps.Add(d);
+        await foreach (var d in RoutingDependencies.FetchAsync(x => stepIds.Contains(x.PredecessorStepId))) deps.Add(d);
 
         foreach (var group in steps.GroupBy(s => s.MaterialId))
         {
@@ -244,7 +230,7 @@ public class ProductionOrderService(
         var now = Now();
         foreach (var planned in plan.WorkOrders)
         {
-            var wo = Persist.Ensure(await workOrders.AddAsync(new WorkOrder
+            var wo = Persist.Ensure(await WorkOrders.AddAsync(new WorkOrder
             {
                 ProductionOrderId = order.Id,
                 OperationNumber = planned.OperationNumber,
@@ -269,7 +255,7 @@ public class ProductionOrderService(
         foreach (var childPlan in plan.Children)
         {
             index++;
-            var child = Persist.Ensure(await orders.AddAsync(new ProductionOrder
+            var child = Persist.Ensure(await Orders.AddAsync(new ProductionOrder
             {
                 Code = $"{order.Code}-{index}",
                 MaterialId = childPlan.MaterialId,
@@ -282,20 +268,20 @@ public class ProductionOrderService(
             }), "Impossibile creare un ordine figlio.");
             data.Orders[child.Id] = child;
             if (!data.Materials.ContainsKey(child.MaterialId))
-                data.Materials[child.MaterialId] = (await materials.GetSingleAsync(child.MaterialId))!;
+                data.Materials[child.MaterialId] = (await Materials.GetSingleAsync(child.MaterialId))!;
             childEntities[childPlan] = child;
 
             await PersistPlanAsync(data, childPlan, child, created);
 
             data.MachineOf(child).Fire(ProductionOrderTrigger.Release);
-            Persist.Ensure(await orders.UpdateAsync(child), "Impossibile aggiornare un ordine figlio.");
+            Persist.Ensure(await Orders.UpdateAsync(child), "Impossibile aggiornare un ordine figlio.");
         }
 
         // Required materials: all on the first start step.
         var target = created[ProductionOrderPlanner.FirstStartStep(plan)];
         foreach (var material in plan.Materials)
         {
-            var line = Persist.Ensure(await lines.AddAsync(new WorkOrderMaterial
+            var line = Persist.Ensure(await Lines.AddAsync(new WorkOrderMaterial
             {
                 WorkOrderId = target.Id,
                 MaterialId = material.MaterialId,
@@ -304,12 +290,12 @@ public class ProductionOrderService(
             }), "Impossibile creare un materiale richiesto.");
             data.Lines.Add(line);
             if (!data.Materials.ContainsKey(line.MaterialId))
-                data.Materials[line.MaterialId] = (await materials.GetSingleAsync(line.MaterialId))!;
+                data.Materials[line.MaterialId] = (await Materials.GetSingleAsync(line.MaterialId))!;
         }
 
         foreach (var (pred, succ) in plan.Dependencies)
         {
-            var dep = Persist.Ensure(await dependencies.AddAsync(new WorkOrderDependency
+            var dep = Persist.Ensure(await Dependencies.AddAsync(new WorkOrderDependency
             {
                 PredecessorWorkOrderId = created[pred].Id,
                 SuccessorWorkOrderId = created[succ].Id
@@ -325,7 +311,7 @@ public class ProductionOrderService(
         {
             if (data.PredecessorIds(wo.Id).Any()) continue;
             data.MachineOf(wo).PredecessorsEnded();
-            Persist.Ensure(await workOrders.UpdateAsync(wo), "Impossibile aggiornare un ordine di lavoro.");
+            Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile aggiornare un ordine di lavoro.");
         }
     }
 
@@ -352,7 +338,7 @@ public class ProductionOrderService(
                 if (!m.CanFire(ProductionOrderTrigger.Cancel))
                     throw new InvalidOperationException(m.DeniedMessage(ProductionOrderTrigger.Cancel));
                 m.Fire(ProductionOrderTrigger.Cancel);
-                Persist.Ensure(await orders.UpdateAsync(o), "Impossibile aggiornare l'ordine di produzione.");
+                Persist.Ensure(await Orders.UpdateAsync(o), "Impossibile aggiornare l'ordine di produzione.");
             }
         });
     }
@@ -377,7 +363,7 @@ public class ProductionOrderService(
                 if (!m.CanFire(ProductionOrderTrigger.Abort)) continue;
                 await AbortOpenWorkOrdersAsync(data, o, o.Id == id ? notes : null);
                 m.Abort(o.Id == id ? notes : null);
-                Persist.Ensure(await orders.UpdateAsync(o), "Impossibile aggiornare l'ordine di produzione.");
+                Persist.Ensure(await Orders.UpdateAsync(o), "Impossibile aggiornare l'ordine di produzione.");
             }
         });
     }
@@ -420,18 +406,12 @@ public class ProductionOrderService(
         var prefix = $"OP-{year}-";
         var pattern = new Regex($"^OP-{year}-(\\d+)$");
         var max = 0;
-        await foreach (var o in orders.FetchAsync(x => x.Code.StartsWith(prefix)))
+        await foreach (var o in Orders.FetchAsync(x => x.Code.StartsWith(prefix)))
         {
             var match = pattern.Match(o.Code);
             if (match.Success && int.TryParse(match.Groups[1].Value, out var n) && n > max) max = n;
         }
         return $"{prefix}{max + 1:D4}";
-    }
-
-    private async Task<bool> CodeExistsAsync(string code)
-    {
-        await foreach (var _ in orders.FetchAsync(x => x.Code == code)) return true;
-        return false;
     }
 
     private DateTime Now() => timeProvider.GetUtcNow().UtcDateTime;

@@ -9,10 +9,12 @@ namespace MicroMES.ApiFeatures.ProductionOrderFeature.Services;
 public class WorkOrderService(
     ProductionDataLoader loader,
     ProductionOrderStatusUpdater orderStatus,
-    IWorkOrderRepository workOrders,
-    IWorkOrderResponseRepository sessions,
     IUnitOfWork unitOfWork)
 {
+    // Repositories always come from the unit of work (same scope, same DbContext, same transaction).
+    private IWorkOrderRepository WorkOrders => unitOfWork.GetRepository<IWorkOrderRepository>();
+    private IWorkOrderResponseRepository Sessions => unitOfWork.GetRepository<IWorkOrderResponseRepository>();
+
     public async Task<ProductionOrderResult<List<WorkOrderModel>>> GetAllAsync(
         WorkOrderStatus? status, int? productionOrderId, string? search)
     {
@@ -89,14 +91,14 @@ public class WorkOrderService(
         var machine = data.MachineOf(wo);
         fire(machine);
 
-        Persist.Ensure(await workOrders.UpdateAsync(wo), "Impossibile aggiornare l'ordine di lavoro.");
+        Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile aggiornare l'ordine di lavoro.");
         if (machine.OpenedSession is { } opened)
         {
-            var added = Persist.Ensure(await sessions.AddAsync(opened), "Impossibile registrare la sessione di lavoro.");
+            var added = Persist.Ensure(await Sessions.AddAsync(opened), "Impossibile registrare la sessione di lavoro.");
             data.Sessions.Add(added);
         }
         if (machine.ClosedSession is { } closed)
-            Persist.Ensure(await sessions.UpdateAsync(closed), "Impossibile aggiornare la sessione di lavoro.");
+            Persist.Ensure(await Sessions.UpdateAsync(closed), "Impossibile aggiornare la sessione di lavoro.");
 
         var order = data.Orders[wo.ProductionOrderId];
         switch (wo.Status)
@@ -121,7 +123,7 @@ public class WorkOrderService(
             if (data.PredecessorIds(successorId).Any(p => data.WorkOrders[p].Status != WorkOrderStatus.Ended)) continue;
 
             data.MachineOf(successor).PredecessorsEnded();
-            Persist.Ensure(await workOrders.UpdateAsync(successor), "Impossibile aggiornare l'ordine di lavoro.");
+            Persist.Ensure(await WorkOrders.UpdateAsync(successor), "Impossibile aggiornare l'ordine di lavoro.");
         }
     }
 

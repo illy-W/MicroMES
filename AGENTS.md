@@ -47,6 +47,7 @@ Node: usa la versione di `.nvmrc`.
 - Usa l'agent `@nx-expert` e le skill `nx-workspace`, `nx-generate`, `nx-run-tasks` per le operazioni sul monorepo.
 - Skill `impeccable` (design UI, mode Operate): usa `PRODUCT.md` e `DESIGN.md` in root come pointer a `doc/`; la skill è in `.opencode/skills/impeccable`.
 - Vocabolario di dominio: riferimento ISA-95 in forma ridotta, vedi `doc/glossary.md`. Pattern backend: `doc/structure.md` (sezione "Backend patterns").
+- Backend: mai `DbContext` nel codice di prodotto (solo repository o `IUnitOfWork`; con la UoW i repository si ottengono da `uow.GetRepository<>()`; interfacce repository vuote; seeder/codice con repository in ApiFeatures o Api, non in ApiCore).
 - Dipendenze con `pnpm add -w` / `pnpm install`; comandi Nx con `npx nx`.
 - Non fare commit né push senza richiesta esplicita.
 

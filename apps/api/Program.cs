@@ -9,6 +9,7 @@ using MicroMES.ApiFeatures.ProcessSegmentFeature;
 using MicroMES.ApiFeatures.ProductionOrderFeature;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Seeding;
 using MicroMES.ApiFeatures.RoutingFeature;
+using MicroMES.ApiFeatures.SampleDataFeature;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -72,6 +73,7 @@ builder.Services.AddBomFeature();
 builder.Services.AddProcessSegmentFeature();
 builder.Services.AddRoutingFeature();
 builder.Services.AddProductionOrderFeature();
+builder.Services.AddSampleDataFeature();
 
 var app = builder.Build();
 
@@ -81,7 +83,7 @@ if (app.Environment.IsDevelopment() && !isOpenApiEnabled)
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-    DevelopmentDataSeeder.SeedAsync(db).GetAwaiter().GetResult();
+    scope.ServiceProvider.GetRequiredService<MasterDataDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
     scope.ServiceProvider.GetRequiredService<ProductionOrderDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
 }
 

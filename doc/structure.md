@@ -62,7 +62,7 @@ See `AGENTS.md` for the project table and dependency direction.
 
 ### Local sample data (Development)
 
-- `DevelopmentDataSeeder` (`libs/api-core/Persistence`) fills an empty database at startup with a small steel and oak furniture workshop: materials, multilevel BOM, process segments and four routings (the chair has parallel branches). It never runs outside Development or when `Materials` already has rows.
+- `MasterDataDevelopmentSeeder` (`libs/api-features/SampleDataFeature`) fills an empty database at startup with a small steel and oak furniture workshop: materials, multilevel BOM, process segments and four routings (the chair has parallel branches). It never runs outside Development or when `Materials` already has rows.
 - To reset: stop the dev server, `docker compose down -v`, then `npx nx run Api:db-up` and restart the API.
 
 ### Production orders and work orders
@@ -76,12 +76,19 @@ See `AGENTS.md` for the project table and dependency direction.
 - Frontend: `features/production-orders` (list, detail with children tree) and `features/work-orders` (operational list and commands). Pages show only the actions in `allowedActions`.
 - Sample data: `ProductionOrderDevelopmentSeeder` (Development only, empty `ProductionOrders` table, uses the services). To recreate: stop the dev server, truncate the order tables (`ProductionOrders` with `restart identity cascade`) or reset the DB (see "Local sample data") and restart the API.
 
+### Backend data access rules
+
+- Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.
+- A service that needs transactions injects `IUnitOfWork` and resolves its repositories from it (`uow.GetRepository<IXRepository>()`), never next to the UoW; services without transactions inject the repositories directly.
+- Repository interfaces stay empty extensions of `IGenericRepository<T, int>`.
+- Dependency direction `Api -> ApiFeatures -> ApiCore`: code needing repositories (seeders included) lives in `ApiFeatures` or `Api`. Sample data: `SampleDataFeature` (master data) and `ProductionOrderFeature` (orders), both Development-only.
+- Tests may use the DbContext for arrange/assert.
+
 ### Constraint violations (409)
 
 - PostgreSQL unique (23505) and foreign-key (23503) violations never surface as 500. illyW's `GenericRepository` swallows the `SaveChanges` exception into a failed `Result`, so a `SaveChangesInterceptor` records the violation in a per-request `ConstraintViolationTracker`; a global result filter turns a 500 with a recorded violation into a 409 `ProblemDetails` (Italian message from the constraint-name map in `ConstraintViolation.Message`; the constraint name only goes to the logs). An `IExceptionHandler` is the safety net for violations that escape as exceptions.
 - Service-level checks (explicit 409 before saving) stay; the mechanism is for races and inconsistent data. New unique indexes need an entry in the message map.
-- Top-level order codes retry up to 5 times on collision; a child order code collision at release is a 409 (rollback complete).
-- `IProductionOrderRepository.DiscardPendingChanges()` is the one deliberate exception to "repositories add no methods" (needed to retry after a failed save).
+- Order code collisions (top-level race or inconsistent child codes) answer 409 with a rollback; there is no retry loop. A failed `SaveChanges` leaves the entity tracked (state `Added`) on the scoped DbContext, so retrying in the same scope would re-insert it; the clean way to retry would be a fresh DI scope per attempt, not touching the DbContext.
 
 ### Backend tests
 

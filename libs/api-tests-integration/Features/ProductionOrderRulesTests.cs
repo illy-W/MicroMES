@@ -121,7 +121,7 @@ public class ProductionOrderRulesTests(ApiFixture fixture) : IntegrationTest(fix
         var release = await Api.ReleaseAsync(order.Id);
 
         release.Status.Should().Be(HttpStatusCode.Conflict);
-        release.Raw.Should().Contain("Esiste già un ordine di produzione con questo codice")
+        release.Raw.Should().Contain("Esiste già un ordine con questo codice")
             .And.NotContain("IX_", "the constraint name stays in the logs");
         (await Api.GetOrderAsync(order.Id)).Ok.Status.Should().Be(ProductionOrderStatus.Planned);
         (await Api.GetWorkOrdersAsync()).Ok.Should().BeEmpty("the work orders inserted before the failure were rolled back");
@@ -132,7 +132,7 @@ public class ProductionOrderRulesTests(ApiFixture fixture) : IntegrationTest(fix
     }
 
     [Fact]
-    public async Task Create_ParallelRequests_Success_RetryGivesDistinctCodesOrCleanConflicts()
+    public async Task Create_ParallelRequests_Success_LostRaceAnswersCleanConflict()
     {
         var product = await ProductWithChildAsync();
 
@@ -141,7 +141,7 @@ public class ProductionOrderRulesTests(ApiFixture fixture) : IntegrationTest(fix
                 new { materialId = product, quantity = 1 })));
 
         results.Should().OnlyContain(r => r.Status == HttpStatusCode.Created || r.Status == HttpStatusCode.Conflict,
-            "a lost race on the order code is retried or answered 409, never 500");
+            "a lost race on the order code is answered 409 (riprova), never 500");
         var codes = results.Where(r => r.IsSuccess).Select(r => r.Body!.Code).ToList();
         codes.Should().OnlyHaveUniqueItems().And.NotBeEmpty();
         (await Api.GetOrdersAsync()).Ok.Should().HaveCount(codes.Count);

@@ -1,20 +1,56 @@
+using illyW.Framework.Core.RepositoryPattern;
+using illyW.Framework.Core.ResultPattern;
 using MicroMES.ApiCore.Persistence.Entities;
-using Microsoft.EntityFrameworkCore;
+using MicroMES.ApiFeatures.BomFeature.Repositories;
+using MicroMES.ApiFeatures.MaterialFeature.Repositories;
+using MicroMES.ApiFeatures.ProcessSegmentFeature.Repositories;
+using MicroMES.ApiFeatures.RoutingFeature.Repositories;
 
-namespace MicroMES.ApiCore.Persistence;
+namespace MicroMES.ApiFeatures.SampleDataFeature;
 
 /// <summary>
-/// Sample data for local development: a small workshop producing steel and oak furniture.
-/// Infrastructure code, so it uses <see cref="AppDbContext"/> directly. Runs only when Materials is empty.
+/// Sample master data for local development: a small workshop producing steel and oak furniture.
+/// It only goes through the repositories of the unit of work, in one transaction. Runs only when Materials is empty.
 /// </summary>
-public static class DevelopmentDataSeeder
+public class MasterDataDevelopmentSeeder(IUnitOfWork unitOfWork)
 {
     private const double ColumnSpacing = 260;
     private const double RowSpacing = 120;
 
-    public static async Task SeedAsync(AppDbContext db)
+    public async Task SeedAsync()
     {
-        if (await db.Materials.AnyAsync()) return;
+        var materialRepo = unitOfWork.GetRepository<IMaterialRepository>();
+        await foreach (var _ in materialRepo.FetchAsync(x => true)) return;
+
+        unitOfWork.BeginTransaction();
+        try
+        {
+            await SeedCoreAsync();
+            unitOfWork.Commit();
+        }
+        catch
+        {
+            try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
+            throw;
+        }
+    }
+
+    /// <summary>Saves the entity (the same instance comes back with its generated id).</summary>
+    private static async Task<T> Save<T>(Task<IResult<T>> add) where T : class
+    {
+        var result = await add;
+        if (!result.IsSuccessful || result.Data is null)
+            throw new InvalidOperationException($"Sample data not saved: {string.Join("; ", result.Errors)}");
+        return result.Data;
+    }
+
+    private async Task SeedCoreAsync()
+    {
+        var materialRepo = unitOfWork.GetRepository<IMaterialRepository>();
+        var segmentRepo = unitOfWork.GetRepository<IProcessSegmentRepository>();
+        var bomRepo = unitOfWork.GetRepository<IBomItemRepository>();
+        var stepRepo = unitOfWork.GetRepository<IRoutingStepRepository>();
+        var dependencyRepo = unitOfWork.GetRepository<IRoutingStepDependencyRepository>();
 
         var now = DateTime.UtcNow;
 
@@ -52,7 +88,7 @@ public static class DevelopmentDataSeeder
             tubQ30, tubQ25, lamS235, tavRov, verPol, verAcq, vit, pie, imb, filSal, disTag, carAbr,
             strutturaTav, pianoTav, tavolino, sedia
         };
-        db.Materials.AddRange(materials);
+        foreach (var material in materials) await Save(materialRepo.AddAsync(material));
 
         // ---- Process segments ------------------------------------------------------------------------
         ProcessSegment S(string code, string name, decimal setup, decimal run, string? description = null) => new()
@@ -74,25 +110,23 @@ public static class DevelopmentDataSeeder
         var imbSeg = S("IMB", "Imballaggio", 5, 3m);
 
         var segments = new[] { tagTub, tagLam, sal, sba, verPolSeg, freLeg, lev, finLeg, ass, col, imbSeg };
-        db.ProcessSegments.AddRange(segments);
-
-        await db.SaveChangesAsync(); // generates the ids needed by BOM and routings
+        foreach (var segment in segments) await Save(segmentRepo.AddAsync(segment));
 
         // ---- BOM -------------------------------------------------------------------------------------
-        void Bom(Material parent, params (Material component, decimal quantity)[] items)
+        async Task Bom(Material parent, params (Material component, decimal quantity)[] items)
         {
             foreach (var (component, quantity) in items)
-                db.BomItems.Add(new BomItem
+                await Save(bomRepo.AddAsync(new BomItem
                 {
                     ParentMaterialId = parent.Id, ComponentMaterialId = component.Id, Quantity = quantity,
                     CreatedAt = now, UpdatedAt = now
-                });
+                }));
         }
 
-        Bom(tavolino, (strutturaTav, 1), (pianoTav, 1), (vit, 8), (pie, 4), (imb, 1));
-        Bom(strutturaTav, (tubQ30, 3.2m), (lamS235, 0.8m), (filSal, 0.05m), (disTag, 0.1m), (verPol, 0.15m));
-        Bom(pianoTav, (tavRov, 1), (carAbr, 3), (verAcq, 0.12m));
-        Bom(sedia, (tubQ30, 4.5m), (lamS235, 1.2m), (tavRov, 0.5m), (filSal, 0.08m), (verPol, 0.2m), (vit, 6), (pie, 4), (imb, 1));
+        await Bom(tavolino, (strutturaTav, 1), (pianoTav, 1), (vit, 8), (pie, 4), (imb, 1));
+        await Bom(strutturaTav, (tubQ30, 3.2m), (lamS235, 0.8m), (filSal, 0.05m), (disTag, 0.1m), (verPol, 0.15m));
+        await Bom(pianoTav, (tavRov, 1), (carAbr, 3), (verAcq, 0.12m));
+        await Bom(sedia, (tubQ30, 4.5m), (lamS235, 1.2m), (tavRov, 0.5m), (filSal, 0.08m), (verPol, 0.2m), (vit, 6), (pie, 4), (imb, 1));
 
         // ---- Routings --------------------------------------------------------------------------------
         // Each step: (operation number, segment, column, row, setup override, run override, notes).
@@ -100,7 +134,7 @@ public static class DevelopmentDataSeeder
         // The edges refer to operation numbers.
         var pendingEdges = new List<(RoutingStep, RoutingStep)>();
 
-        void Routing(Material material,
+        async Task Routing(Material material,
             (int op, ProcessSegment segment, int column, int row, decimal? setup, decimal? run, string? notes)[] defs,
             params (int from, int to)[] edges)
         {
@@ -115,13 +149,13 @@ public static class DevelopmentDataSeeder
                     CreatedAt = now, UpdatedAt = now
                 };
                 byOp[d.op] = step;
-                db.RoutingSteps.Add(step);
+                await Save(stepRepo.AddAsync(step));
             }
 
             pendingEdges.AddRange(edges.Select(e => (byOp[e.from], byOp[e.to])));
         }
 
-        Routing(strutturaTav,
+        await Routing(strutturaTav,
         [
             (10, tagTub, 0, 0, null, 3m, "Quattro gambe e due traverse da barra da 6 m"),
             (20, sal, 1, 0, null, null, null),
@@ -129,21 +163,21 @@ public static class DevelopmentDataSeeder
             (40, verPolSeg, 3, 0, 40m, null, "Lotto minimo di 10 pezzi per cottura in forno")
         ], (10, 20), (20, 30), (30, 40));
 
-        Routing(pianoTav,
+        await Routing(pianoTav,
         [
             (10, freLeg, 0, 0, null, null, "Profilo del bordo con fresa da 12 mm"),
             (20, lev, 1, 0, null, 8m, "Grana 120 poi 180"),
             (30, finLeg, 2, 0, null, null, "Due mani con asciugatura intermedia")
         ], (10, 20), (20, 30));
 
-        Routing(tavolino,
+        await Routing(tavolino,
         [
             (10, ass, 0, 0, null, 10m, "Fissaggio del piano con 8 viti M6"),
             (20, col, 1, 0, null, null, null),
             (30, imbSeg, 2, 0, null, null, null)
         ], (10, 20), (20, 30));
 
-        Routing(sedia,
+        await Routing(sedia,
         [
             (10, tagTub, 0, 0, null, 3.5m, "Gambe, schienale e traverse"),
             (20, tagLam, 0, 1, 25m, null, "Piastra di appoggio della seduta"),
@@ -155,12 +189,8 @@ public static class DevelopmentDataSeeder
             (80, imbSeg, 6, 0, null, null, null)
         ], (10, 30), (20, 30), (30, 40), (40, 50), (50, 60), (60, 70), (70, 80));
 
-        await db.SaveChangesAsync(); // generates the step ids
-
         foreach (var (pred, succ) in pendingEdges)
-            db.RoutingStepDependencies.Add(new RoutingStepDependency { PredecessorStepId = pred.Id, SuccessorStepId = succ.Id });
-
-        await db.SaveChangesAsync();
+            await Save(dependencyRepo.AddAsync(new RoutingStepDependency { PredecessorStepId = pred.Id, SuccessorStepId = succ.Id }));
     }
 
 }

@@ -12,7 +12,7 @@ public class ConstraintViolationFixture
     [Theory]
     [InlineData("IX_Materials_Code", "Esiste già un materiale con questo codice.")]
     [InlineData("IX_ProcessSegments_Code", "Esiste già un segmento di processo con questo codice.")]
-    [InlineData("IX_ProductionOrders_Code", "Esiste già un ordine di produzione con questo codice.")]
+    [InlineData("IX_ProductionOrders_Code", "Esiste già un ordine con questo codice, riprova.")]
     [InlineData("IX_BomItems_ParentMaterialId_ComponentMaterialId", "Il componente è già presente nella distinta.")]
     [InlineData("IX_RoutingSteps_MaterialId_OperationNumber", "Esiste già un passo del ciclo con questo numero di operazione.")]
     [InlineData("IX_WorkOrderDependencies_PredecessorWorkOrderId_SuccessorWorkO", "La dipendenza tra gli ordini di lavoro esiste già.")]
