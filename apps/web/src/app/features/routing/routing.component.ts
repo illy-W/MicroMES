@@ -256,8 +256,10 @@ function toNumberOrNull(v: string): number | null {
                       (selectionChanged)="onSelection($event)"
                     >
                       <ng-diagram-background />
-                      <ng-diagram-minimap position="bottom-right" />
                     </ng-diagram>
+                    @if (showMinimap()) {
+                      <ng-diagram-minimap position="bottom-right" />
+                    }
                     @if (!steps().length) {
                       <div class="absolute inset-0 flex items-center justify-center" [class.pointer-events-none]="editing()">
                         <div class="bg-card flex max-w-sm flex-col items-center gap-2 rounded-lg border p-6 text-center shadow-sm">
@@ -464,6 +466,8 @@ export class RoutingComponent {
   protected readonly view = signal<'diagram' | 'list'>('diagram');
   /** Lettura di default; la modifica si attiva esplicitamente. */
   protected readonly editing = signal(false);
+  /** Oltre questo numero di passi compare la minimappa. */
+  protected readonly showMinimap = computed(() => this.steps().length > 8);
   protected readonly discardOpen = signal(false);
   protected readonly leaveResolver = signal<((v: boolean) => void) | null>(null);
 

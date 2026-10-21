@@ -22,7 +22,7 @@ public sealed record ConstraintViolation(ConstraintViolationKind Kind, string? C
     [
         ("IX_Materials_Code", "Esiste già un materiale con questo codice."),
         ("IX_ProcessSegments_Code", "Esiste già un segmento di processo con questo codice."),
-        ("IX_ProductionOrders_Code", "Esiste già un ordine con questo codice, riprova."),
+        ("IX_ProductionOrders_Code", "Esiste già un ordine di produzione con questo codice."),
         ("IX_BomItems_ParentMaterialId_ComponentMaterialId", "Il componente è già presente nella distinta."),
         ("IX_RoutingSteps_MaterialId_OperationNumber", "Esiste già un passo del ciclo con questo numero di operazione."),
         ("IX_RoutingStepDependencies_", "La dipendenza tra i passi del ciclo esiste già."),

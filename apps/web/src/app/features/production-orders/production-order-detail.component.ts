@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideCalendarClock,
@@ -232,8 +232,17 @@ const columns = columnHelper.columns([
                     <tbody hlmTBody>
                       @for (w of o.workOrders; track w.id) {
                         @let ws = workStatus(w.status);
-                        <tr hlmTr>
-                          <td hlmTd class="font-medium">{{ w.code }}</td>
+                        <tr hlmTr class="hover:bg-muted/50 cursor-pointer" (click)="openWork()">
+                          <td hlmTd class="font-medium">
+                            <a
+                              class="hover:underline"
+                              [routerLink]="['/work-orders']"
+                              [queryParams]="{ order: o.id }"
+                              [attr.aria-label]="'Apri il lavoro ' + w.code + ' in Ordini di lavoro'"
+                              (click)="$event.stopPropagation()"
+                              >{{ w.code }}</a
+                            >
+                          </td>
                           <td hlmTd>{{ w.processSegmentName }}</td>
                           <td hlmTd class="text-right tabular-nums">{{ minutes(w.plannedMinutes) }}</td>
                           <td hlmTd>
@@ -395,6 +404,7 @@ const columns = columnHelper.columns([
 })
 export class ProductionOrderDetailComponent {
   private readonly store = inject(ProductionOrdersStore);
+  private readonly router = inject(Router);
 
   private readonly orderId = toSignal(inject(ActivatedRoute).paramMap.pipe(map((p) => Number(p.get('id')))), {
     initialValue: 0,
@@ -459,6 +469,10 @@ export class ProductionOrderDetailComponent {
         if (id) void this.load(id);
       });
     });
+  }
+
+  protected openWork(): void {
+    void this.router.navigate(['/work-orders'], { queryParams: { order: this.orderId() } });
   }
 
   protected can(action: string): boolean {

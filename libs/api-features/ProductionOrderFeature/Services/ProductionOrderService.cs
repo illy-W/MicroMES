@@ -78,7 +78,7 @@ public class ProductionOrderService(
 
         // The code is max+1, computed inside the transaction. Two concurrent creations can still pick the same
         // one: the unique index rejects the loser, which fails cleanly (the request scope is not reused, so no
-        // retry here) and is answered 409 "riprova" by the constraint-violation mapping.
+        // retry here) and is answered 409 "esiste già" by the constraint-violation mapping.
         ProductionOrder order;
         try
         {
