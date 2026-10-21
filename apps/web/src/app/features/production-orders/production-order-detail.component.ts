@@ -25,10 +25,11 @@ import {
   rowExpandingFeature,
   tableFeatures,
 } from '@tanstack/angular-table';
-import type {
-  ProductionOrderDetailModel,
-  ProductionOrderTreeModel,
-  WorkOrderLinkModel,
+import {
+  ProductionOrderStatus,
+  type ProductionOrderDetailModel,
+  type ProductionOrderTreeModel,
+  type WorkOrderLinkModel,
 } from '@micromes/api-client/models';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -41,6 +42,7 @@ import { map } from 'rxjs';
 import { unitLabel } from '../materials/material-labels';
 import { toFailure } from '../materials/materials.service';
 import { formatMinutes } from '../routing/routing-metrics';
+import { ProductionOrderOverviewComponent } from './overview/overview.component';
 import { ProductionOrderConfirmDialogComponent } from './production-order-confirm-dialog.component';
 import { ProductionOrderFormDialogComponent } from './production-order-form-dialog.component';
 import { ACTIONS, canEditOrder, formatDate, formatQty, orderStatus, workStatus } from './production-order-labels';
@@ -74,6 +76,7 @@ const columns = columnHelper.columns([
     NgIcon,
     ProductionOrderFormDialogComponent,
     ProductionOrderConfirmDialogComponent,
+    ProductionOrderOverviewComponent,
   ],
   providers: [
     provideIcons({
@@ -196,8 +199,9 @@ const columns = columnHelper.columns([
           </div>
         </dl>
 
-        <hlm-tabs tab="work">
+        <hlm-tabs class="relative" [tab]="activeTab()" (tabActivated)="userTab.set($any($event))">
           <hlm-tabs-list aria-label="Sezioni dell’ordine">
+            <button hlmTabsTrigger="overview" type="button">Panoramica</button>
             <button hlmTabsTrigger="work" type="button">Lavori ({{ o.workOrders.length }})</button>
             <button hlmTabsTrigger="materials" type="button">Materiali richiesti ({{ o.materials.length }})</button>
             <button hlmTabsTrigger="children" type="button">Ordini figli ({{ o.children.length }})</button>
@@ -353,6 +357,25 @@ const columns = columnHelper.columns([
               </div>
             }
           </div>
+
+          <!--
+            La panoramica sta fuori dai pannelli dei tab (che si distruggono): resta montata e, da inattiva, si
+            nasconde senza display:none (romperebbe le misure di ngDiagram) e si rende inerte.
+          -->
+          @if (showOverview()) {
+            <div
+              role="tabpanel"
+              aria-label="Panoramica"
+              class="pt-4"
+              [class]="activeTab() === 'overview' ? 'pt-4' : 'pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden'"
+              [attr.aria-hidden]="activeTab() === 'overview' ? null : 'true'"
+              [attr.inert]="activeTab() === 'overview' ? null : ''"
+            >
+              <app-production-order-overview [orderId]="o.id" [refreshKey]="o.status" />
+            </div>
+          } @else if (activeTab() === 'overview') {
+            <p class="text-muted-foreground pt-4 text-sm">{{ overviewMessage() }}</p>
+          }
         </hlm-tabs>
 
         @if (formOpen()) {
@@ -383,6 +406,20 @@ export class ProductionOrderDetailComponent {
   protected readonly notFound = signal(false);
   protected readonly formOpen = signal(false);
   protected readonly confirm = signal<string | null>(null);
+  /** Scheda scelta dall'utente; finché è null vale il default (Panoramica se c'è qualcosa da mostrare). */
+  protected readonly userTab = signal<string | null>(null);
+
+  /** La panoramica ha senso dal rilascio in poi; un ordine annullato senza lavori non ne ha. */
+  protected readonly showOverview = computed(() => {
+    const o = this.order();
+    return !!o && o.status !== ProductionOrderStatus.Planned && !(o.status === ProductionOrderStatus.Cancelled && !o.workOrders.length);
+  });
+  protected readonly activeTab = computed(() => this.userTab() ?? (this.showOverview() ? 'overview' : 'work'));
+  protected readonly overviewMessage = computed(() =>
+    this.order()?.status === ProductionOrderStatus.Cancelled
+      ? 'L’ordine è stato annullato prima del rilascio: non ci sono lavori da mostrare.'
+      : 'L’ordine non è ancora stato rilasciato: i lavori vengono creati al rilascio',
+  );
 
   protected readonly status = orderStatus;
   protected readonly workStatus = workStatus;
@@ -418,6 +455,7 @@ export class ProductionOrderDetailComponent {
       untracked(() => {
         this.order.set(null);
         this.expanded.set({});
+        this.userTab.set(null);
         if (id) void this.load(id);
       });
     });
