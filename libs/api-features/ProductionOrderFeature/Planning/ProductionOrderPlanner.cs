@@ -182,5 +182,33 @@ public static class ProductionOrderPlanner
         return finish;
     }
 
+    /// <summary>
+    /// Nodes of one longest path (the one that ends at the largest earliest finish), from first to last.
+    /// Ties are broken by the lowest node id so the result is deterministic.
+    /// </summary>
+    public static List<int> CriticalPath(
+        IReadOnlyDictionary<int, decimal> durations,
+        IEnumerable<(int Predecessor, int Successor)> dependencies)
+    {
+        var deps = dependencies.Where(d => durations.ContainsKey(d.Predecessor) && durations.ContainsKey(d.Successor)).ToList();
+        var finish = EarliestFinish(durations, deps);
+        if (finish.Count == 0) return [];
+
+        var path = new List<int>();
+        var current = finish.OrderByDescending(f => f.Value).ThenBy(f => f.Key).First().Key;
+        var guard = durations.Count;
+        while (guard-- > 0)
+        {
+            path.Add(current);
+            var start = finish[current] - durations[current];
+            var previous = deps.Where(d => d.Successor == current && finish[d.Predecessor] == start)
+                .Select(d => d.Predecessor).OrderBy(id => id).Cast<int?>().FirstOrDefault();
+            if (previous is null) break;
+            current = previous.Value;
+        }
+        path.Reverse();
+        return path;
+    }
+
     private sealed class CyclicBomException : Exception;
 }

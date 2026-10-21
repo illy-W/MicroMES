@@ -28,6 +28,7 @@ import type {
   GetProductionOrdersParams,
   ProductionOrderDetailModel,
   ProductionOrderModel,
+  ProductionOrderOverviewModel,
   UpdateProductionOrderRequest
 } from '../model';
 
@@ -283,6 +284,36 @@ export class ProductionOrdersService {
     return this.http.put<TData>(
       `/api/production-orders/${id}`,
       updateProductionOrderRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+      }
+    );
+  }
+ getProductionOrderOverview<TData = ProductionOrderOverviewModel>(id: number, options?: HttpClientBodyOptions): Observable<TData>;
+ getProductionOrderOverview<TData = ProductionOrderOverviewModel>(id: number, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ getProductionOrderOverview<TData = ProductionOrderOverviewModel>(id: number, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  getProductionOrderOverview<TData = ProductionOrderOverviewModel>(
+    id: number, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    if (options?.observe === 'events') {
+      return this.http.get<TData>(
+      `/api/production-orders/${id}/overview`,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+      }
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.get<TData>(
+      `/api/production-orders/${id}/overview`,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+      }
+    );
+    }
+
+    return this.http.get<TData>(
+      `/api/production-orders/${id}/overview`,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'body',
       }

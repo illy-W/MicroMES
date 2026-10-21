@@ -215,6 +215,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -341,6 +351,47 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/production-orders/{id}/overview": {
+      "get": {
+        "tags": [
+          "ProductionOrders"
+        ],
+        "operationId": "GetProductionOrderOverview",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionOrderOverviewModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -2486,6 +2537,211 @@
           }
         }
       },
+      "ProductionOrderOverviewModel": {
+        "required": [
+          "orders",
+          "workOrders",
+          "dependencies",
+          "summary",
+          "generatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionOrderOverviewOrderModel"
+            }
+          },
+          "workOrders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionOrderOverviewWorkOrderModel"
+            }
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderDependencyModel"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ProductionOrderOverviewSummaryModel"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProductionOrderOverviewOrderModel": {
+        "required": [
+          "id",
+          "code",
+          "materialId",
+          "materialCode",
+          "materialName",
+          "unitOfMeasure",
+          "quantity",
+          "status",
+          "producedQuantity",
+          "progressPercent"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "parentOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "materialId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "materialCode": {
+            "type": "string"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "unitOfMeasure": {
+            "$ref": "#/components/schemas/UnitOfMeasure"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProductionOrderStatus"
+          },
+          "producedQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "progressPercent": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ProductionOrderOverviewSummaryModel": {
+        "required": [
+          "totalWorkOrders",
+          "counts",
+          "minimumDurationMinutes",
+          "criticalPathWorkOrderIds",
+          "workContentMinutes",
+          "workedMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "totalWorkOrders": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/WorkOrderStatusCountsModel"
+          },
+          "minimumDurationMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "criticalPathWorkOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "workContentMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "workedMinutes": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ProductionOrderOverviewWorkOrderModel": {
+        "required": [
+          "id",
+          "productionOrderId",
+          "code",
+          "operationNumber",
+          "processSegmentCode",
+          "processSegmentName",
+          "status",
+          "plannedQuantity",
+          "goodQuantity",
+          "scrapQuantity",
+          "plannedMinutes",
+          "workedMinutes",
+          "allowedActions"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productionOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "operationNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "processSegmentCode": {
+            "type": "string"
+          },
+          "processSegmentName": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/WorkOrderStatus"
+          },
+          "plannedQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "goodQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "plannedMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "workedMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "ProductionOrderStatus": {
         "enum": [
           "Planned",
@@ -3513,6 +3769,43 @@
           "Ended",
           "Aborted"
         ]
+      },
+      "WorkOrderStatusCountsModel": {
+        "required": [
+          "waiting",
+          "ready",
+          "running",
+          "interrupted",
+          "ended",
+          "aborted"
+        ],
+        "type": "object",
+        "properties": {
+          "waiting": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ready": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "running": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "interrupted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ended": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "aborted": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       }
     }
   },

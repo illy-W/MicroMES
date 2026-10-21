@@ -10,7 +10,7 @@ namespace MicroMES.ApiFeatures.ProductionOrderFeature.Controllers;
 [Route("api/production-orders")]
 [Tags("ProductionOrders")]
 [Produces("application/json")]
-public class ProductionOrdersController(ProductionOrderService service) : ControllerBase
+public class ProductionOrdersController(ProductionOrderService service, ProductionOrderOverviewService overviewService) : ControllerBase
 {
     [HttpGet(Name = "GetProductionOrders")]
     [ProducesResponseType<List<ProductionOrderModel>>(StatusCodes.Status200OK)]
@@ -26,6 +26,12 @@ public class ProductionOrdersController(ProductionOrderService service) : Contro
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetProductionOrder(int id)
         => ToResponse(await service.GetAsync(id), r => Ok(r.Data));
+
+    [HttpGet("{id:int}/overview", Name = "GetProductionOrderOverview")]
+    [ProducesResponseType<ProductionOrderOverviewModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetProductionOrderOverview(int id)
+        => ToResponse(await overviewService.GetAsync(id), r => Ok(r.Data));
 
     [HttpPost(Name = "CreateProductionOrder")]
     [ProducesResponseType<ProductionOrderDetailModel>(StatusCodes.Status201Created)]

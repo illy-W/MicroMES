@@ -103,6 +103,9 @@ public sealed class ApiClient(HttpClient http)
     public Task<ApiResult<ProductionOrderDetailModel>> GetOrderAsync(int orderId)
         => GetAsync<ProductionOrderDetailModel>($"/api/production-orders/{orderId}");
 
+    public Task<ApiResult<ProductionOrderOverviewModel>> GetOrderOverviewAsync(int orderId)
+        => GetAsync<ProductionOrderOverviewModel>($"/api/production-orders/{orderId}/overview");
+
     public Task<ApiResult<List<ProductionOrderModel>>> GetOrdersAsync(bool includeChildren = true)
         => GetAsync<List<ProductionOrderModel>>($"/api/production-orders?includeChildren={includeChildren.ToString().ToLowerInvariant()}");
 

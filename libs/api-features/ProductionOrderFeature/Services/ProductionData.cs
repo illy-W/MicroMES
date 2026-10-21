@@ -277,4 +277,67 @@ public class ProductionData(TimeProvider timeProvider)
             ScrapQuantity = ownSessions.Sum(s => s.ScrapQuantity)
         };
     }
+
+    /// <summary>Overview of the order and its descendants (flat), reusing the existing duration and progress logic.</summary>
+    public ProductionOrderOverviewModel ToOverview(int orderId)
+    {
+        var orders = Subtree(orderId).OrderBy(o => o.Id).ToList();
+        var orderIds = orders.Select(o => o.Id).ToHashSet();
+        var workOrders = WorkOrders.Values.Where(w => orderIds.Contains(w.ProductionOrderId))
+            .OrderBy(w => w.ProductionOrderId).ThenBy(w => w.OperationNumber).ToList();
+        var woIds = workOrders.Select(w => w.Id).ToHashSet();
+        var deps = Dependencies.Where(d => woIds.Contains(d.PredecessorWorkOrderId) && woIds.Contains(d.SuccessorWorkOrderId))
+            .OrderBy(d => d.Id).ToList();
+
+        var durations = workOrders.ToDictionary(w => w.Id, PlannedMinutes);
+        var pairs = deps.Select(d => (d.PredecessorWorkOrderId, d.SuccessorWorkOrderId)).ToList();
+        var finish = ProductionOrderPlanner.EarliestFinish(durations, pairs);
+
+        int Count(WorkOrderStatus s) => workOrders.Count(w => w.Status == s);
+
+        return new ProductionOrderOverviewModel
+        {
+            Orders = orders.Select(o =>
+            {
+                var m = ToOrderModel(o);
+                return new ProductionOrderOverviewOrderModel
+                {
+                    Id = m.Id, Code = m.Code, ParentOrderId = o.Id == orderId ? null : m.ParentOrderId,
+                    MaterialId = m.MaterialId, MaterialCode = m.MaterialCode, MaterialName = m.MaterialName,
+                    UnitOfMeasure = m.UnitOfMeasure, Quantity = m.Quantity, Status = m.Status,
+                    ProducedQuantity = m.ProducedQuantity, ProgressPercent = m.ProgressPercent
+                };
+            }).ToList(),
+            WorkOrders = workOrders.Select(w =>
+            {
+                var m = ToWorkOrderModel(w);
+                return new ProductionOrderOverviewWorkOrderModel
+                {
+                    Id = m.Id, ProductionOrderId = m.ProductionOrderId, Code = m.Code, OperationNumber = m.OperationNumber,
+                    ProcessSegmentCode = m.ProcessSegmentCode, ProcessSegmentName = m.ProcessSegmentName, Status = m.Status,
+                    PlannedQuantity = m.PlannedQuantity, GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity,
+                    PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes, AllowedActions = m.AllowedActions
+                };
+            }).ToList(),
+            Dependencies = deps.Select(d => new WorkOrderDependencyModel
+            {
+                PredecessorWorkOrderId = d.PredecessorWorkOrderId, SuccessorWorkOrderId = d.SuccessorWorkOrderId
+            }).ToList(),
+            Summary = new ProductionOrderOverviewSummaryModel
+            {
+                TotalWorkOrders = workOrders.Count,
+                Counts = new WorkOrderStatusCountsModel
+                {
+                    Waiting = Count(WorkOrderStatus.Waiting), Ready = Count(WorkOrderStatus.Ready),
+                    Running = Count(WorkOrderStatus.Running), Interrupted = Count(WorkOrderStatus.Interrupted),
+                    Ended = Count(WorkOrderStatus.Ended), Aborted = Count(WorkOrderStatus.Aborted)
+                },
+                MinimumDurationMinutes = finish.Count == 0 ? 0m : finish.Values.Max(),
+                CriticalPathWorkOrderIds = ProductionOrderPlanner.CriticalPath(durations, pairs),
+                WorkContentMinutes = durations.Values.Sum(),
+                WorkedMinutes = workOrders.Sum(w => WorkedMinutes(w.Id))
+            },
+            GeneratedAt = timeProvider.GetUtcNow().UtcDateTime
+        };
+    }
 }

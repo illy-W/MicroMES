@@ -29,6 +29,7 @@ public static class Registrar
         services.AddScoped<ProductionOrderStatusUpdater>();
         services.AddScoped<WorkOrderService>();
         services.AddScoped<ProductionOrderService>();
+        services.AddScoped<ProductionOrderOverviewService>();
         return services;
     }
 }
