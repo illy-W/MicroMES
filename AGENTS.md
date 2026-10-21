@@ -10,6 +10,8 @@ Monorepo Nx (pnpm) con frontend Angular e backend .NET.
 | `apps/api` | `Api` | API ASP.NET Core (`MicroMES.Api`) |
 | `libs/api-features` | `ApiFeatures` | Lib .NET con le feature (`MicroMES.ApiFeatures`) |
 | `libs/api-core` | `ApiCore` | Lib .NET con il core (`MicroMES.ApiCore`) |
+| `libs/api-tests` | `ApiTests` | Test unitari .NET (xUnit, `MicroMES.ApiTests`) |
+| `libs/api-tests-integration` | `ApiTests.Integration` | Test di integrazione .NET (Testcontainers PostgreSQL, richiede Docker) |
 | `libs/ui/*` | `<nome>` (es. `button`) | Componenti spartan helm, generati (alias `@spartan-ng/helm/*`, mai a mano) |
 | `libs/shared/api-client` | `api-client` | Client Angular generato da Orval (`src/generated/**`, mai modificare a mano) |
 | `docker-compose.yml` | - | Database PostgreSQL locale (container `micromes-db`) |
@@ -33,6 +35,7 @@ Node: usa la versione di `.nvmrc`.
 - `npx nx serve web`: avvia il frontend
 - `dotnet run --project apps/api`: avvia l'API
 - `npx nx run api-client:generate-api`: rigenera `openapi/Api.json` e il client Angular (`generate-api:no-build` salta la build dell'API)
+- `npx nx run ApiTests:unit-test`: test unitari backend; `npx nx run ApiTests.Integration:unit-test`: test di integrazione (richiede Docker)
 - `npx nx g @spartan-ng/cli:ui <nome> --no-interactive`: aggiunge un componente spartan in `libs/ui` (poi `npx nx lint <nome> --fix`)
 - `npx nx run Api:db-up` / `npx nx run Api:db-down`: avvia/ferma il database locale
 - Nuova migration: `dotnet tool restore`, poi `dotnet ef migrations add <Nome> --project libs/api-core --startup-project apps/api --output-dir Persistence/Migrations` (applicate all'avvio solo in Development)

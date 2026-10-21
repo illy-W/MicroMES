@@ -10,6 +10,7 @@
       "pnpm install*": "allow",
       "dotnet build*": "allow",
       "dotnet list*": "allow",
+      "dotnet test*": "allow",
       "git commit*": "deny",
       "git push*": "deny"
     }

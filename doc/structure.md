@@ -76,6 +76,13 @@ See `AGENTS.md` for the project table and dependency direction.
 - Frontend: `features/production-orders` (list, detail with children tree) and `features/work-orders` (operational list and commands). Pages show only the actions in `allowedActions`.
 - Sample data: `ProductionOrderDevelopmentSeeder` (Development only, empty `ProductionOrders` table, uses the services). To recreate: stop the dev server, truncate the order tables (`ProductionOrders` with `restart identity cascade`) or reset the DB (see "Local sample data") and restart the API.
 
+### Backend tests
+
+- `libs/api-tests` (`ApiTests`, xUnit + FluentAssertions 7 + NSubstitute): fast unit tests (~1 s). Pure logic (Stateless machines, `ProductionOrderPlanner`) and services on in-memory SQLite (`BaseFeatureFixture`, foreign keys on). Folders per feature, files named `<Subject>Fixture.cs`, test names `Subject_Scenario_Expected`.
+- `libs/api-tests-integration` (`ApiTests.Integration`): a few high-value tests on a **real PostgreSQL** (Testcontainers, `postgres:17.6-alpine`, one container per run, Respawn between tests) through `WebApplicationFactory<Program>`. They cover what SQLite/InMemory cannot: transactions (`IUnitOfWork`), unique indexes, FK `Restrict`, migrations from scratch and the Development seeders. Docker required; the local `micromes-db` container is never used.
+- Run: `npx nx run ApiTests:unit-test`, `npx nx run ApiTests.Integration:unit-test`. Rule: business rules go in unit tests; add an integration test only when the behaviour depends on PostgreSQL or on a transaction.
+- Note: `AllowedActions` of the machines follows the enum order (Stateless 5.20.1 has no non-obsolete sync API to list permitted triggers).
+
 ### Layouts (`apps/web/src/app/core/layouts`)
 
 - `blank`: only a `router-outlet`, for pages without shell. Currently unused.
