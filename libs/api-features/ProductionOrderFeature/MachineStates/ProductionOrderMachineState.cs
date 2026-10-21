@@ -96,7 +96,8 @@ public class ProductionOrderMachineState
     public ProductionOrderStatus Status => _order.Status;
 
     /// <summary>Actions the UI may offer now (Release, Cancel, Abort), service-driven triggers excluded.</summary>
-    public IReadOnlyList<string> AllowedActions => _machine.GetPermittedTriggers()
+    public IReadOnlyList<string> AllowedActions => Enum.GetValues<ProductionOrderTrigger>()
+        .Where(t => _machine.CanFire(t))
         .Where(t => !InternalTriggers.Contains(t))
         .Select(t => t.ToString())
         .ToList();

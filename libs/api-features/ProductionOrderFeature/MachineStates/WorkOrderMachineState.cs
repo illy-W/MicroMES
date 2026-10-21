@@ -114,7 +114,8 @@ public class WorkOrderMachineState
     public WorkOrderStatus Status => _workOrder.Status;
 
     /// <summary>Actions the UI may offer now (single source for the commands), internal triggers excluded.</summary>
-    public IReadOnlyList<string> AllowedActions => _machine.GetPermittedTriggers()
+    public IReadOnlyList<string> AllowedActions => Enum.GetValues<WorkOrderTrigger>()
+        .Where(t => _machine.CanFire(t))
         .Where(t => !InternalTriggers.Contains(t))
         .Select(t => t.ToString())
         .ToList();
