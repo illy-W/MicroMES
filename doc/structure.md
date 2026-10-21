@@ -84,6 +84,11 @@ See `AGENTS.md` for the project table and dependency direction.
 - "Aggiorna" keeps viewport and selection when only statuses/quantities change (`updateNodes`/`updateEdges` on `data`); it re-layouts only when the set of nodes/edges changes. The model is created once (`initializeModel`), never per tab switch; the inactive diagram is hidden with `invisible`/`inert`, never `display:none`.
 - ng-diagram skills (`.agents/skills/ng-diagram-*`) are the guide for diagram work; confirm API names in `node_modules/ng-diagram/ng-diagram.d.ts`.
 
+### BOM-step link
+
+- `BomItem.ConsumedInStepId` (nullable FK to `RoutingStep`, `SetNull`): null means the first start step. Editing happens only on the BOM page; the routing page and the order overview show the components per step read-only.
+- Release: `WorkOrderMaterial` goes on the work order of the effective step; a child order's last work order gates only the consuming work order. Routing `PUT` resets the links of deleted steps in the same transaction and returns `unassignedComponents`; the editor asks confirmation before saving.
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.

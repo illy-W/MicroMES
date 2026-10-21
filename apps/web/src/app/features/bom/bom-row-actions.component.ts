@@ -5,7 +5,7 @@ import type { BomNodeModel } from '@micromes/api-client/models';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 
-/** Menu azioni di una riga di primo livello della distinta (Modifica quantità / Rimuovi). */
+/** Menu azioni di una riga di primo livello della distinta (Modifica / Rimuovi). */
 @Component({
   selector: 'app-bom-row-actions',
   imports: [HlmButton, HlmDropdownMenuImports, NgIcon],
@@ -25,7 +25,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
     <ng-template #menu>
       <hlm-dropdown-menu>
         <hlm-dropdown-menu-group>
-          <button hlmDropdownMenuItem (click)="edit.emit(node())">Modifica quantità</button>
+          <button hlmDropdownMenuItem (click)="edit.emit(node())">Modifica</button>
         </hlm-dropdown-menu-group>
         <hlm-dropdown-menu-separator />
         <hlm-dropdown-menu-group>

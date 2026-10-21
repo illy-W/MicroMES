@@ -47,6 +47,7 @@ const columns = columnHelper.columns([
   columnHelper.accessor((r) => typeLabel(r.type), { id: 'type', header: 'Tipo' }),
   columnHelper.accessor('quantity', { id: 'quantity', header: 'Quantità' }),
   columnHelper.accessor((r) => unitLabel(r.unitOfMeasure), { id: 'unit', header: 'Unità' }),
+  columnHelper.accessor((r) => r.effectiveStep?.id ?? null, { id: 'step', header: 'Usato nel passo' }),
   columnHelper.accessor('isActive', { id: 'status', header: 'Stato' }),
   columnHelper.display({ id: 'actions', header: 'Azioni' }),
 ]);
@@ -181,6 +182,16 @@ const quantityFormat = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 4
                           }
                           @case ('quantity') {
                             {{ formatQuantity(row.original.quantity) }}
+                          }
+                          @case ('step') {
+                            @if (row.original.effectiveStep; as st) {
+                              <span class="whitespace-nowrap">Op. {{ st.operationNumber }} · {{ st.processSegmentName }}</span>
+                              @if (st.isAutomatic) {
+                                <span class="text-muted-foreground ml-1 text-xs">automatico</span>
+                              }
+                            } @else {
+                              <span class="text-muted-foreground">—</span>
+                            }
                           }
                           @case ('status') {
                             <span hlmBadge variant="outline" class="text-muted-foreground px-1.5">

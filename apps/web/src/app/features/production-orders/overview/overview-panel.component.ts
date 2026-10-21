@@ -123,6 +123,23 @@ interface LinkedWork {
               }
             </div>
           </div>
+          <div>
+            <h3 class="text-muted-foreground mb-1 text-xs font-medium">Materiali</h3>
+            @for (m of w.materials; track m.id) {
+              <p class="flex flex-wrap items-baseline gap-x-2 text-sm">
+                <span class="font-medium">{{ m.materialCode }}</span>
+                <span class="text-muted-foreground">{{ m.materialName }}</span>
+                <span class="tabular-nums">{{ qty(m.requiredQuantity) }} {{ unit(m.unitOfMeasure) }}</span>
+                @if (m.childProductionOrderId; as childId) {
+                  <a hlmBtn variant="link" size="sm" class="h-auto p-0 text-xs" [routerLink]="['/production-orders', childId]">
+                    Ordine {{ m.childProductionOrderCode }}
+                  </a>
+                }
+              </p>
+            } @empty {
+              <p class="text-muted-foreground text-sm">Nessun materiale per questo lavoro</p>
+            }
+          </div>
           <div class="flex flex-wrap gap-2">
             <a hlmBtn variant="outline" size="sm" routerLink="/work-orders" [queryParams]="{ order: w.productionOrderId }">
               Apri in Ordini di lavoro

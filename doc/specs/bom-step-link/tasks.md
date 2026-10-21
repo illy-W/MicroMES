@@ -23,12 +23,12 @@
 
 ## Frontend
 
-- [ ] 2.1 [Frontend] Distinta: select «Usato nel passo» (voci «Automatico (Op. N Nome)» e passi «Op. 10 · Nome»), disabilitata con spiegazione se il padre non ha ciclo; colonna nella lista dei componenti; errori 400/409 mostrati con il testo del backend; usare i componenti helm e `itemToString`. _Satisfies: REQ-1, REQ-4_
-- [ ] 2.2 [Frontend] Ciclo: nel pannello del passo l'elenco dei componenti consumati (con link alla distinta); nel nodo l'indicatore compatto con testo accessibile; al salvataggio, se tra i passi eliminati ce ne sono con componenti collegati, conferma prima di inviare («I componenti X, Y tornano al primo passo»); dopo il salvataggio, conferma coerente con `unassignedComponents`. Il diagramma resta montato e in sola lettura di default. _Satisfies: REQ-2, REQ-5_
-- [ ] 2.3 [Frontend] Panoramica: nel pannello laterale del lavoro, materiali richiesti (con link all'ordine figlio per i semilavorati); il caso «nessun materiale» è esplicito. _Satisfies: REQ-5_
-- [ ] 2.4 [Frontend] `npx nx lint web` e `npx nx build web`; verificare i flussi nel browser; riportare cosa non è stato verificato. _Satisfies: REQ-1..REQ-5_
+- [x] 2.1 [Frontend] Distinta: select «Usato nel passo» (voci «Automatico (Op. N Nome)» e passi «Op. 10 · Nome»), disabilitata con spiegazione se il padre non ha ciclo; colonna nella lista dei componenti; errori 400/409 mostrati con il testo del backend; usare i componenti helm e `itemToString`. _Satisfies: REQ-1, REQ-4_
+- [x] 2.2 [Frontend] Ciclo: nel pannello del passo l'elenco dei componenti consumati (con link alla distinta); nel nodo l'indicatore compatto con testo accessibile; al salvataggio, se tra i passi eliminati ce ne sono con componenti collegati, conferma prima di inviare («I componenti X, Y tornano al primo passo»); dopo il salvataggio, conferma coerente con `unassignedComponents`. Il diagramma resta montato e in sola lettura di default. _Satisfies: REQ-2, REQ-5_
+- [x] 2.3 [Frontend] Panoramica: nel pannello laterale del lavoro, materiali richiesti (con link all'ordine figlio per i semilavorati); il caso «nessun materiale» è esplicito. _Satisfies: REQ-5_
+- [x] 2.4 [Frontend] `npx nx lint web` e `npx nx build web`; verificare i flussi nel browser; riportare cosa non è stato verificato. _Satisfies: REQ-1..REQ-5_
 
 ## Lead
 
-- [ ] 3.1 [Lead] Aggiornare `doc/glossary.md` (campo `ConsumedInStepId`, deviazioni, limite «un componente, un passo», riga «Product Definition» tra i «Planned») e `doc/structure.md` (sezione ciclo/BOM e rilascio). _Satisfies: tutti_
-- [ ] 3.2 [Lead] Verifica: `npx nx run-many -t lint build`, test unitari e di integrazione, controllo DOM nel browser di distinta, ciclo e panoramica sui dati del seed, verifica dei criteri di accettazione. _Satisfies: tutti_
+- [x] 3.1 [Lead] Aggiornare `doc/glossary.md` (campo `ConsumedInStepId`, deviazioni, limite «un componente, un passo», riga «Product Definition» tra i «Planned») e `doc/structure.md` (sezione ciclo/BOM e rilascio). _Satisfies: tutti_
+- [x] 3.2 [Lead] Verifica: `npx nx run-many -t lint build`, test unitari e di integrazione, controllo DOM nel browser di distinta, ciclo e panoramica sui dati del seed, verifica dei criteri di accettazione. _Satisfies: tutti_

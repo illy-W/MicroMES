@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideListOrdered, lucidePencil, lucidePlus, lucideTriangleAlert, lucideWorkflow } from '@ng-icons/lucide';
+import { toast } from '@spartan-ng/brain/sonner';
 import type {
   MaterialModel,
   ProcessSegmentModel,
@@ -42,6 +43,7 @@ import {
   type SelectionChangedEvent,
 } from 'ng-diagram';
 import { firstValueFrom, map } from 'rxjs';
+import { unitLabel } from '../materials/material-labels';
 import { toFailure } from '../materials/materials.service';
 import { RoutingEdgeComponent } from './routing-edge.component';
 import { layeredLayout, ROW_SPACING } from './routing-layout';
@@ -341,6 +343,25 @@ function toNumberOrNull(v: string): number | null {
                         <textarea hlmTextarea id="st-notes" maxlength="1000" [value]="s.data.notes ?? ''"
                           (input)="patch(s.id, { notes: text($event) })"></textarea>
                       </div>
+                      <div class="flex flex-col gap-1.5">
+                        <h3 hlmLabel>Componenti consumati</h3>
+                        @for (c of s.data.consumedComponents; track c.bomItemId) {
+                          <p class="flex flex-wrap items-baseline gap-x-2 text-sm">
+                            <span class="font-medium">{{ c.materialCode }}</span>
+                            <span class="text-muted-foreground">{{ c.materialName }}</span>
+                            <span class="tabular-nums">{{ c.quantity }} {{ unit(c.unitOfMeasure) }}</span>
+                            @if (c.isAutomatic) {
+                              <span class="text-muted-foreground text-xs">automatico</span>
+                            }
+                          </p>
+                        } @empty {
+                          <p class="text-muted-foreground text-sm">Nessun componente.</p>
+                        }
+                        <a hlmBtn variant="link" size="sm" class="h-auto w-fit p-0" [routerLink]="['/materials', materialId(), 'bom']">
+                          Apri la distinta base
+                        </a>
+                        <p class="text-muted-foreground text-xs">Il collegamento si modifica dalla distinta base.</p>
+                      </div>
                     </div>
                   </section>
                 } @else {
@@ -366,6 +387,27 @@ function toNumberOrNull(v: string): number | null {
                         <dt class="text-muted-foreground">Note</dt>
                         <dd class="whitespace-pre-wrap">{{ s.data.notes || '—' }}</dd>
                       </dl>
+                      <div class="mt-4">
+                      <div class="flex flex-col gap-1.5">
+                        <h3 class="text-muted-foreground text-sm">Componenti consumati</h3>
+                        @for (c of s.data.consumedComponents; track c.bomItemId) {
+                          <p class="flex flex-wrap items-baseline gap-x-2 text-sm">
+                            <span class="font-medium">{{ c.materialCode }}</span>
+                            <span class="text-muted-foreground">{{ c.materialName }}</span>
+                            <span class="tabular-nums">{{ c.quantity }} {{ unit(c.unitOfMeasure) }}</span>
+                            @if (c.isAutomatic) {
+                              <span class="text-muted-foreground text-xs">automatico</span>
+                            }
+                          </p>
+                        } @empty {
+                          <p class="text-muted-foreground text-sm">Nessun componente.</p>
+                        }
+                        <a hlmBtn variant="link" size="sm" class="h-auto w-fit p-0" [routerLink]="['/materials', materialId(), 'bom']">
+                          Apri la distinta base
+                        </a>
+                        <p class="text-muted-foreground text-xs">Il collegamento si modifica dalla distinta base.</p>
+                      </div>
+                      </div>
                     </div>
                   </section>
                 }
@@ -422,6 +464,25 @@ function toNumberOrNull(v: string): number | null {
       </hlm-alert-dialog>
     }
 
+    @if (deleteConfirm(); as dc) {
+      <hlm-alert-dialog state="open" (closed)="deleteConfirm.set(null)">
+        <ng-template hlmAlertDialogPortal>
+          <hlm-alert-dialog-content>
+            <hlm-alert-dialog-header>
+              <h2 hlmAlertDialogTitle>Eliminare passi con componenti collegati?</h2>
+              <p hlmAlertDialogDescription>
+                I componenti {{ dc.names }} tornano al primo passo.
+              </p>
+            </hlm-alert-dialog-header>
+            <hlm-alert-dialog-footer>
+              <button hlmAlertDialogCancel>Annulla</button>
+              <button hlmBtn type="button" (click)="confirmDelete()">Salva comunque</button>
+            </hlm-alert-dialog-footer>
+          </hlm-alert-dialog-content>
+        </ng-template>
+      </hlm-alert-dialog>
+    }
+
     @if (discardOpen()) {
       <hlm-alert-dialog state="open" (closed)="discardOpen.set(false)">
         <ng-template hlmAlertDialogPortal>
@@ -450,7 +511,7 @@ export class RoutingComponent {
   private readonly diagramService = inject(NgDiagramService);
   private readonly viewState = inject(RoutingViewState);
 
-  private readonly materialId = toSignal(
+  private readonly materialIdParam = toSignal(
     inject(ActivatedRoute).paramMap.pipe(map((p) => Number(p.get('id')))),
     { initialValue: 0 },
   );
@@ -469,6 +530,9 @@ export class RoutingComponent {
   /** Oltre questo numero di passi compare la minimappa. */
   protected readonly showMinimap = computed(() => this.steps().length > 8);
   protected readonly discardOpen = signal(false);
+  protected readonly deleteConfirm = signal<{ names: string; request: UpdateRoutingRequest } | null>(null);
+  protected readonly materialId = computed(() => this.materialIdParam());
+  protected readonly unit = unitLabel;
   protected readonly leaveResolver = signal<((v: boolean) => void) | null>(null);
 
   private readonly version = signal(0);
@@ -578,7 +642,7 @@ export class RoutingComponent {
       this.unregisterGate = null;
     });
     effect(() => {
-      const id = this.materialId();
+      const id = this.materialIdParam();
       untracked(() => {
         if (id) void this.load();
       });
@@ -616,7 +680,7 @@ export class RoutingComponent {
   }
 
   async load(): Promise<void> {
-    const id = this.materialId();
+    const id = this.materialIdParam();
     this.loading.set(true);
     this.loadError.set(null);
     try {
@@ -667,6 +731,7 @@ export class RoutingComponent {
         setupMinutes: s.setupMinutes ?? null,
         runMinutesPerUnit: s.runMinutesPerUnit ?? null,
         notes: s.notes ?? null,
+        consumedComponents: s.consumedComponents ?? [],
       },
     }));
     const modelEdges: Edge[] = routing.dependencies.map((d) => ({
@@ -793,6 +858,7 @@ export class RoutingComponent {
           setupMinutes: null,
           runMinutesPerUnit: null,
           notes: null,
+          consumedComponents: [],
         },
       } satisfies StepNode,
     ]);
@@ -825,11 +891,41 @@ export class RoutingComponent {
       })),
       dependencies: edges.map((e) => ({ predecessorKey: e.source, successorKey: e.target })),
     };
+    const keptIds = new Set(request.steps.map((st) => st.id).filter((i): i is number => i != null));
+    const explicit = (this.serverRouting?.steps ?? [])
+      .filter((st) => !keptIds.has(st.id))
+      .flatMap((st) => (st.consumedComponents ?? []).filter((c) => !c.isAutomatic));
+    if (explicit.length) {
+      this.deleteConfirm.set({ names: explicit.map((c) => c.materialName).join(', '), request });
+      return;
+    }
+    await this.send(request);
+  }
+
+  protected async confirmDelete(): Promise<void> {
+    const dc = this.deleteConfirm();
+    this.deleteConfirm.set(null);
+    if (dc) await this.send(dc.request);
+  }
+
+  private async send(request: UpdateRoutingRequest): Promise<void> {
     this.saving.set(true);
     try {
-      const saved = await firstValueFrom(this.routingApi.updateRouting(this.materialId(), request));
+      const saved = await firstValueFrom(this.routingApi.updateRouting(this.materialIdParam(), request));
       this.applyRouting(saved);
       this.editing.set(false);
+      const un = saved.unassignedComponents ?? [];
+      if (un.length) {
+        toast.info(`Ciclo salvato. I componenti ${un.map((c) => c.materialName).join(', ')} tornano al primo passo.`);
+      } else {
+        toast.success('Ciclo salvato');
+      }
+      // ricarica silenziosa (senza skeleton: il diagramma resta montato) per aggiornare i conteggi dei componenti
+      try {
+        this.applyRouting(await firstValueFrom(this.routingApi.getRouting(this.materialIdParam())));
+      } catch {
+        // la risposta del PUT è già applicata
+      }
     } catch (e) {
       const f = toFailure(e);
       const fields = Object.values(f.fieldErrors);

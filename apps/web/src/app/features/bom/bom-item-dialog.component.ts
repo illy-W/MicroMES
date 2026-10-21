@@ -12,7 +12,7 @@ import { BomStore } from './bom.store';
 const MIN_QUANTITY = 0.0001;
 const MAX_QUANTITY = 99999999999999;
 
-/** Dialog unico: "Aggiungi componente" (senza `item`) o "Modifica quantità" (con `item`). */
+/** Dialog unico: "Aggiungi componente" (senza `item`) o "Modifica componente" (con `item`). */
 @Component({
   selector: 'app-bom-item-dialog',
   imports: [ReactiveFormsModule, HlmDialogImports, HlmSelectImports, HlmButton, HlmInput, HlmLabel],
@@ -23,7 +23,7 @@ const MAX_QUANTITY = 99999999999999;
         <hlm-dialog-content class="sm:max-w-md">
           <form [formGroup]="form" (ngSubmit)="submit()" class="grid gap-4">
             <hlm-dialog-header>
-              <h2 hlmDialogTitle>{{ item() ? 'Modifica quantità' : 'Aggiungi componente' }}</h2>
+              <h2 hlmDialogTitle>{{ item() ? 'Modifica componente' : 'Aggiungi componente' }}</h2>
               <p hlmDialogDescription>
                 @if (item(); as i) {
                   {{ i.code }} — {{ i.name }}
@@ -76,6 +76,28 @@ const MAX_QUANTITY = 99999999999999;
               }
             </div>
 
+            <div class="grid gap-1.5">
+              <label hlmLabel for="b-step">Usato nel passo</label>
+              <hlm-select formControlName="stepChoice" [itemToString]="stepLabel">
+                <hlm-select-trigger class="w-full" buttonId="b-step">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content *hlmSelectPortal>
+                  <hlm-select-item [value]="AUTO">{{ autoLabel() }}</hlm-select-item>
+                  @for (s of steps(); track s.id) {
+                    <hlm-select-item [value]="s.id">{{ s.label }}</hlm-select-item>
+                  }
+                </hlm-select-content>
+              </hlm-select>
+              @if (hasRouting()) {
+                <p class="text-muted-foreground text-xs">Un componente si usa in un solo passo.</p>
+              } @else {
+                <p class="text-muted-foreground text-xs">
+                  Il materiale non ha un ciclo: i componenti vanno al primo passo quando ne definirai uno.
+                </p>
+              }
+            </div>
+
             <hlm-dialog-footer>
               <button hlmBtn type="button" variant="outline" hlmDialogClose>Annulla</button>
               <button hlmBtn type="submit" [disabled]="saving()">
@@ -112,7 +134,32 @@ export class BomItemDialogComponent implements OnInit {
     return m ? `${m.code} - ${m.name}` : String(id);
   };
 
+  protected readonly AUTO = 0;
+
+  protected readonly hasRouting = computed(() => (this.store.routing()?.steps.length ?? 0) > 0);
+
+  /** Passi del ciclo del padre, per numero di operazione. */
+  protected readonly steps = computed(() =>
+    [...(this.store.routing()?.steps ?? [])]
+      .sort((a, b) => a.operationNumber - b.operationNumber)
+      .map((s) => ({ id: s.id, label: `Op. ${s.operationNumber} · ${s.processSegmentName}` })),
+  );
+
+  /** Primo passo di partenza: numero di operazione più basso tra i passi senza predecessori. */
+  protected readonly autoLabel = computed(() => {
+    const r = this.store.routing();
+    if (!r?.steps.length) return 'Automatico';
+    const hasPred = new Set(r.dependencies.map((d) => d.successorStepId));
+    const starts = r.steps.filter((s) => !hasPred.has(s.id));
+    const first = (starts.length ? starts : r.steps).reduce((a, b) => (b.operationNumber < a.operationNumber ? b : a));
+    return `Automatico (Op. ${first.operationNumber} · ${first.processSegmentName})`;
+  });
+
+  protected readonly stepLabel = (id: number): string =>
+    id === this.AUTO ? this.autoLabel() : (this.steps().find((s) => s.id === id)?.label ?? String(id));
+
   protected readonly form = this.fb.group({
+    stepChoice: this.fb.control<number>(0),
     componentId: this.fb.control<number | null>(null),
     quantity: this.fb.control<number | null>(null, [
       Validators.required,
@@ -123,8 +170,9 @@ export class BomItemDialogComponent implements OnInit {
 
   ngOnInit(): void {
     const i = this.item();
+    if (!this.hasRouting()) this.form.controls.stepChoice.disable();
     if (i) {
-      this.form.patchValue({ quantity: i.quantity });
+      this.form.patchValue({ quantity: i.quantity, stepChoice: i.consumedInStepId ?? this.AUTO });
     } else {
       this.form.controls.componentId.addValidators(Validators.required);
       this.form.controls.componentId.updateValueAndValidity();
@@ -146,7 +194,8 @@ export class BomItemDialogComponent implements OnInit {
   protected async submit(): Promise<void> {
     this.form.markAllAsTouched();
     if (this.form.invalid) return;
-    const { componentId, quantity } = this.form.getRawValue();
+    const { componentId, quantity, stepChoice } = this.form.getRawValue();
+    const consumedInStepId = this.hasRouting() && stepChoice !== this.AUTO ? stepChoice : null;
     if (quantity === null) return;
     this.saving.set(true);
     this.formError.set(null);
@@ -154,10 +203,10 @@ export class BomItemDialogComponent implements OnInit {
     try {
       const i = this.item();
       if (i) {
-        await this.store.updateQuantity(i.id, quantity);
+        await this.store.update(i.id, quantity, consumedInStepId);
       } else {
         if (componentId === null) return;
-        await this.store.add(componentId, quantity);
+        await this.store.add(componentId, quantity, consumedInStepId);
       }
       this.saved.emit();
     } catch (e) {
@@ -165,7 +214,7 @@ export class BomItemDialogComponent implements OnInit {
       if (f.status === 422 && Object.keys(f.fieldErrors).length) {
         const { componentMaterialId, ...rest } = f.fieldErrors;
         this.serverErrors.set(componentMaterialId ? { ...rest, componentId: componentMaterialId } : rest);
-        if (!('quantity' in rest) && !componentMaterialId) this.formError.set(f.message);
+        if (!('quantity' in rest) && !componentMaterialId) this.formError.set(Object.values(rest).join(' ') || f.message);
       } else {
         this.formError.set(f.message);
       }

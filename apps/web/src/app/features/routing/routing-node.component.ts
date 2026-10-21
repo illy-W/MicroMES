@@ -1,4 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucidePackage } from '@ng-icons/lucide';
+import type { RoutingStepComponentModel } from '@micromes/api-client/models';
 import { NgDiagramPortComponent, type NgDiagramNodeTemplate, type Node } from 'ng-diagram';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { RoutingViewState } from './routing-view-state';
@@ -14,6 +17,7 @@ export interface StepNodeData {
   setupMinutes: number | null;
   runMinutesPerUnit: number | null;
   notes: string | null;
+  consumedComponents: RoutingStepComponentModel[];
   [key: string]: unknown;
 }
 
@@ -25,7 +29,8 @@ const fmt = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
  */
 @Component({
   selector: 'app-routing-node',
-  imports: [NgDiagramPortComponent, HlmBadge],
+  imports: [NgDiagramPortComponent, HlmBadge, NgIcon],
+  providers: [provideIcons({ lucidePackage })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -46,6 +51,13 @@ const fmt = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
           <span hlmBadge variant="outline" class="px-1 py-0 text-[10px]">modificato</span>
         }
       </span>
+      @if (componentCount() > 0) {
+        <span class="text-muted-foreground flex items-center gap-1 text-xs tabular-nums">
+          <ng-icon name="lucidePackage" aria-hidden="true" />
+          <span aria-hidden="true">{{ componentCount() }}</span>
+          <span class="sr-only">{{ componentCount() === 1 ? '1 componente consumato' : componentCount() + ' componenti consumati' }}</span>
+        </span>
+      }
     </div>
     <ng-diagram-port id="in" side="left" type="target" [class.pointer-events-none]="!view.editing()" />
     <ng-diagram-port id="out" side="right" type="source" [class.pointer-events-none]="!view.editing()" />
@@ -58,6 +70,9 @@ export class RoutingNodeComponent implements NgDiagramNodeTemplate<StepNodeData>
   /** Sul percorso più lungo, solo in lettura. */
   protected readonly critical = computed(() => !this.view.editing() && this.view.criticalNodeIds().has(this.node().id));
 
+  protected componentCount(): number {
+    return this.node().data.consumedComponents.length;
+  }
   protected setup(): number {
     const d = this.node().data;
     return d.setupMinutes ?? d.standardSetup;
