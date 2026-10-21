@@ -76,6 +76,14 @@ See `AGENTS.md` for the project table and dependency direction.
 - Frontend: `features/production-orders` (list, detail with children tree) and `features/work-orders` (operational list and commands). Pages show only the actions in `allowedActions`.
 - Sample data: `ProductionOrderDevelopmentSeeder` (Development only, empty `ProductionOrders` table, uses the services). To recreate: stop the dev server, truncate the order tables (`ProductionOrders` with `restart identity cascade`) or reset the DB (see "Local sample data") and restart the API.
 
+### Order overview (`features/production-orders/overview`)
+
+- Endpoint `GET /api/production-orders/{id}/overview` (`ProductionOrderOverviewService`, read-only, repositories injected directly): the whole family of the order (order + descendants) flat: `orders`, `workOrders`, `dependencies` (including child last step -> parent start steps), `summary` (counters per status, minimum duration, `criticalPathWorkOrderIds`). The requested order has `parentOrderId = null` even if it is a child; a `Planned` order answers 200 with empty work orders.
+- Tab "Panoramica" (first tab of the order detail): read-only ng-diagram. Work orders are node cards; child orders (BOM semi-finished) are **group nodes** (`isGroup`, nested by `groupId` for multilevel BOM); cross-order edges are dashed; the longest path is highlighted (toggle). Selecting a node/group shows a side panel with details and links to `/work-orders?order=<id>` / the child order; no commands.
+- Layout: **ELK.js** (`elkjs@0.11.1`, imported only dynamically from `elkjs/lib/elk.bundled.js`: plain `elkjs` fails with `Could not resolve "web-worker"`, a static import breaks the 1 MB initial budget). Groups are sent to ELK as **nested graphs** (`elk.hierarchyHandling: INCLUDE_CHILDREN`), child positions are relative to the group (add the group's global position), group `size` is written from ELK's result because groups do not grow. Positions are never stored. "Riordina" re-runs the layout, "Adatta" fits the view (capped at 1:1).
+- "Aggiorna" keeps viewport and selection when only statuses/quantities change (`updateNodes`/`updateEdges` on `data`); it re-layouts only when the set of nodes/edges changes. The model is created once (`initializeModel`), never per tab switch; the inactive diagram is hidden with `invisible`/`inert`, never `display:none`.
+- ng-diagram skills (`.agents/skills/ng-diagram-*`) are the guide for diagram work; confirm API names in `node_modules/ng-diagram/ng-diagram.d.ts`.
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.
