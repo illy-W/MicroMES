@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideCircleCheck, lucideCircleOff, lucideCog, lucidePlus, lucideSearch, lucideSearchX, lucideTriangleAlert } from '@ng-icons/lucide';
+import { lucideCircleCheck, lucideCircleOff, lucideCog, lucidePlus, lucideSearch, lucideSearchX, lucideStar, lucideTriangleAlert } from '@ng-icons/lucide';
 import {
   columnVisibilityFeature,
   createColumnHelper,
@@ -70,7 +70,7 @@ const columns = columnHelper.columns([
     FlexRender,
     EquipmentFormDialogComponent,
   ],
-  providers: [provideIcons({ lucideCircleCheck, lucideCircleOff, lucideCog, lucidePlus, lucideSearch, lucideSearchX, lucideTriangleAlert })],
+  providers: [provideIcons({ lucideCircleCheck, lucideCircleOff, lucideCog, lucidePlus, lucideSearch, lucideSearchX, lucideStar, lucideTriangleAlert })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col gap-4 p-4">
@@ -177,12 +177,19 @@ const columns = columnHelper.columns([
                             @if (row.original.processSegments.length) {
                               <span class="flex flex-wrap gap-1">
                                 @for (p of row.original.processSegments; track p.id) {
-                                  <span class="inline-flex items-center gap-1">
+                                  @if (p.isDefault) {
+                                    <span
+                                      hlmBadge
+                                      variant="outline"
+                                      class="border-primary/40 bg-primary/10 text-primary gap-1 font-semibold"
+                                      title="Fase con questa macchina predefinita"
+                                    >
+                                      <ng-icon name="lucideStar" class="size-3 fill-current" aria-hidden="true" />
+                                      {{ p.code }}<span class="sr-only">, predefinita</span>
+                                    </span>
+                                  } @else {
                                     <span hlmBadge variant="secondary">{{ p.code }}</span>
-                                    @if (p.isDefault) {
-                                      <span hlmBadge variant="outline" class="px-1.5">predefinita</span>
-                                    }
-                                  </span>
+                                  }
                                 }
                               </span>
                             } @else {
@@ -218,6 +225,7 @@ const columns = columnHelper.columns([
               </tbody>
             </table>
           </div>
+          <p class="text-muted-foreground mt-2 text-xs">Evidenziata = macchina predefinita della fase</p>
         </div>
         <div class="mt-4 flex flex-col justify-between sm:flex-row sm:items-center">
           <span class="text-muted-foreground text-sm tabular-nums" aria-live="polite">
