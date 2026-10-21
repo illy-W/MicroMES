@@ -1,0 +1,16 @@
+{
+  "name": "@spartan-ng/helm/calendar",
+  "version": "0.0.1",
+  "peerDependencies": {
+    "@angular/common": "^22.1.0",
+    "@angular/core": "^22.1.0",
+    "@ng-icons/core": "33.2.2",
+    "@ng-icons/lucide": "33.2.2",
+    "@spartan-ng/brain": "1.5.0",
+    "@spartan-ng/helm/button": "0.0.1",
+    "@spartan-ng/helm/select": "0.0.1",
+    "@spartan-ng/helm/utils": "0.0.1"
+  },
+  "sideEffects": false,
+  "private": true
+}

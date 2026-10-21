@@ -30,6 +30,7 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { toFailure } from '../../materials/materials.service';
 import { WORK_STATUS } from '../production-order-labels';
+import { EstimatedEndComponent } from '../estimated-end.component';
 import { OverviewEdgeComponent } from './overview-edge.component';
 import { layoutOverview } from './overview-layout';
 import {
@@ -87,6 +88,7 @@ type DiagramModel = ReturnType<typeof initializeModel>;
     HlmSkeleton,
     HlmSwitch,
     NgIcon,
+    EstimatedEndComponent,
   ],
   providers: [
     provideNgDiagram(),
@@ -157,6 +159,11 @@ type DiagramModel = ReturnType<typeof initializeModel>;
                 <dt class="text-muted-foreground">Durata minima</dt>
                 <dd class="font-semibold tabular-nums">{{ s.minimumDuration }}</dd>
               </div>
+              @if (ov.summary.estimatedEnd) {
+                <div class="text-sm">
+                  <app-estimated-end [estimatedEnd]="ov.summary.estimatedEnd" [requestedEnd]="requestedEnd()" />
+                </div>
+              }
             </dl>
             <div class="flex items-center gap-3">
               <span class="text-muted-foreground text-xs" role="status">Aggiornato alle {{ updatedAt() }}</span>
@@ -239,6 +246,8 @@ export class ProductionOrderOverviewComponent {
   readonly orderId = input.required<number>();
   /** Cambia quando la pagina ricarica l'ordine con un nuovo stato: ricarica la panoramica in place. */
   readonly refreshKey = input<string>('');
+  /** Data di fine richiesta dell'ordine (per segnalare una stima oltre la scadenza). */
+  readonly requestedEnd = input<string | null | undefined>(null);
 
   protected readonly overview = signal<ProductionOrderOverviewModel | null>(null);
   protected readonly model = signal<DiagramModel | null>(null);

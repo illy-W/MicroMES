@@ -105,6 +105,13 @@ See `AGENTS.md` for the project table and dependency direction.
 - `POST start/resume` accept an optional body `OpenSessionRequest {equipmentId}`: without body start uses the assigned machine and resume the last session's; required only if the phase has active linked machines; the work order's assignment follows the machine used; the session keeps a code/name snapshot. Corrections may change the machine (trace in the correction record).
 - Web: one dialog (`work-order-machine-dialog`) for start, resume and assign; shown only when the phase has machines; "in uso" is computed client side from the Running work orders (no endpoint).
 
+### Work calendars
+
+- `CalendarFeature`: `WorkingTimeCalculator` is pure (no database) and works on an availability abstraction (`IAvailabilitySource` / `EffectiveAvailability` built by `AvailabilityResolver` from the calendar slots plus calendar and equipment exceptions); it handles the company time zone, DST (a slot inside the non-existent spring hour counts 0) and a 731-day horizon with an explicit error. Efficiency is applied only in calculations (preview, estimate), never to stored planned minutes.
+- The migration creates the default calendar `STANDARD` (08-12/13-17 Mon-Fri) if missing; a filtered unique index keeps exactly one default. `CalendarDevelopmentSeeder` runs in its own scope after the master data and fills `DOPPIO-TURNO`, Italian holidays (current and next year, Easter computed), a summer closure and machine examples.
+- `estimatedEnd` (order detail and overview summary) comes from `ProductionEndEstimator`: open work orders only, each starts when its open predecessors end (not before now), running ones count the remaining minutes, machine calendar and efficiency applied, the latest end wins. It ignores capacity conflicts and is never stored.
+- Web: `features/calendars` (list, weekly editor, exceptions with the spartan calendar, month/week read-only view built with helm and own grid, Italian holidays import) and the machine detail inside `features/equipment`. The initial bundle is above the 500 kB warning (CSS from Tailwind grows with utilities); new pages stay in lazy chunks.
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.

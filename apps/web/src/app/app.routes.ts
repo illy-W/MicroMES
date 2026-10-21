@@ -32,6 +32,10 @@ export const appRoutes: Route[] = [
         loadComponent: () => import('./features/equipment/equipment.component').then((m) => m.EquipmentComponent),
       },
       {
+        path: 'calendars',
+        loadComponent: () => import('./features/calendars/calendars.component').then((m) => m.CalendarsComponent),
+      },
+      {
         path: 'scrap-reasons',
         loadComponent: () =>
           import('./features/scrap-reasons/scrap-reasons.component').then((m) => m.ScrapReasonsComponent),

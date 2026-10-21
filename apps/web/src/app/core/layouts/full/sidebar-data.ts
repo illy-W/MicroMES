@@ -21,6 +21,7 @@ export const sidebarSections: NavSection[] = [
       { id: 'materials', displayName: 'Materiali', iconName: 'lucidePackage', route: '/materials' },
       { id: 'process-segments', displayName: 'Fasi di processo', iconName: 'lucideWorkflow', route: '/process-segments' },
       { id: 'equipment', displayName: 'Macchine e postazioni', iconName: 'lucideCog', route: '/equipment' },
+      { id: 'calendars', displayName: 'Calendari', iconName: 'lucideCalendarDays', route: '/calendars' },
       { id: 'scrap-reasons', displayName: 'Motivi di scarto', iconName: 'lucideTags', route: '/scrap-reasons' },
     ],
   },

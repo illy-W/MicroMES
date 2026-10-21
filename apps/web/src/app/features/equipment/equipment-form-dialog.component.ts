@@ -1,20 +1,23 @@
-import { ChangeDetectionStrategy, Component, inject, input, OnInit, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import type { EquipmentModel } from '@micromes/api-client/models';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmSwitch } from '@spartan-ng/helm/switch';
 import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { LinkedItemsPickerComponent } from '../../shared/components/linked-items-picker.component';
+import { CalendarsStore } from '../calendars/calendars.store';
+import { formatHours } from '../calendars/calendar-time';
 import { toFailure } from '../materials/materials.service';
 import { ProcessSegmentsStore } from '../process-segments/process-segments.store';
 import { EquipmentStore } from './equipment.store';
 
 @Component({
   selector: 'app-equipment-form-dialog',
-  imports: [ReactiveFormsModule, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSwitch, HlmTextarea, LinkedItemsPickerComponent],
+  imports: [ReactiveFormsModule, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSelectImports, HlmSwitch, HlmTextarea, LinkedItemsPickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-dialog state="open" (closed)="closed.emit()">
@@ -54,6 +57,42 @@ import { EquipmentStore } from './equipment.store';
               }
             </div>
 
+            <div class="grid gap-1.5">
+              <label hlmLabel for="eq-cal">Calendario di lavoro</label>
+              <hlm-select [value]="calendarSel()" [itemToString]="calendarLabel" (valueChange)="calendarSel.set($event ?? 0)">
+                <hlm-select-trigger id="eq-cal" class="w-full" aria-label="Calendario di lavoro">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content *hlmSelectPortal>
+                  <hlm-select-item [value]="0">Predefinito aziendale</hlm-select-item>
+                  @for (c of calendarOptions(); track c.id) {
+                    <hlm-select-item [value]="c.id">{{ c.name }} · {{ hours(c.weeklyHours) }}/sett.{{ c.isActive ? '' : ' (disattivato)' }}</hlm-select-item>
+                  }
+                </hlm-select-content>
+              </hlm-select>
+              @if (fieldError('workCalendarId'); as e) {
+                <p class="text-destructive text-xs" role="alert">{{ e }}</p>
+              }
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="grid gap-1.5">
+                <label hlmLabel for="eq-cap">Capacità</label>
+                <input hlmInput id="eq-cap" type="number" min="1" max="1000" step="1" formControlName="capacity" [attr.aria-invalid]="fieldError('capacity') ? true : null" aria-describedby="eq-cap-hint" />
+                <p id="eq-cap-hint" class="text-muted-foreground text-xs">Numero di lavorazioni simultanee.</p>
+                @if (fieldError('capacity'); as e) {
+                  <p class="text-destructive text-xs" role="alert">{{ e }}</p>
+                }
+              </div>
+              <div class="grid gap-1.5">
+                <label hlmLabel for="eq-eff">Efficienza (%)</label>
+                <input hlmInput id="eq-eff" type="number" min="1" max="1000" step="1" formControlName="efficiencyPercent" [attr.aria-invalid]="fieldError('efficiencyPercent') ? true : null" aria-describedby="eq-eff-hint" />
+                <p id="eq-eff-hint" class="text-muted-foreground text-xs">80% = più lenta dello standard, 120% = più veloce.</p>
+                @if (fieldError('efficiencyPercent'); as e) {
+                  <p class="text-destructive text-xs" role="alert">{{ e }}</p>
+                }
+              </div>
+            </div>
+
             <app-linked-items-picker
               legend="Fasi di processo"
               hint="Nessuna fase selezionata = la macchina non viene offerta per nessuna fase."
@@ -89,6 +128,7 @@ export class EquipmentFormDialogComponent implements OnInit {
   private readonly fb = inject(FormBuilder).nonNullable;
   private readonly store = inject(EquipmentStore);
   protected readonly segments = inject(ProcessSegmentsStore);
+  private readonly calendars = inject(CalendarsStore);
 
   readonly equipment = input<EquipmentModel | null>(null);
   readonly saved = output<void>();
@@ -99,18 +139,31 @@ export class EquipmentFormDialogComponent implements OnInit {
   private readonly serverErrors = signal<Record<string, string>>({});
   protected readonly selected = signal<ReadonlySet<number>>(new Set());
 
+  /** 0 = predefinito aziendale (workCalendarId null). */
+  protected readonly calendarSel = signal(0);
+  protected readonly calendarOptions = computed(() => {
+    const current = this.equipment()?.workCalendarId;
+    return this.calendars.items().filter((c) => c.isActive || c.id === current);
+  });
+  protected readonly hours = (weekly: number): string => formatHours(weekly * 60);
+  protected readonly calendarLabel = (v: number | null): string => (v ? (this.calendars.items().find((c) => c.id === v)?.name ?? '') : 'Predefinito aziendale');
+
   protected readonly form = this.fb.group({
     code: ['', [Validators.required, Validators.maxLength(50)]],
     name: ['', [Validators.required, Validators.maxLength(200)]],
     description: ['', Validators.maxLength(1000)],
     isActive: [true],
+    capacity: [1, [Validators.required, Validators.min(1), Validators.max(1000)]],
+    efficiencyPercent: [100, [Validators.required, Validators.min(0.01), Validators.max(1000)]],
   });
 
   ngOnInit(): void {
     void this.segments.load();
+    void this.calendars.load();
     const e = this.equipment();
     if (e) {
-      this.form.patchValue({ code: e.code, name: e.name, description: e.description ?? '', isActive: e.isActive });
+      this.form.patchValue({ code: e.code, name: e.name, description: e.description ?? '', isActive: e.isActive, capacity: e.capacity, efficiencyPercent: e.efficiencyPercent });
+      this.calendarSel.set(e.workCalendarId ?? 0);
       this.selected.set(new Set(e.processSegments.map((s) => s.id)));
     }
   }
@@ -123,6 +176,8 @@ export class EquipmentFormDialogComponent implements OnInit {
     if (c.hasError('required')) return 'Campo obbligatorio';
     const max = c.getError('maxlength');
     if (max) return `Massimo ${max.requiredLength} caratteri`;
+    if (c.hasError('min')) return name === 'capacity' ? 'Almeno 1' : 'Deve essere maggiore di 0';
+    if (c.hasError('max')) return 'Valore troppo alto (massimo 1000)';
     return null;
   }
 
@@ -135,6 +190,10 @@ export class EquipmentFormDialogComponent implements OnInit {
       name: v.name.trim(),
       description: v.description.trim() || null,
       processSegmentIds: [...this.selected()],
+      // Sempre inviati: sull'aggiornamento un workCalendarId assente reimposterebbe il predefinito.
+      workCalendarId: this.calendarSel() || null,
+      capacity: Math.trunc(v.capacity),
+      efficiencyPercent: v.efficiencyPercent,
     };
     this.saving.set(true);
     this.formError.set(null);

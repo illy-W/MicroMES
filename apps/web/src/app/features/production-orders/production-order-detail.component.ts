@@ -42,6 +42,7 @@ import { map } from 'rxjs';
 import { unitLabel } from '../materials/material-labels';
 import { toFailure } from '../materials/materials.service';
 import { formatMinutes } from '../routing/routing-metrics';
+import { EstimatedEndComponent } from './estimated-end.component';
 import { ProductionOrderOverviewComponent } from './overview/overview.component';
 import { ProductionOrderConfirmDialogComponent } from './production-order-confirm-dialog.component';
 import { ProductionOrderFormDialogComponent } from './production-order-form-dialog.component';
@@ -77,6 +78,7 @@ const columns = columnHelper.columns([
     ProductionOrderFormDialogComponent,
     ProductionOrderConfirmDialogComponent,
     ProductionOrderOverviewComponent,
+    EstimatedEndComponent,
   ],
   providers: [
     provideIcons({
@@ -142,6 +144,9 @@ const columns = columnHelper.columns([
             <p class="text-muted-foreground text-sm tabular-nums">
               Priorità {{ o.priority }} · Inizio richiesto {{ date(o.requestedStart) }} · Fine richiesta {{ date(o.requestedEnd) }}
             </p>
+            @if (o.estimatedEnd) {
+              <p class="text-sm"><app-estimated-end [estimatedEnd]="o.estimatedEnd" [requestedEnd]="o.requestedEnd" /></p>
+            }
             @if (o.parentOrderId) {
               <p class="text-muted-foreground text-sm">
                 Ordine figlio di
@@ -395,7 +400,7 @@ const columns = columnHelper.columns([
               [attr.aria-hidden]="activeTab() === 'overview' ? null : 'true'"
               [attr.inert]="activeTab() === 'overview' ? null : ''"
             >
-              <app-production-order-overview [orderId]="o.id" [refreshKey]="o.status" />
+              <app-production-order-overview [orderId]="o.id" [refreshKey]="o.status" [requestedEnd]="o.requestedEnd" />
             </div>
           } @else if (activeTab() === 'overview') {
             <p class="text-muted-foreground pt-4 text-sm">{{ overviewMessage() }}</p>

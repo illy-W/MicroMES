@@ -32,6 +32,7 @@ import { HlmSwitch } from '@spartan-ng/helm/switch';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { TablePaginatorComponent } from '../../shared/components/table-paginator.component';
 import { EquipmentRowActionsComponent } from './equipment-row-actions.component';
+import { EquipmentDetailComponent } from './equipment-detail.component';
 import { EquipmentFormDialogComponent } from './equipment-form-dialog.component';
 import { toFailure } from '../materials/materials.service';
 import { EquipmentStore } from './equipment.store';
@@ -48,6 +49,7 @@ const columns = columnHelper.columns([
   columnHelper.accessor('code', { id: 'code', header: 'Codice' }),
   columnHelper.accessor('name', { id: 'name', header: 'Nome' }),
   columnHelper.display({ id: 'phases', header: 'Fasi' }),
+  columnHelper.display({ id: 'planning', header: 'Pianificazione' }),
   columnHelper.accessor('isActive', { id: 'status', header: 'Stato' }),
   columnHelper.display({ id: 'actions', header: 'Azioni' }),
 ]);
@@ -69,11 +71,15 @@ const columns = columnHelper.columns([
     NgIcon,
     FlexRender,
     EquipmentFormDialogComponent,
+    EquipmentDetailComponent,
   ],
   providers: [provideIcons({ lucideCircleCheck, lucideCircleOff, lucideCog, lucidePlus, lucideSearch, lucideSearchX, lucideStar, lucideTriangleAlert })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col gap-4 p-4">
+      @if (detail(); as m) {
+        <app-equipment-detail [equipment]="m" (back)="detailId.set(null)" (edit)="openEdit($event)" />
+      } @else {
       <div class="flex items-start justify-between gap-4">
         <div class="flex flex-col gap-1">
           <h1 class="text-xl font-semibold">Macchine e postazioni</h1>
@@ -196,6 +202,11 @@ const columns = columnHelper.columns([
                               <span class="text-muted-foreground">Nessuna fase</span>
                             }
                           }
+                          @case ('planning') {
+                            <span class="text-muted-foreground text-xs">
+                              {{ planning(row.original) }}
+                            </span>
+                          }
                           @case ('status') {
                             <span hlmBadge variant="outline" class="text-muted-foreground px-1.5">
                               @if (row.original.isActive) {
@@ -208,6 +219,7 @@ const columns = columnHelper.columns([
                           @case ('actions') {
                             <app-equipment-row-actions
                               [equipment]="row.original"
+                              (open)="detailId.set($event.id)"
                               (edit)="openEdit($event)"
                               (deactivate)="askDeactivate($event)"
                             />
@@ -233,6 +245,7 @@ const columns = columnHelper.columns([
           </span>
           <div table-paginator [table]="table"></div>
         </div>
+      }
       }
     </div>
 
@@ -274,6 +287,8 @@ export class EquipmentComponent implements OnInit {
 
   protected readonly search = signal('');
   protected readonly showInactive = signal(false);
+  protected readonly detailId = signal<number | null>(null);
+  protected readonly detail = computed(() => this.store.items().find((m) => m.id === this.detailId()) ?? null);
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<EquipmentModel | null>(null);
   protected readonly toDeactivate = signal<EquipmentModel | null>(null);
@@ -318,6 +333,14 @@ export class EquipmentComponent implements OnInit {
 
   ngOnInit(): void {
     void this.store.load();
+  }
+
+  /** Info compatta: calendario (o «Predefinito»), efficienza se diversa da 100, capacità se maggiore di 1. */
+  protected planning(m: EquipmentModel): string {
+    const parts = [m.workCalendarId ? (m.effectiveCalendar?.name ?? 'Calendario proprio') : 'Predefinito'];
+    if (m.efficiencyPercent !== 100) parts.push(`efficienza ${m.efficiencyPercent}%`);
+    if (m.capacity > 1) parts.push(`capacità ${m.capacity}`);
+    return parts.join(' · ');
   }
 
   protected cellClass(id: string): string {

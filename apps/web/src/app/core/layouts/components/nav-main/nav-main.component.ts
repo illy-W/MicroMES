@@ -9,6 +9,7 @@ import {
   lucideListChecks,
   lucidePackage,
   lucideTags,
+  lucideCalendarDays,
   lucideWorkflow,
 } from '@ng-icons/lucide';
 import { HlmSidebarImports } from '@spartan-ng/helm/sidebar';
@@ -26,6 +27,7 @@ import { NavSection } from '../../models/nav-item.model';
       lucideListChecks,
       lucidePackage,
       lucideTags,
+      lucideCalendarDays,
       lucideWorkflow,
     }),
   ],
