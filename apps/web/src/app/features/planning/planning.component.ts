@@ -14,7 +14,7 @@ import { PlanningStore } from './planning.store';
   providers: [provideIcons({ lucideRefreshCw, lucideWand })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex h-[calc(100svh-8rem)] min-h-[32rem] flex-col gap-3">
+    <div class="-mx-2 flex min-w-0 h-[calc(100svh-8rem)] min-h-[32rem] flex-col gap-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h1 class="text-xl font-semibold" title="Assegna macchine e date ai lavori aperti, con anteprima prima di applicare.">Pianificazione</h1>
         <div class="flex flex-wrap items-center gap-2">
@@ -28,7 +28,7 @@ import { PlanningStore } from './planning.store';
         </div>
       </div>
 
-      <app-planning-timeline class="flex min-h-0 flex-1 flex-col" />
+      <app-planning-timeline class="flex min-h-0 min-w-0 flex-1 flex-col" />
     </div>
 
     @if (dialogScope(); as s) {

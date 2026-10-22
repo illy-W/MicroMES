@@ -43,9 +43,10 @@ import { type DepLink, PlanningWorkPanelComponent } from './planning-work-panel.
 import { PlanningStore } from './planning.store';
 import { CHIP_EXTRA_CODE, CHIP_EXTRA_FULL, estimateTextWidth, fitLeftChip, LABEL_INSIDE_MIN, placeLabel } from './bar-label';
 import { type Axis, buildAxis, centreTime, clampSpan, commonClosedRanges, type Range, scrollForCentre, visibleTimeRange } from './timeline-axis';
+import { adaptiveDayPph, dayAxisHours, shouldAutoScale } from './adaptive-scale';
 import { capRange, formatAt, initialRange, loadedUnion, parseAt, planCover, planExtension, resolveLanes } from './timeline-nav';
 import { detailLevel, operationNumber, orderColor, STATUS_STYLE } from './timeline-style';
-import { dayKey, daysBetween, dayStart, formatDateTime, formatDay, formatDuration, formatRangeTitle, formatWeekday, HOUR, hourLabel } from './timeline-time';
+import { dayKey, daysBetween, dayStart, formatDateTime, formatDay, formatDuration, formatRangeTitle, formatWeekday, HOUR, hourLabel, startOfDay } from './timeline-time';
 
 type Zoom = 'day' | 'week' | 'month';
 const ZOOMS: { value: Zoom; label: string }[] = [
@@ -56,7 +57,7 @@ const ZOOMS: { value: Zoom; label: string }[] = [
 /** Pixel per ora (di asse, cioè lavorativa quando il tempo chiuso è compresso) di default per ogni zoom. */
 const DEFAULT_PPH: Record<Zoom, number> = { day: 90, week: 28, month: 10 };
 const PPH_MIN = 6;
-const PPH_MAX = 80;
+const PPH_MAX = 260;
 const LEFT = 224;
 /** Altezza di una corsia (barra 44 + 4 di spazio). */
 const LANE_H = 48;
@@ -185,7 +186,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="bg-card text-card-foreground flex min-h-0 flex-1 flex-col gap-2 rounded-xl border p-2" aria-label="Timeline di pianificazione">
+    <section class="bg-card text-card-foreground flex min-h-0 min-w-0 flex-1 flex-col gap-2 rounded-xl border p-2" aria-label="Timeline di pianificazione">
       <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <div class="bg-muted inline-flex gap-0.5 rounded-md p-0.5" role="group" aria-label="Zoom">
           @for (z of zooms; track z.value) {
@@ -326,7 +327,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           @for (i of [1, 2, 3, 4]; track i) { <hlm-skeleton class="h-14 w-full" /> }
         </div>
       } @else {
-        <div class="flex min-h-0 flex-1 gap-2" [attr.aria-busy]="loading()">
+        <div class="flex min-h-0 min-w-0 flex-1 gap-2" [attr.aria-busy]="loading()">
           <div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
             @if (loadingLeft() || errorLeft()) {
               <div class="bg-card/90 text-muted-foreground pointer-events-none absolute z-30 flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs shadow-xs" [style.left.px]="LEFT + 8" [style.top.px]="headH() + 8" role="status">
@@ -596,6 +597,8 @@ export class PlanningTimelineComponent {
   /** Densità orizzontale (px per ora d'asse). */
   protected readonly pph = signal(DEFAULT_PPH[this.zoom()]);
   protected readonly collapse = signal(true);
+  /** `true` dopo una regolazione manuale −/+: la scala adattiva del Giorno resta ferma finché si clicca di nuovo 'Giorno'. */
+  private readonly manualPph = signal(false);
   /** Ordine evidenziato dalla legenda (clic) e ordine sotto il mouse: gli altri vengono attenuati. */
   protected readonly highlight = signal<number | null>(null);
   protected readonly hoverOrder = signal<number | null>(null);
@@ -1124,6 +1127,7 @@ export class PlanningTimelineComponent {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private visTimer: ReturnType<typeof setTimeout> | undefined;
   private atTimer: ReturnType<typeof setTimeout> | undefined;
+  private rescaleTimer: ReturnType<typeof setTimeout> | undefined;
   private first = true;
   /** Durante un riposizionamento programmato (zoom, nuova ancora) gli eventi di scroll transitori vengono ignorati. */
   private anchoring = false;
@@ -1137,11 +1141,14 @@ export class PlanningTimelineComponent {
       clearTimeout(this.timer);
       clearTimeout(this.visTimer);
       clearTimeout(this.atTimer);
+      clearTimeout(this.rescaleTimer);
     });
 
     const ro = new ResizeObserver(([e]) => {
       this.hostW.set(Math.round(e.contentRect.width));
       setTimeout(() => this.onScroll());
+      clearTimeout(this.rescaleTimer);
+      this.rescaleTimer = setTimeout(() => this.rescale(), 150);
     });
     ro.observe(this.host.nativeElement);
     this.hostW.set(this.host.nativeElement.clientWidth);
@@ -1166,6 +1173,16 @@ export class PlanningTimelineComponent {
         }
         clearTimeout(this.timer);
         this.timer = setTimeout(() => void this.reloadLoaded(), 250);
+      });
+    });
+
+    // Caricamento iniziale, compressione o macchine cambiati: riallinea la scala adattiva del Giorno.
+    effect(() => {
+      this.closed();
+      this.collapse();
+      untracked(() => {
+        clearTimeout(this.rescaleTimer);
+        this.rescaleTimer = setTimeout(() => this.rescale(), 60);
       });
     });
 
@@ -1535,6 +1552,15 @@ export class PlanningTimelineComponent {
     this.checkExtend();
   }
 
+  /** Ricalcola la scala adattiva del Giorno (resize, pannello laterale), solo in modalità automatica. */
+  private rescale(): void {
+    const el = this.scroller()?.nativeElement;
+    if (!el) return;
+    if (!shouldAutoScale(this.zoom(), this.manualPph())) return;
+    const next = this.adaptivePph();
+    if (next != null && next !== this.pph()) this.withAnchor(() => this.pph.set(next));
+  }
+
   private updateVisible(): void {
     const el = this.scroller()?.nativeElement;
     if (!el || !this.loaded()) return;
@@ -1583,10 +1609,27 @@ export class PlanningTimelineComponent {
   protected setZoom(z: Zoom): void {
     this.withAnchor(() => {
       this.zoom.set(z);
-      this.pph.set(DEFAULT_PPH[z]);
+      this.manualPph.set(false);
+      this.pph.set(z === 'day' ? (this.adaptivePph() ?? 90) : DEFAULT_PPH[z]);
     });
   }
+  /**
+   * Scala del Giorno: un giorno lavorativo intero (quello al centro del viewport, non una media) riempie la larghezza utile.
+   * Ore = 24 h meno gli intervalli compressi dai soli calendari; con compressione spenta l'asse è lineare, quindi 24 h.
+   */
+  private adaptivePph(): number | null {
+    const el = this.scroller()?.nativeElement;
+    if (!el || !this.loaded()) return null;
+    const usable = el.clientWidth - LEFT;
+    const tz = this.tz();
+    const c = centreTime(this.axis(), el.scrollLeft, usable);
+    const start = startOfDay(c, tz);
+    const end = startOfDay(start + 36 * HOUR, tz);
+    const { hours, seps } = dayAxisHours({ start, end }, this.closed());
+    return adaptiveDayPph(usable, hours, seps, SEP_W);
+  }
   protected density(dir: 1 | -1): void {
+    this.manualPph.set(true);
     this.withAnchor(() => this.pph.update((p) => clampPph(dir > 0 ? p * 1.25 : p / 1.25)));
   }
   protected toggleCollapse(): void {
