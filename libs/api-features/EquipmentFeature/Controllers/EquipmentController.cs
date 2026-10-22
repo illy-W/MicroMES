@@ -9,7 +9,7 @@ namespace MicroMES.ApiFeatures.EquipmentFeature.Controllers;
 [Route("api/equipment")]
 [Tags("Equipment")]
 [Produces("application/json")]
-public class EquipmentController(EquipmentService service) : ControllerBase
+public class EquipmentController(EquipmentService service, IEnumerable<IEquipmentDetailEnricher> enrichers) : ControllerBase
 {
     /// <summary>With processSegmentId only the machines enabled for that segment; search matches code or name.</summary>
     [HttpGet(Name = "GetEquipmentList")]
@@ -22,7 +22,12 @@ public class EquipmentController(EquipmentService service) : ControllerBase
     [ProducesResponseType<EquipmentModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetEquipment(int id)
-        => ToResponse(await service.GetAsync(id), r => Ok(r.Data));
+    {
+        var result = await service.GetAsync(id);
+        if (result.IsSuccessful && result.Data is { } model)
+            foreach (var enricher in enrichers) await enricher.EnrichAsync(model);
+        return ToResponse(result, r => Ok(r.Data));
+    }
 
     [HttpPost(Name = "CreateEquipment")]
     [ProducesResponseType<EquipmentModel>(StatusCodes.Status201Created)]

@@ -13,6 +13,19 @@ public class EquipmentSegmentModel
     public required bool IsDefault { get; set; }
 }
 
+/// <summary>Tooling usable on a machine (detail of the machine only).</summary>
+public class EquipmentToolingModel
+{
+    public required int Id { get; set; }
+    public required string Code { get; set; }
+    public required string Name { get; set; }
+    public required int Quantity { get; set; }
+    public required int SetupMinutes { get; set; }
+    public required bool IsActive { get; set; }
+    /// <summary>True when the tooling is mounted on the machine now (same rule as the overview mounted state).</summary>
+    public required bool IsMountedNow { get; set; }
+}
+
 public class EquipmentModel
 {
     public required int Id { get; set; }
@@ -30,6 +43,10 @@ public class EquipmentModel
     public EffectiveCalendarModel? EffectiveCalendar { get; set; }
     /// <summary>Process segments this machine can perform (empty = not enabled for any segment).</summary>
     public required List<EquipmentSegmentModel> ProcessSegments { get; set; }
+    /// <summary>Tooling with an explicit link to this machine. Filled only by GetEquipment (empty in lists and in create/update responses).</summary>
+    public List<EquipmentToolingModel> CompatibleTooling { get; set; } = [];
+    /// <summary>Tooling with no machine links (compatible with every machine), active or not. Filled only by GetEquipment.</summary>
+    public List<EquipmentToolingModel> UniversalTooling { get; set; } = [];
     public required DateTime CreatedAt { get; set; }
     public required DateTime UpdatedAt { get; set; }
 }

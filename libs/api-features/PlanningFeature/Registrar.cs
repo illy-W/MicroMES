@@ -14,6 +14,8 @@ public static class Registrar
         services.AddScoped<PlanningCatalogLoader>();
         services.AddScoped<PlanningService>();
         services.AddScoped<TimelineService>();
+        services.AddScoped<EquipmentOverviewService>();
+        services.AddScoped<MicroMES.ApiFeatures.EquipmentFeature.Services.IEquipmentDetailEnricher, EquipmentToolingEnricher>();
         services.AddScoped<PlanLockService>();
         services.AddScoped<PlanningDevelopmentSeeder>();
         return services;
