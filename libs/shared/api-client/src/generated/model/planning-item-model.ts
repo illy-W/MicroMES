@@ -30,4 +30,9 @@ export interface PlanningItemModel {
   isLate: boolean;
   lateDays: number;
   reasons: PlanningReasonModel[];
+  setupMinutes?: number;
+  setupReasons?: string[];
+  isFullSetup?: boolean;
+  /** @nullable */
+  currentSetupMinutes?: number | null;
 }

@@ -49,6 +49,10 @@ export interface WorkOrderModel {
   plannedEndAt?: string | null;
   /** @nullable */
   plannedAt?: string | null;
+  /** @nullable */
+  plannedSetupMinutes?: number | null;
+  plannedSetupReasons?: string[];
+  isFullSetup?: boolean;
   planStatus: PlanStatus;
   planStatusReason: StaleCause;
   isPlanLocked: boolean;

@@ -8,7 +8,9 @@ import type { PlanStatus } from './plan-status';
 import type { StaleCause } from './stale-cause';
 import type { WorkOrderEquipmentModel } from './work-order-equipment-model';
 import type { WorkOrderMaterialModel } from './work-order-material-model';
+import type { WorkOrderSetupValueModel } from './work-order-setup-value-model';
 import type { WorkOrderStatus } from './work-order-status';
+import type { WorkOrderToolingModel } from './work-order-tooling-model';
 
 export interface ProductionOrderOverviewWorkOrderModel {
   id: number;
@@ -29,11 +31,17 @@ export interface ProductionOrderOverviewWorkOrderModel {
   plannedStartAt?: string | null;
   /** @nullable */
   plannedEndAt?: string | null;
+  /** @nullable */
+  plannedSetupMinutes?: number | null;
+  plannedSetupReasons?: string[];
+  isFullSetup?: boolean;
   planStatus: PlanStatus;
   planStatusReason: StaleCause;
   isPlanLocked: boolean;
   /** @nullable */
   planLockedAt?: string | null;
   allowedActions: string[];
+  tooling?: WorkOrderToolingModel[];
+  setupValues?: WorkOrderSetupValueModel[];
   materials: WorkOrderMaterialModel[];
 }

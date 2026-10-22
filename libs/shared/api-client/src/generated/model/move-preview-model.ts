@@ -19,6 +19,9 @@ export interface MovePreviewModel {
   newStart: string;
   newEnd: string;
   durationMinutes: number;
+  setupMinutes?: number;
+  setupReasons?: string[];
+  isFullSetup?: boolean;
   expectedUpdatedAt: string;
   conflicts: MoveConflictModel[];
 }

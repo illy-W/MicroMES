@@ -3,6 +3,7 @@ using illyW.Framework.EFCore.Extensions;
 using MicroMES.ApiCore.Persistence;
 using MicroMES.ApiFeatures.EquipmentFeature;
 using MicroMES.ApiFeatures.ToolingFeature.Repositories;
+using MicroMES.ApiFeatures.ToolingFeature.Seeding;
 using MicroMES.ApiFeatures.ToolingFeature.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,6 +22,7 @@ public static class Registrar
             services.AddUnitOfWork<AppDbContext>();
         services.AddScoped<ToolingService>();
         services.AddScoped<SetupAttributeService>();
+        services.AddScoped<ToolingDevelopmentSeeder>();
         return services;
     }
 }

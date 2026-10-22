@@ -318,8 +318,3 @@ export class ScrapReasonsService {
   }
 };
 
-export type GetScrapReasonsClientResult = NonNullable<ScrapReasonModel[]>
-export type CreateScrapReasonClientResult = NonNullable<ScrapReasonModel>
-export type GetScrapReasonClientResult = NonNullable<ScrapReasonModel>
-export type UpdateScrapReasonClientResult = NonNullable<ScrapReasonModel>
-export type DeactivateScrapReasonClientResult = NonNullable<unknown>

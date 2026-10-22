@@ -21,7 +21,7 @@
 - [x] 1.7 [Backend] Motore: vincolo cumulativo per attrezzatura (anche con intervalli fissi), compatibilità macchine, attrezzaggio dalla sequenza reale (inserimenti in un vuoto solo se il successivo non peggiora), preferenza a parità di fine, motivi nominati; proprietà «attrezzaggio = formula su coppie consecutive» verificata da test; tre scenari nuovi nel banco di prova con valori di riferimento; baseline esistenti invariate. _Satisfies: REQ-5_
 - [x] 1.8 [Backend] Anteprima/applicazione e timeline: attrezzaggio calcolato e motivazione per lavoro, minuti totali prima/dopo nel riepilogo, filtro per attrezzatura; spostamento manuale (`move`) che ricalcola l'attrezzaggio e riporta i conflitti di attrezzatura. _Satisfies: REQ-4, REQ-5, REQ-7_
 - [x] 1.9 [Backend] Segnalazioni: attrezzatura sovrapposta, non compatibile con la macchina, disattivata con lavori aperti, lavoro non pianificabile per attrezzatura; causa nominata e suggerimento. _Satisfies: REQ-6_
-- [ ] 1.10 [Backend] Dati di esempio di sviluppo (attrezzature condivise tra macchine, attributi colore/materiale, requisiti sui cicli) e rigenerazione del contratto (`npx nx run api-client:generate-api`) con riepilogo per il frontend. _Satisfies: REQ-1, REQ-2, REQ-3, REQ-7_
+- [x] 1.10 [Backend] Dati di esempio di sviluppo (attrezzature condivise tra macchine, attributi colore/materiale, requisiti sui cicli) e rigenerazione del contratto (`npx nx run api-client:generate-api`) con riepilogo per il frontend. _Satisfies: REQ-1, REQ-2, REQ-3, REQ-7_
 
 ## Frontend
 

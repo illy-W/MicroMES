@@ -5,6 +5,8 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { RoutingStepComponentModel } from './routing-step-component-model';
+import type { RoutingStepSetupValueModel } from './routing-step-setup-value-model';
+import type { RoutingStepToolingModel } from './routing-step-tooling-model';
 
 export interface RoutingStepModel {
   id: number;
@@ -27,4 +29,6 @@ export interface RoutingStepModel {
   /** @nullable */
   positionY?: number | null;
   consumedComponents?: RoutingStepComponentModel[];
+  tooling?: RoutingStepToolingModel[];
+  setupValues?: RoutingStepSetupValueModel[];
 }

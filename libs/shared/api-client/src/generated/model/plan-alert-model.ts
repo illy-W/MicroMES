@@ -23,6 +23,11 @@ export interface PlanAlertModel {
   /** @nullable */
   equipmentCode?: string | null;
   /** @nullable */
+  toolingId?: number | null;
+  /** @nullable */
+  toolingCode?: string | null;
+  workOrderIds?: number[];
+  /** @nullable */
   causeWorkOrderId?: number | null;
   /** @nullable */
   date?: string | null;

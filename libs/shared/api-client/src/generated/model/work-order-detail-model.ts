@@ -12,9 +12,13 @@ import type { WorkOrderEquipmentModel } from './work-order-equipment-model';
 import type { WorkOrderLinkModel } from './work-order-link-model';
 import type { WorkOrderMaterialModel } from './work-order-material-model';
 import type { WorkOrderSessionModel } from './work-order-session-model';
+import type { WorkOrderSetupValueModel } from './work-order-setup-value-model';
 import type { WorkOrderStatus } from './work-order-status';
+import type { WorkOrderToolingModel } from './work-order-tooling-model';
 
 export interface WorkOrderDetailModel {
+  tooling?: WorkOrderToolingModel[];
+  setupValues?: WorkOrderSetupValueModel[];
   sessions: WorkOrderSessionModel[];
   materials: WorkOrderMaterialModel[];
   id: number;
@@ -53,6 +57,10 @@ export interface WorkOrderDetailModel {
   plannedEndAt?: string | null;
   /** @nullable */
   plannedAt?: string | null;
+  /** @nullable */
+  plannedSetupMinutes?: number | null;
+  plannedSetupReasons?: string[];
+  isFullSetup?: boolean;
   planStatus: PlanStatus;
   planStatusReason: StaleCause;
   isPlanLocked: boolean;

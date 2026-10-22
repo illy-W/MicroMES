@@ -4,6 +4,7 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { UpdateRoutingSetupValueRequest } from './update-routing-setup-value-request';
 
 export interface UpdateRoutingStepRequest {
   /**
@@ -39,4 +40,8 @@ export interface UpdateRoutingStepRequest {
   positionX?: number | null;
   /** @nullable */
   positionY?: number | null;
+  /** @nullable */
+  toolingIds?: number[] | null;
+  /** @nullable */
+  setupValues?: UpdateRoutingSetupValueRequest[] | null;
 }

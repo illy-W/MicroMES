@@ -16,6 +16,8 @@ export interface PlanningSummaryModel {
   lateOrders: number;
   maxLateDays: number;
   unplanned: number;
+  setupMinutesBefore?: number;
+  setupMinutesAfter?: number;
   /** @nullable */
   lastEnd?: string | null;
 }

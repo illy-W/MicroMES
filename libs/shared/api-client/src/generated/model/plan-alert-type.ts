@@ -18,4 +18,8 @@ export const PlanAlertType = {
   LockedMachineUnavailable: 'LockedMachineUnavailable',
   LockedOverCapacity: 'LockedOverCapacity',
   LockedLate: 'LockedLate',
+  ToolingOverbooked: 'ToolingOverbooked',
+  ToolingIncompatibleMachine: 'ToolingIncompatibleMachine',
+  ToolingInactive: 'ToolingInactive',
+  UnplannableForTooling: 'UnplannableForTooling',
 } as const;

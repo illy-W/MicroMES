@@ -13,4 +13,6 @@ export const MoveConflictCode = {
   SuccessorsStartBeforeEnd: 'SuccessorsStartBeforeEnd',
   MachineOverCapacity: 'MachineOverCapacity',
   Late: 'Late',
+  ToolingOverCapacity: 'ToolingOverCapacity',
+  ToolingIncompatible: 'ToolingIncompatible',
 } as const;

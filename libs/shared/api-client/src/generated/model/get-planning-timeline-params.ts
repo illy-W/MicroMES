@@ -13,4 +13,5 @@ equipmentId?: number;
 status?: WorkOrderStatus;
 productionOrderId?: number;
 locked?: boolean;
+toolingId?: number;
 };

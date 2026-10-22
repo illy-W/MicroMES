@@ -1,3 +1,4 @@
+using MicroMES.ApiFeatures.ToolingFeature.Seeding;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using MicroMES.Api;
@@ -99,6 +100,9 @@ if (app.Environment.IsDevelopment() && !isOpenApiEnabled)
     // The unit of work cannot reopen a transaction within the same scope: the calendar seeder gets its own.
     using (var calendarScope = app.Services.CreateScope())
         calendarScope.ServiceProvider.GetRequiredService<CalendarDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
+    // Before the order seeder: on a fresh database the released orders take the tooling snapshots. Own scope (transaction).
+    using (var toolingScope = app.Services.CreateScope())
+        toolingScope.ServiceProvider.GetRequiredService<ToolingDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
     scope.ServiceProvider.GetRequiredService<ProductionOrderDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
     // After calendars and orders; own scope (the unit of work cannot reopen a transaction within the same scope).
     using (var planningScope = app.Services.CreateScope())

@@ -16,4 +16,5 @@ export const PlanningReasonCode = {
   AssignedMachineNotEnabled: 'AssignedMachineNotEnabled',
   Locked: 'Locked',
   AdvancedForLocked: 'AdvancedForLocked',
+  WaitingForTooling: 'WaitingForTooling',
 } as const;

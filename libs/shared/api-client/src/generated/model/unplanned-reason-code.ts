@@ -14,4 +14,6 @@ export const UnplannedReasonCode = {
   NoCandidateMachine: 'NoCandidateMachine',
   CyclicDependency: 'CyclicDependency',
   PredecessorUnplanned: 'PredecessorUnplanned',
+  ToolingInactive: 'ToolingInactive',
+  ToolingIncompatible: 'ToolingIncompatible',
 } as const;
