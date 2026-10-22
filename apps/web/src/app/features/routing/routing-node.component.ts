@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePackage } from '@ng-icons/lucide';
-import type { RoutingStepComponentModel } from '@micromes/api-client/models';
+import type { RoutingStepComponentModel, RoutingStepToolingModel } from '@micromes/api-client/models';
 import { NgDiagramPortComponent, type NgDiagramNodeTemplate, type Node } from 'ng-diagram';
 import { HlmBadge } from '@spartan-ng/helm/badge';
+import type { SetupValueRow } from './routing-step-extras';
 import { RoutingViewState } from './routing-view-state';
 
 export interface StepNodeData {
@@ -18,6 +19,12 @@ export interface StepNodeData {
   runMinutesPerUnit: number | null;
   notes: string | null;
   consumedComponents: RoutingStepComponentModel[];
+  /** Attrezzature richieste (id) e dati del server (nomi, stato) per mostrare anche le disattivate. */
+  toolingIds: number[];
+  linkedTooling: RoutingStepToolingModel[];
+  setupRows: SetupValueRow[];
+  /** Attributi con valore già salvato: servono a cancellare quelli rimossi. */
+  savedAttributeIds: number[];
   [key: string]: unknown;
 }
 

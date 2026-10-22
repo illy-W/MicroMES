@@ -6,6 +6,8 @@ import { lucideListOrdered, lucidePencil, lucidePlus, lucideTriangleAlert, lucid
 import { toast } from '@spartan-ng/brain/sonner';
 import type {
   MaterialModel,
+  SetupAttributeModel,
+  ToolingModel,
   ProcessSegmentModel,
   RoutingModel,
   UpdateRoutingRequest,
@@ -13,6 +15,8 @@ import type {
 import { MaterialsService } from '@micromes/api-client/services/materials';
 import { ProcessSegmentsService } from '@micromes/api-client/services/process-segments';
 import { RoutingService } from '@micromes/api-client/services/routing';
+import { SetupAttributesService } from '@micromes/api-client/services/setup-attributes';
+import { ToolingService } from '@micromes/api-client/services/tooling';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmAlertDialogImports } from '@spartan-ng/helm/alert-dialog';
 import { HlmBadge } from '@spartan-ng/helm/badge';
@@ -50,6 +54,8 @@ import { layeredLayout, ROW_SPACING } from './routing-layout';
 import { computeMetrics, formatMinutes } from './routing-metrics';
 import { RoutingNodeComponent, type StepNodeData } from './routing-node.component';
 import { numbersOutOfFlow, proposeNumber, renumber } from './routing-numbering';
+import { RoutingStepExtrasComponent } from './routing-step-extras.component';
+import { buildSetupValuesRequest, duplicateAttributeIds, rowsMissingAttribute, type SetupValueRow, toRows } from './routing-step-extras';
 import { RoutingViewState } from './routing-view-state';
 import { validateRouting } from './routing-validation';
 
@@ -99,6 +105,7 @@ function toNumberOrNull(v: string): number | null {
     HlmTabsImports,
     HlmTextarea,
     NgIcon,
+    RoutingStepExtrasComponent,
   ],
   providers: [
     provideNgDiagram(),
@@ -362,6 +369,16 @@ function toNumberOrNull(v: string): number | null {
                         </a>
                         <p class="text-muted-foreground text-xs">Il collegamento si modifica dalla distinta base.</p>
                       </div>
+                      <app-routing-step-extras
+                        [idPrefix]="'st-' + s.id"
+                        [tooling]="toolingList()"
+                        [linkedTooling]="s.data.linkedTooling"
+                        [toolingIds]="s.data.toolingIds"
+                        [attributes]="attributeList()"
+                        [rows]="s.data.setupRows"
+                        (toolingIdsChange)="patch(s.id, { toolingIds: $event })"
+                        (rowsChange)="patch(s.id, { setupRows: $event })"
+                      />
                     </div>
                   </section>
                 } @else {
@@ -386,6 +403,30 @@ function toNumberOrNull(v: string): number | null {
                         </dd>
                         <dt class="text-muted-foreground">Note</dt>
                         <dd class="whitespace-pre-wrap">{{ s.data.notes || '—' }}</dd>
+                        <dt class="text-muted-foreground">Attrezzature richieste</dt>
+                        <dd>
+                          @if (s.data.linkedTooling.length) {
+                            <ul class="flex flex-wrap gap-1" aria-label="Attrezzature richieste">
+                              @for (t of s.data.linkedTooling; track t.id) {
+                                <li hlmBadge variant="secondary" [title]="t.name">{{ t.code }}{{ t.isActive ? '' : ' (disattivata)' }}</li>
+                              }
+                            </ul>
+                          } @else {
+                            —
+                          }
+                        </dd>
+                        <dt class="text-muted-foreground">Attributi di cambio</dt>
+                        <dd>
+                          @if (s.data.setupRows.length) {
+                            <ul class="flex flex-wrap gap-1" aria-label="Attributi di cambio">
+                              @for (v of readOnlyValues(s.data.setupRows); track v.id) {
+                                <li hlmBadge variant="outline">{{ v.label }}: {{ v.value }}</li>
+                              }
+                            </ul>
+                          } @else {
+                            —
+                          }
+                        </dd>
                       </dl>
                       <div class="mt-4">
                       <div class="flex flex-col gap-1.5">
@@ -505,6 +546,8 @@ export class RoutingComponent {
   private readonly routingApi = inject(RoutingService);
   private readonly materialsApi = inject(MaterialsService);
   private readonly segmentsApi = inject(ProcessSegmentsService);
+  private readonly toolingApi = inject(ToolingService);
+  private readonly attributesApi = inject(SetupAttributesService);
   private readonly modelService = inject(NgDiagramModelService);
   private readonly viewport = inject(NgDiagramViewportService);
   private readonly selection = inject(NgDiagramSelectionService);
@@ -518,6 +561,8 @@ export class RoutingComponent {
 
   protected readonly material = signal<MaterialModel | null>(null);
   protected readonly segments = signal<ProcessSegmentModel[]>([]);
+  protected readonly toolingList = signal<ToolingModel[]>([]);
+  protected readonly attributeList = signal<SetupAttributeModel[]>([]);
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly saving = signal(false);
@@ -684,11 +729,16 @@ export class RoutingComponent {
     this.loading.set(true);
     this.loadError.set(null);
     try {
-      const [material, routing, segments] = await Promise.all([
+      const [material, routing, segments, tooling, attributes] = await Promise.all([
         firstValueFrom(this.materialsApi.getMaterial(id)),
         firstValueFrom(this.routingApi.getRouting(id)),
         firstValueFrom(this.segmentsApi.getProcessSegments()),
+        // Elenchi di supporto: se falliscono il ciclo resta consultabile (i nomi arrivano dai passi).
+        firstValueFrom(this.toolingApi.getToolingList()).catch(() => [] as ToolingModel[]),
+        firstValueFrom(this.attributesApi.getSetupAttributesList()).catch(() => [] as SetupAttributeModel[]),
       ]);
+      this.toolingList.set(tooling);
+      this.attributeList.set(attributes);
       this.material.set(material);
       this.segments.set(segments.filter((s) => s.isActive));
       this.applyRouting(routing);
@@ -732,6 +782,10 @@ export class RoutingComponent {
         runMinutesPerUnit: s.runMinutesPerUnit ?? null,
         notes: s.notes ?? null,
         consumedComponents: s.consumedComponents ?? [],
+        toolingIds: (s.tooling ?? []).map((t) => t.id),
+        linkedTooling: s.tooling ?? [],
+        setupRows: toRows(s.setupValues ?? []),
+        savedAttributeIds: (s.setupValues ?? []).map((v) => v.attributeId),
       },
     }));
     const modelEdges: Edge[] = routing.dependencies.map((d) => ({
@@ -821,6 +875,16 @@ export class RoutingComponent {
     this.selectedId.set(e.selectedNodes.length === 1 ? e.selectedNodes[0].id : null);
   }
 
+  /** Etichetta «CODICE» + valore per la vista in sola lettura. */
+  protected readOnlyValues(rows: SetupValueRow[]): { id: number; label: string; value: string }[] {
+    return rows
+      .filter((r) => r.attributeId !== null && r.value.trim() !== '')
+      .map((r) => {
+        const a = this.attributeList().find((x) => x.id === r.attributeId);
+        return { id: r.attributeId as number, label: a ? a.code : `#${r.attributeId}`, value: r.value };
+      });
+  }
+
   protected num(e: Event): number | null {
     return toNumberOrNull((e.target as HTMLInputElement).value);
   }
@@ -859,6 +923,10 @@ export class RoutingComponent {
           runMinutesPerUnit: null,
           notes: null,
           consumedComponents: [],
+          toolingIds: [],
+          linkedTooling: [],
+          setupRows: [],
+          savedAttributeIds: [],
         },
       } satisfies StepNode,
     ]);
@@ -873,6 +941,11 @@ export class RoutingComponent {
       nodes.map((n) => ({ id: n.id, operationNumber: n.data.operationNumber, label: `${n.data.operationNumber ?? '—'} ${n.data.code}` })),
       edges,
     );
+    for (const n of nodes) {
+      const label = `${n.data.operationNumber ?? '—'} ${n.data.code}`;
+      if (duplicateAttributeIds(n.data.setupRows).length) errors.push(`Passo ${label}: lo stesso attributo di cambio compare in più righe.`);
+      if (rowsMissingAttribute(n.data.setupRows)) errors.push(`Passo ${label}: scegli l'attributo per ogni valore inserito.`);
+    }
     this.validationErrors.set(errors);
     this.saveError.set(null);
     if (errors.length) return;
@@ -888,6 +961,8 @@ export class RoutingComponent {
         notes: n.data.notes,
         positionX: Math.round(n.position.x),
         positionY: Math.round(n.position.y),
+        toolingIds: n.data.toolingIds,
+        setupValues: buildSetupValuesRequest(n.data.setupRows, n.data.savedAttributeIds),
       })),
       dependencies: edges.map((e) => ({ predecessorKey: e.source, successorKey: e.target })),
     };

@@ -32,6 +32,15 @@ export const appRoutes: Route[] = [
         loadComponent: () => import('./features/equipment/equipment.component').then((m) => m.EquipmentComponent),
       },
       {
+        path: 'tooling',
+        loadComponent: () => import('./features/tooling/tooling.component').then((m) => m.ToolingComponent),
+      },
+      {
+        path: 'setup-attributes',
+        loadComponent: () =>
+          import('./features/setup-attributes/setup-attributes.component').then((m) => m.SetupAttributesComponent),
+      },
+      {
         path: 'calendars',
         loadComponent: () => import('./features/calendars/calendars.component').then((m) => m.CalendarsComponent),
       },

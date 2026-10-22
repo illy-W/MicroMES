@@ -11,7 +11,9 @@ import {
   lucidePackage,
   lucideTags,
   lucideCalendarDays,
+  lucideSlidersHorizontal,
   lucideWorkflow,
+  lucideWrench,
 } from '@ng-icons/lucide';
 import { HlmSidebarImports } from '@spartan-ng/helm/sidebar';
 import { NavSection } from '../../models/nav-item.model';
@@ -30,7 +32,9 @@ import { NavSection } from '../../models/nav-item.model';
       lucidePackage,
       lucideTags,
       lucideCalendarDays,
+      lucideSlidersHorizontal,
       lucideWorkflow,
+      lucideWrench,
     }),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,

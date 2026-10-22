@@ -25,9 +25,9 @@
 
 ## Frontend
 
-- [ ] 2.1 [Frontend] Pagina «Attrezzature» (Anagrafiche): elenco, ricerca, filtro attive, creazione/modifica con macchine compatibili, dettaglio con passi e lavori che la usano; voce di menu. _Satisfies: REQ-1, REQ-7_
-- [ ] 2.2 [Frontend] Pagina «Attributi di cambio» (Anagrafiche) con CRUD e messaggi specifici. _Satisfies: REQ-3, REQ-7_
-- [ ] 2.3 [Frontend] Editor del ciclo: selezione delle attrezzature richieste e valori degli attributi per passo, errori inline, tastiera. _Satisfies: REQ-2, REQ-3, REQ-7_
+- [x] 2.1 [Frontend] Pagina «Attrezzature» (Anagrafiche): elenco, ricerca, filtro attive, creazione/modifica con macchine compatibili, dettaglio con passi e lavori che la usano; voce di menu. _Satisfies: REQ-1, REQ-7_
+- [x] 2.2 [Frontend] Pagina «Attributi di cambio» (Anagrafiche) con CRUD e messaggi specifici. _Satisfies: REQ-3, REQ-7_
+- [x] 2.3 [Frontend] Editor del ciclo: selezione delle attrezzature richieste e valori degli attributi per passo, errori inline, tastiera. _Satisfies: REQ-2, REQ-3, REQ-7_
 - [ ] 2.4 [Frontend] Timeline e pannello: tratto di attrezzaggio distinto nella barra (pattern, non solo colore), tooltip e pannello con durata e motivazione e attrezzature richieste, filtro «Attrezzatura», legenda. _Satisfies: REQ-7_
 - [ ] 2.5 [Frontend] Anteprima di pianificazione e spostamento: attrezzaggio per lavoro, minuti totali prima/dopo, motivi sulle attrezzature, conflitti di attrezzatura nel dialogo «Sposta…»; segnalazioni nel popover, nel dettaglio ordine e nella lista lavori. _Satisfies: REQ-6, REQ-7_
 
