@@ -83,7 +83,7 @@ public sealed record PlanningTooling(int Id, string Code, int Quantity, IReadOnl
 /// <param name="Zone">Company time zone (calendar slots are local times).</param>
 /// <param name="Now">Nothing is planned before this instant (rounded up to the minute).</param>
 /// <param name="Horizon">Nothing is planned ending after Now + Horizon (default: 6 months).</param>
-/// <param name="ToolingResources">Tooling resources referenced by the jobs (data only for now: the engine does not use them yet).</param>
+/// <param name="ToolingResources">Tooling resources referenced by the jobs (compatibility and quantity are enforced by the engine; a tooling id missing here is unconstrained).</param>
 public sealed record PlanningInput(
     IReadOnlyList<PlanningJob> Jobs,
     IReadOnlyList<PlanningEquipment> Equipment,
@@ -112,7 +112,9 @@ public enum PlanningReasonCode
     /// <summary>The job is locked: it keeps its plan and machine.</summary>
     Locked,
     /// <summary>Planned before its turn because it must end before the start of a locked job (RelatedWorkOrderId).</summary>
-    AdvancedForLocked
+    AdvancedForLocked,
+    /// <summary>Waits for a tooling resource (RelatedEquipmentId = machine using it, RelatedWorkOrderId = job using it) in use until Until.</summary>
+    WaitingForTooling
 }
 
 public sealed record PlanningReason(
@@ -130,7 +132,14 @@ public sealed record PlannedJob(
     DateTime End,
     bool IsFixed,
     IReadOnlyList<PlanningReason> Reasons,
-    bool IsLocked = false);
+    bool IsLocked = false,
+    decimal SetupMinutes = 0m,
+    IReadOnlyList<string>? SetupReasons = null,
+    bool IsFullSetup = false)
+{
+    /// <summary>Why the setup lasts <see cref="SetupMinutes"/> (from <see cref="SetupCalculator"/>); empty for fixed jobs.</summary>
+    public IReadOnlyList<string> SetupReasonList => SetupReasons ?? [];
+}
 
 public enum UnplannedReasonCode
 {
@@ -143,7 +152,11 @@ public enum UnplannedReasonCode
     /// <summary>The job is in a dependency cycle.</summary>
     CyclicDependency,
     /// <summary>A predecessor (RelatedWorkOrderId) could not be planned (or depends on a cycle).</summary>
-    PredecessorUnplanned
+    PredecessorUnplanned,
+    /// <summary>A tooling the job needs is inactive.</summary>
+    ToolingInactive,
+    /// <summary>No active candidate machine is compatible with all the tooling of the job.</summary>
+    ToolingIncompatible
 }
 
 public sealed record UnplannedJob(int WorkOrderId, UnplannedReasonCode Code, string Message, int? RelatedWorkOrderId = null);

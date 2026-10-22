@@ -17,7 +17,10 @@ public class PlanningBenchTests(ITestOutputHelper output)
         { "Due ordini concorrenti con scadenze diverse", 960m, "2026-11-03T10:00:00.0000000Z", 0.636m },
         { "Colli di bottiglia con alternative", 652m, "2026-11-03T10:52:00.0000000Z", 0.542m },
         { "Calendari diversi", 1020m, "2026-11-04T09:00:00.0000000Z", 0.550m },
-        { "Lavori fissati", 0m, "2026-11-03T10:30:00.0000000Z", 0.464m }
+        { "Lavori fissati", 0m, "2026-11-03T10:30:00.0000000Z", 0.464m },
+        { "Stampo condiviso su due macchine", 0m, "2026-11-03T07:10:00.0000000Z", 0.5m },
+        { "Cambio ridotto", 0m, "2026-11-02T10:00:00.0000000Z", 1m },
+        { "Compatibilità parziale", 0m, "2026-11-02T12:50:00.0000000Z", 0.983m }
     };
 
     [Theory]

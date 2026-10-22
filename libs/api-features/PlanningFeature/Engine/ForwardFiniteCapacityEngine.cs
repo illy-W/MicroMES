@@ -27,6 +27,17 @@ namespace MicroMES.ApiFeatures.PlanningFeature.Engine;
 /// <item><b>Reasons.</b> Each planned job lists why it does not start right away: predecessor, requested start, calendar
 /// closed, machine busy, assigned machine not enabled.</item>
 /// </list>
+/// <para><b>Tooling and sequence-dependent setup</b> (greedy, no re-sequencing: reordering jobs to cut setups is the future optimizer's job):</para>
+/// <list type="bullet">
+/// <item><b>Compatibility.</b> A job with tooling goes only on machines compatible with all of it (empty list = any). Inactive tooling or no compatible candidate: unplanned, naming the tooling.</item>
+/// <item><b>Quantity.</b> Each tooling is used by 1 unit per job over the job's whole interval (setup included); at no instant more than Quantity jobs (fixed ones too). Slots that break it are skipped
+/// (<see cref="PlanningReasonCode.WaitingForTooling"/>). A tooling id absent from <see cref="PlanningInput.ToolingResources"/> is unconstrained.</item>
+/// <item><b>Setup.</b> The setup of a free job is <see cref="SetupCalculator"/>(state left by the job immediately before it on the machine, or the machine initial state), and the duration is the standard minutes with that setup in place of the full one,
+/// then ÷ efficiency. Jobs without tooling/values keep their standard minutes unchanged.</item>
+/// <item><b>Insertion into a gap.</b> The job following the slot has its setup recomputed from the inserted job; the slot is skipped if that setup would increase (the successor, free or fixed, cannot absorb it);
+/// when it decreases, the free successor is shortened (its start never moves).</item>
+/// <item><b>Machine tie-break.</b> Same end: smaller setup first, then the default machine, then the code.</item>
+/// </list>
 /// Complexity: O(n log n) for the queue plus, per job and candidate machine, a scan of that machine's intervals.
 /// </summary>
 public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
@@ -65,6 +76,31 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
         private readonly HashSet<int> _failed = [];
         private readonly List<PlannedJob> _planned = [];
         private readonly List<UnplannedJob> _unplanned = [];
+        private readonly Dictionary<int, PlanningTooling> _tooling = [];
+        private readonly Dictionary<int, List<ToolUse>> _toolUse = [];
+        private readonly Dictionary<int, List<SeqEntry>> _seq = [];
+
+        /// <summary>A job occupying a machine in sequence (state source for the setup of the next one).</summary>
+        private sealed class SeqEntry(int workOrderId, DateTime start, DateTime end, SetupRequirements req, bool isFixed, decimal standardMinutes, SetupResult? setup)
+        {
+            public int WorkOrderId { get; } = workOrderId;
+            public DateTime Start { get; } = start;
+            public DateTime End { get; set; } = end;
+            public SetupRequirements Req { get; } = req;
+            public bool IsFixed { get; } = isFixed;
+            public decimal StandardMinutes { get; } = standardMinutes;
+            public SetupResult? Setup { get; set; } = setup;
+        }
+
+        private sealed class ToolUse(int workOrderId, int? machineId, DateTime start, DateTime end)
+        {
+            public int WorkOrderId { get; } = workOrderId;
+            public int? MachineId { get; } = machineId;
+            public DateTime Start { get; } = start;
+            public DateTime End { get; set; } = end;
+        }
+
+        private sealed record ToolWait(PlanningTooling Tooling, ToolUse By);
 
         public Run(PlanningInput input)
         {
@@ -74,10 +110,12 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
             _horizonEnd = _now + horizon;
             // The calculator looks far enough ahead; the horizon itself is checked by the engine.
             _calc = new WorkingTimeCalculator(input.Zone, horizon + horizon + TimeSpan.FromDays(31));
+            foreach (var t in input.ToolingResources ?? []) _tooling.TryAdd(t.Id, t);
             foreach (var j in input.Jobs) _jobs.TryAdd(j.WorkOrderId, j);
             foreach (var e in input.Equipment)
             {
                 _equipment.TryAdd(e.Id, e);
+                _seq[e.Id] = [];
                 _busy[e.Id] = e.BusyIntervals.Select(b => new PlanningInterval(Utc(b.Start), Utc(b.End))).Where(b => b.End > b.Start).ToList();
             }
         }
@@ -261,6 +299,7 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
             if (machine is not null && end > start) _busy[machine.Id].Add(new PlanningInterval(start, end));
             _end[job.WorkOrderId] = end;
             _fixedIntervals[job.WorkOrderId] = (machine?.Id, start, end);
+            RegisterFixed(job, machine?.Id, start, end);
             _planned.Add(new PlannedJob(job.WorkOrderId, machine?.Id, start, end, true,
                 [new PlanningReason(PlanningReasonCode.Locked, "Fissato: non spostato")], true));
         }
@@ -325,10 +364,62 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
             if (endAt < start) endAt = start;
             if (machine is not null && endAt > start) _busy[machine.Id].Add(new PlanningInterval(start, endAt));
             _end[job.WorkOrderId] = endAt;
+            RegisterFixed(job, machine?.Id, start, endAt);
             _planned.Add(new PlannedJob(job.WorkOrderId, machine?.Id, start, endAt, true, []));
         }
 
-        private sealed record Slot(PlanningEquipment? Machine, DateTime Start, DateTime End, UnplannedReasonCode? Error);
+        /// <summary>A fixed job is a sequence entry (its tooling/values are the state it leaves) and uses its tooling over its interval.</summary>
+        private void RegisterFixed(PlanningJob job, int? machineId, DateTime start, DateTime end)
+        {
+            if (machineId is { } m) InsertEntry(m, new SeqEntry(job.WorkOrderId, start, end, job.Setup, true, 0m, null));
+            if (end > start)
+                foreach (var t in (job.Tooling ?? []).DistinctBy(t => t.ToolingId))
+                    UseTooling(t.ToolingId).Add(new ToolUse(job.WorkOrderId, machineId, start, end));
+        }
+
+        private List<ToolUse> UseTooling(int id)
+        {
+            if (!_toolUse.TryGetValue(id, out var l)) _toolUse[id] = l = [];
+            return l;
+        }
+
+        /// <summary>Index after the last entry starting at or before <paramref name="t"/>.</summary>
+        private static int Position(List<SeqEntry> seq, DateTime t)
+        {
+            var i = seq.Count;
+            while (i > 0 && seq[i - 1].Start > t) i--;
+            return i;
+        }
+
+        private void InsertEntry(int machineId, SeqEntry e)
+        {
+            var seq = _seq[machineId];
+            seq.Insert(Position(seq, e.Start), e);
+        }
+
+        private bool Compatible(int toolingId, int machineId)
+            => !_tooling.TryGetValue(toolingId, out var t) || t.CompatibleEquipmentIds.Count == 0 || t.CompatibleEquipmentIds.Contains(machineId);
+
+        /// <summary>
+        /// Effect of putting a job needing <paramref name="req"/> just before <c>seq[pos]</c>: the successor's setup is recomputed from it.
+        /// Not acceptable when the successor's setup would grow (its interval cannot absorb it).
+        /// </summary>
+        private static (bool Ok, SeqEntry? Succ, SetupResult? NewSetup) CheckSuccessor(PlanningEquipment machine, List<SeqEntry> seq, int pos, SetupRequirements req)
+        {
+            if (pos >= seq.Count || seq[pos].Req.IsEmpty) return (true, null, null);
+            var succ = seq[pos];
+            var neu = SetupCalculator.Compute(MachineSetupState.After(req), succ.Req);
+            decimal old;
+            if (succ.IsFixed)
+            {
+                var before = pos > 0 ? MachineSetupState.After(seq[pos - 1].Req) : machine.InitialState;
+                old = SetupCalculator.Compute(before, succ.Req).Minutes;
+            }
+            else old = succ.Setup?.Minutes ?? 0m;
+            return (neu.Minutes <= old, succ, neu);
+        }
+
+        private sealed record Slot(PlanningEquipment? Machine, DateTime Start, DateTime End, UnplannedReasonCode? Error, SetupResult? Setup = null, ToolWait? Wait = null);
 
         private void Place(PlanningJob job, List<int> predecessors)
         {
@@ -365,6 +456,27 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
                     "Non pianificabile: la fase ha macchine ma nessuna è attiva e abilitata. Abilita o attiva una macchina.");
                 return;
             }
+            var needed = (job.Tooling ?? []).DistinctBy(t => t.ToolingId).OrderBy(t => t.Code, StringComparer.Ordinal).ToList();
+            foreach (var t in needed)
+                if (_tooling.TryGetValue(t.ToolingId, out var res) && !res.IsActive)
+                {
+                    Fail(job, UnplannedReasonCode.ToolingInactive,
+                        $"L'attrezzatura {t.Code} richiesta dal lavoro è disattivata. Riattivala per pianificarlo.");
+                    return;
+                }
+            if (needed.Count > 0 && !noMachine)
+            {
+                var compatible = candidates.Where(m => needed.All(t => Compatible(t.ToolingId, m.Id))).ToList();
+                if (compatible.Count == 0)
+                {
+                    var blamed = needed.Where(t => !candidates.Any(m => Compatible(t.ToolingId, m.Id))).ToList();
+                    if (blamed.Count == 0) blamed = needed;
+                    Fail(job, UnplannedReasonCode.ToolingIncompatible,
+                        $"Nessuna macchina compatibile con {string.Join(", ", blamed.Select(t => t.Code))}. Scegli un'altra attrezzatura o una macchina compatibile.");
+                    return;
+                }
+                candidates = compatible;
+            }
             if (job.AssignedEquipmentId is { } assigned && !noMachine)
             {
                 var keep = candidates.FirstOrDefault(c => c.Id == assigned);
@@ -380,7 +492,7 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
             var options = noMachine ? new List<PlanningEquipment?> { null } : candidates.Cast<PlanningEquipment?>().ToList();
             foreach (var machine in options)
             {
-                var slot = FindSlot(machine, ready, job.StandardMinutes);
+                var slot = FindSlot(machine, ready, job);
                 if (slot.Error is { } err)
                 {
                     if (err == UnplannedReasonCode.NoWorkingTime) anyNoTime = true;
@@ -414,52 +526,149 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
                 reasons.Add(new PlanningReason(PlanningReasonCode.CalendarClosed,
                     $"Il calendario{(best.Machine is null ? "" : $" di {best.Machine.Code}")} è chiuso fino al {PlanningDateFormat.UntilToken}.",
                     firstWorking, null, best.Machine?.Id));
-            if (best.Start > firstWorking && best.Machine is not null)
+            if (best.Wait is { } w && best.Start > firstWorking)
+                reasons.Add(new PlanningReason(PlanningReasonCode.WaitingForTooling,
+                    $"Aspetta l'attrezzatura {w.Tooling.Code}, in uso su {(w.By.MachineId is { } bm && _equipment.TryGetValue(bm, out var bmm) ? bmm.Code : Label(w.By.WorkOrderId))} fino al {PlanningDateFormat.UntilToken}.",
+                    best.Start, w.By.WorkOrderId, w.By.MachineId));
+            else if (best.Start > firstWorking && best.Machine is not null)
                 reasons.Add(new PlanningReason(PlanningReasonCode.MachineBusy,
                     $"La macchina {best.Machine.Code} è occupata fino al {PlanningDateFormat.UntilToken}.", best.Start, null, best.Machine.Id));
 
             if (best.Machine is not null && best.End > best.Start) _busy[best.Machine.Id].Add(new PlanningInterval(best.Start, best.End));
             _end[job.WorkOrderId] = best.End;
-            _planned.Add(new PlannedJob(job.WorkOrderId, best.Machine?.Id, best.Start, best.End, false, reasons));
+            var setup = best.Setup!;
+            if (best.Machine is not null)
+            {
+                var seq = _seq[best.Machine.Id];
+                var pos = Position(seq, best.Start);
+                var (_, succ, newSetup) = CheckSuccessor(best.Machine, seq, pos, job.Setup);
+                if (succ is not null && !succ.IsFixed && newSetup is not null) ReviseSuccessor(best.Machine, succ, newSetup);
+                seq.Insert(pos, new SeqEntry(job.WorkOrderId, best.Start, best.End, job.Setup, false, job.StandardMinutes, setup));
+            }
+            if (best.End > best.Start)
+                foreach (var t in needed) UseTooling(t.ToolingId).Add(new ToolUse(job.WorkOrderId, best.Machine?.Id, best.Start, best.End));
+            _planned.Add(new PlannedJob(job.WorkOrderId, best.Machine?.Id, best.Start, best.End, false, reasons,
+                false, setup.Minutes, setup.Reasons, setup.IsFull));
         }
 
-        /// <summary>Earliest end wins; then the default machine of the phase; then the machine code.</summary>
+        /// <summary>The free job after an inserted one gets its recomputed (never larger) setup: same start, possibly earlier end.</summary>
+        private void ReviseSuccessor(PlanningEquipment machine, SeqEntry succ, SetupResult neu)
+        {
+            var oldEnd = succ.End;
+            if (neu.Minutes != succ.Setup?.Minutes)
+            {
+                var job = _jobs[succ.WorkOrderId];
+                var minutes = WorkingTimeCalculator.ApplyEfficiency(
+                    SetupCalculator.WithSetup(succ.StandardMinutes, job.FullSetupMinutes, neu), machine.EfficiencyPercent);
+                var e = _calc.AddWorkingMinutes(machine.Availability, succ.Start, minutes);
+                if (e.IsSuccess && CeilMinute(e.Value) <= oldEnd) succ.End = CeilMinute(e.Value);
+            }
+            succ.Setup = neu;
+            if (succ.End != oldEnd)
+            {
+                var b = _busy[machine.Id];
+                var i = b.FindIndex(x => x.Start == succ.Start && x.End == oldEnd);
+                if (i >= 0) b[i] = new PlanningInterval(succ.Start, succ.End);
+                foreach (var u in _toolUse.Values.SelectMany(l => l).Where(u => u.WorkOrderId == succ.WorkOrderId)) u.End = succ.End;
+                _end[succ.WorkOrderId] = succ.End;
+            }
+            var idx = _planned.FindIndex(p => p.WorkOrderId == succ.WorkOrderId);
+            if (idx >= 0) _planned[idx] = _planned[idx] with { End = succ.End, SetupMinutes = neu.Minutes, SetupReasons = neu.Reasons, IsFullSetup = neu.IsFull };
+        }
+
+        /// <summary>Earliest end wins; then the smaller setup; then the default machine of the phase; then the machine code.</summary>
         private static bool Better(Slot candidate, Slot best, PlanningJob job)
         {
             if (candidate.End != best.End) return candidate.End < best.End;
+            var cs = candidate.Setup?.Minutes ?? 0m;
+            var bs = best.Setup?.Minutes ?? 0m;
+            if (cs != bs) return cs < bs;
             var cd = candidate.Machine?.Id == job.DefaultEquipmentId;
             var bd = best.Machine?.Id == job.DefaultEquipmentId;
             if (cd != bd) return cd;
             return string.CompareOrdinal(candidate.Machine?.Code, best.Machine?.Code) < 0;
         }
 
-        /// <summary>First [start, end) with room on the machine (or on the default calendar when machine is null).</summary>
-        private Slot FindSlot(PlanningEquipment? machine, DateTime earliest, decimal standardMinutes)
+        /// <summary>
+        /// First [start, end) with room on the machine (or on the default calendar when machine is null) and with the tooling available.
+        /// The duration depends on the start (the setup follows from the job before it), so it is recomputed per candidate start.
+        /// </summary>
+        private Slot FindSlot(PlanningEquipment? machine, DateTime earliest, PlanningJob job)
         {
             var source = machine?.Availability ?? _input.DefaultAvailability;
             if (!AvailabilityResolver.HasAnyWorkingTime(source)) return new Slot(machine, earliest, earliest, UnplannedReasonCode.NoWorkingTime);
-            var minutes = WorkingTimeCalculator.ApplyEfficiency(Math.Max(0m, standardMinutes), machine?.EfficiencyPercent ?? 100m);
+            var efficiency = machine?.EfficiencyPercent ?? 100m;
             var capacity = machine is null ? int.MaxValue : Math.Max(1, machine.Capacity);
             var busy = machine is null ? null : _busy[machine.Id];
+            var seq = machine is null ? null : _seq[machine.Id];
+            var req = job.Setup;
+            var tools = (job.Tooling ?? []).DistinctBy(t => t.ToolingId).OrderBy(t => t.Code, StringComparer.Ordinal)
+                .Where(t => _tooling.ContainsKey(t.ToolingId)).Select(t => _tooling[t.ToolingId]).ToList();
 
+            var maxAttempts = (busy?.Count ?? 0) + (seq?.Count ?? 0) + _toolUse.Values.Sum(l => l.Count) + 2;
             var candidate = earliest;
+            ToolWait? wait = null;
             // Each retry moves past at least one interval end: more retries than intervals means something is wrong, never loop.
-            for (var attempt = 0; attempt <= (busy?.Count ?? 0) + 1; attempt++)
+            for (var attempt = 0; attempt <= maxAttempts; attempt++)
             {
                 var s = _calc.NextWorkingInstant(source, candidate);
                 if (!s.IsSuccess) return new Slot(machine, earliest, earliest, UnplannedReasonCode.NoWorkingTime);
                 var start = CeilMinute(s.Value);
                 if (start >= _horizonEnd) return new Slot(machine, start, start, UnplannedReasonCode.HorizonExceeded);
+
+                var pos = seq is null ? 0 : Position(seq, start);
+                var previous = pos > 0 ? MachineSetupState.After(seq![pos - 1].Req) : machine?.InitialState;
+                var setup = SetupCalculator.Compute(previous, req);
+                var standard = req.IsEmpty ? Math.Max(0m, job.StandardMinutes)
+                    : SetupCalculator.WithSetup(Math.Max(0m, job.StandardMinutes), job.FullSetupMinutes, setup);
+                var minutes = WorkingTimeCalculator.ApplyEfficiency(standard, efficiency);
+
                 var e = _calc.AddWorkingMinutes(source, start, minutes);
                 if (!e.IsSuccess) return new Slot(machine, start, start, UnplannedReasonCode.HorizonExceeded);
                 var end = CeilMinute(e.Value);
                 if (end > _horizonEnd) return new Slot(machine, start, end, UnplannedReasonCode.HorizonExceeded);
+                if (end == start) return new Slot(machine, start, end, null, setup);
 
-                if (busy is null || end == start || capacity == int.MaxValue) return new Slot(machine, start, end, null);
-                var overlapping = busy.Where(b => b.Start < end && b.End > start).ToList();
-                if (MaxDepth(overlapping, capacity) < capacity) return new Slot(machine, start, end, null);
-                // Retry when something is released: the earliest end of the overlapping intervals.
-                candidate = overlapping.Where(b => b.End > start).Min(b => b.End);
+                if (busy is not null && capacity != int.MaxValue)
+                {
+                    var overlapping = busy.Where(b => b.Start < end && b.End > start).ToList();
+                    if (MaxDepth(overlapping, capacity) >= capacity)
+                    {
+                        // Retry when something is released: the earliest end of the overlapping intervals.
+                        candidate = overlapping.Where(b => b.End > start).Min(b => b.End);
+                        wait = null;
+                        continue;
+                    }
+                }
+
+                ToolWait? blocked = null;
+                var until = DateTime.MinValue;
+                foreach (var t in tools)
+                {
+                    if (!_toolUse.TryGetValue(t.Id, out var uses)) continue;
+                    var quantity = Math.Max(1, t.Quantity);
+                    var overlapping = uses.Where(u => u.Start < end && u.End > start).ToList();
+                    if (MaxDepth(overlapping.Select(u => new PlanningInterval(u.Start, u.End)).ToList(), quantity) < quantity) continue;
+                    var by = overlapping.OrderBy(u => u.End).ThenBy(u => u.WorkOrderId).First();
+                    blocked = new ToolWait(t, by);
+                    until = by.End;
+                    break;
+                }
+                if (blocked is not null)
+                {
+                    candidate = until;
+                    wait = blocked;
+                    continue;
+                }
+
+                if (machine is not null && !CheckSuccessor(machine, seq!, pos, req).Ok)
+                {
+                    // The job after the gap would get a larger setup: skip the gap.
+                    candidate = seq![pos].End > start ? seq[pos].End : start.AddMinutes(1);
+                    wait = null;
+                    continue;
+                }
+                return new Slot(machine, start, end, null, setup, wait);
             }
             return new Slot(machine, candidate, candidate, UnplannedReasonCode.HorizonExceeded);
         }

@@ -49,4 +49,30 @@ internal static class PlanningTestKit
     public static PlannedJob Of(this PlanningResult r, int id) => r.Planned.Single(p => p.WorkOrderId == id);
 
     public static UnplannedJob UnplannedOf(this PlanningResult r, int id) => r.Unplanned.Single(p => p.WorkOrderId == id);
+
+    // ---- tooling and setup -------------------------------------------------------------------
+
+    public static JobTooling Tl(int id, string code, int setupMinutes = 10) => new(id, code, setupMinutes);
+
+    public static JobSetupValue Val(string value, int changeMinutes = 5, int attributeId = 1, string code = "COL")
+        => new(attributeId, code, code, changeMinutes, value);
+
+    /// <summary>Job needing tooling/values: <paramref name="runMinutes"/> + <paramref name="full"/> = standard minutes.</summary>
+    public static PlanningJob Tooled(int id, decimal runMinutes, int[] machines, JobTooling[]? tooling = null, JobSetupValue[]? values = null,
+        decimal full = 15m, int[]? after = null, string? order = null, int? op = null, int priority = 0, DateTime? reqStart = null,
+        DateTime? reqEnd = null, int? defaultMachine = null, int? assigned = null, int? orderId = null)
+        => Job(id, runMinutes + full, machines, after, order ?? $"T{id}", op, priority, reqStart, reqEnd, assigned, defaultMachine, orderId: orderId ?? id)
+            .WithSetup(new SetupRequirements(tooling ?? [], values ?? [], full));
+
+    public static PlanningTooling Res(int id, string code, int quantity = 1, bool active = true, params int[] compatible)
+        => new(id, code, quantity, compatible, active);
+
+    public static PlanningEquipment WithState(this PlanningEquipment m, JobTooling[]? tooling, JobSetupValue[]? values = null)
+        => m with { InitialState = MachineSetupState.After(new SetupRequirements(tooling ?? [], values ?? [], 0m)) };
+
+    public static PlanningInput ToolInput(IEnumerable<PlanningJob> jobs, IEnumerable<PlanningEquipment> machines, IEnumerable<PlanningTooling> tooling)
+        => Input(jobs, machines) with { ToolingResources = tooling.ToList() };
+
+    public static PlanningResult PlanTool(IEnumerable<PlanningJob> jobs, IEnumerable<PlanningEquipment> machines, params PlanningTooling[] tooling)
+        => new ForwardFiniteCapacityEngine().Plan(ToolInput(jobs, machines, tooling));
 }

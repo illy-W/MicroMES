@@ -149,6 +149,44 @@ internal static class PlanningBench
         return new("Lavori fissati", Input(jobs, machines));
     }
 
+    /// <summary>One mould (Quantity 1) needed by jobs that could go to either of two machines: never used on both at once.</summary>
+    public static PlanningScenario SharedMould()
+    {
+        var machines = new[] { Machine(1, "VER-1"), Machine(2, "VER-2") };
+        var mould = new[] { Tl(1, "ST-01", 10) };
+        var jobs = Enumerable.Range(1, 6).Select(i => Tooled(i, 80, [1, 2], mould, full: 10, order: $"S-{i}", reqEnd: N(3, 12), orderId: i)).ToList();
+        return new("Stampo condiviso su due macchine", ToolInput(jobs, machines, [Res(1, "ST-01")]));
+    }
+
+    /// <summary>Same mould, different colour: 5 min instead of the full 15. The engine prefers the machine whose state gives the smaller setup.</summary>
+    public static PlanningScenario ReducedChangeover()
+    {
+        var mould = new[] { Tl(1, "ST-01", 10) };
+        var machines = new[]
+        {
+            Machine(1, "VER-1").WithState(mould, [Val("Rosso")]),
+            Machine(2, "VER-2").WithState(mould, [Val("Blu")])
+        };
+        var jobs = Enumerable.Range(1, 6)
+            .Select(i => Tooled(i, 60, [1, 2], mould, [Val(i % 2 == 0 ? "Rosso" : "Blu")], 15m, order: $"C-{i}", reqEnd: N(3, 12), defaultMachine: 1, orderId: i)).ToList();
+        return new("Cambio ridotto", ToolInput(jobs, machines, [Res(1, "ST-01", 2)]));
+    }
+
+    /// <summary>A tooling that fits one of the two machines only: its jobs go there, the others use both.</summary>
+    public static PlanningScenario PartialCompatibility()
+    {
+        var machines = new[] { Machine(1, "VER-1"), Machine(2, "VER-2") };
+        var tool = new[] { Tl(2, "ST-02", 10) };
+        var jobs = new List<PlanningJob>();
+        for (var i = 1; i <= 4; i++)
+        {
+            jobs.Add(Tooled(i, 70, [1, 2], tool, full: 10, order: $"P-{i}", reqEnd: N(3, 12), orderId: i));
+            jobs.Add(Job(10 + i, 70, [1, 2], order: $"Q-{i}", reqEnd: N(3, 12), orderId: 10 + i));
+        }
+        return new("Compatibilità parziale", ToolInput(jobs, machines, [Res(2, "ST-02", 1, true, 2)]));
+    }
+
     public static IReadOnlyList<PlanningScenario> All()
-        => [WorkshopQueues(), ConcurrentOrders(), BottleneckWithAlternatives(), DifferentCalendars(), LockedJobs()];
+        => [WorkshopQueues(), ConcurrentOrders(), BottleneckWithAlternatives(), DifferentCalendars(), LockedJobs(),
+            SharedMould(), ReducedChangeover(), PartialCompatibility()];
 }
