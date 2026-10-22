@@ -11,6 +11,8 @@ public class ProductionDataLoader(
     IWorkOrderRepository workOrders,
     IWorkOrderDependencyRepository dependencies,
     IWorkOrderMaterialRepository lines,
+    IWorkOrderToolingRepository toolingLines,
+    IWorkOrderSetupValueRepository setupValueLines,
     IWorkOrderResponseRepository sessions,
     IWorkOrderResponseScrapRepository scraps,
     IWorkOrderResponseCorrectionRepository corrections,
@@ -72,6 +74,8 @@ public class ProductionDataLoader(
         var sessionIds = data.Sessions.Select(x => x.Id).ToList();
         await foreach (var e in scraps.FetchAsync(x => sessionIds.Contains(x.WorkOrderResponseId))) data.Scraps.Add(e);
         await foreach (var c in corrections.FetchAsync(x => sessionIds.Contains(x.WorkOrderResponseId))) data.Corrections.Add(c);
+        await foreach (var l in toolingLines.FetchAsync(x => woIds.Contains(x.WorkOrderId))) data.ToolingLines.Add(l);
+        await foreach (var l in setupValueLines.FetchAsync(x => woIds.Contains(x.WorkOrderId))) data.SetupValueLines.Add(l);
         await foreach (var l in lines.FetchAsync(x => woIds.Contains(x.WorkOrderId))) data.Lines.Add(l);
 
         var materialIds = data.Orders.Values.Select(o => o.MaterialId).Concat(data.Lines.Select(l => l.MaterialId)).Distinct().ToList();

@@ -17,6 +17,8 @@ public static class Registrar
         services.AddRepository<IWorkOrderRepository, WorkOrderRepository>();
         services.AddRepository<IWorkOrderDependencyRepository, WorkOrderDependencyRepository>();
         services.AddRepository<IWorkOrderMaterialRepository, WorkOrderMaterialRepository>();
+        services.AddRepository<IWorkOrderToolingRepository, WorkOrderToolingRepository>();
+        services.AddRepository<IWorkOrderSetupValueRepository, WorkOrderSetupValueRepository>();
         services.AddRepository<IWorkOrderResponseRepository, WorkOrderResponseRepository>();
         services.AddRepository<IWorkOrderResponseScrapRepository, WorkOrderResponseScrapRepository>();
         services.AddRepository<IWorkOrderResponseCorrectionRepository, WorkOrderResponseCorrectionRepository>();

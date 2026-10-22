@@ -541,6 +541,59 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("RoutingStepDependencies", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStepSetupValue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("RoutingStepId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SetupAttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SetupAttributeId");
+
+                    b.HasIndex("RoutingStepId", "SetupAttributeId")
+                        .IsUnique();
+
+                    b.ToTable("RoutingStepSetupValues", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStepTooling", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("RoutingStepId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ToolingId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ToolingId");
+
+                    b.HasIndex("RoutingStepId", "ToolingId")
+                        .IsUnique();
+
+                    b.ToTable("RoutingStepTooling", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.ScrapReason", b =>
                 {
                     b.Property<int>("Id")
@@ -1135,6 +1188,85 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.ToTable("WorkOrderResponseScraps", (string)null);
                 });
 
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderSetupValue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AttributeChangeMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AttributeCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("AttributeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SetupAttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SetupAttributeId");
+
+                    b.HasIndex("WorkOrderId", "SetupAttributeId")
+                        .IsUnique();
+
+                    b.ToTable("WorkOrderSetupValues", (string)null);
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderTooling", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ToolingCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("ToolingId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ToolingName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("ToolingSetupMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ToolingId");
+
+                    b.HasIndex("WorkOrderId", "ToolingId")
+                        .IsUnique();
+
+                    b.ToTable("WorkOrderTooling", (string)null);
+                });
+
             modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.BomItem", b =>
                 {
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.Material", null)
@@ -1254,6 +1386,36 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.RoutingStep", null)
                         .WithMany()
                         .HasForeignKey("SuccessorStepId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStepSetupValue", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.RoutingStep", null)
+                        .WithMany()
+                        .HasForeignKey("RoutingStepId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.SetupAttribute", null)
+                        .WithMany()
+                        .HasForeignKey("SetupAttributeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.RoutingStepTooling", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.RoutingStep", null)
+                        .WithMany()
+                        .HasForeignKey("RoutingStepId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.Tooling", null)
+                        .WithMany()
+                        .HasForeignKey("ToolingId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1385,6 +1547,36 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrderResponse", null)
                         .WithMany()
                         .HasForeignKey("WorkOrderResponseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderSetupValue", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.SetupAttribute", null)
+                        .WithMany()
+                        .HasForeignKey("SetupAttributeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MicroMES.ApiCore.Persistence.Entities.WorkOrderTooling", b =>
+                {
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.Tooling", null)
+                        .WithMany()
+                        .HasForeignKey("ToolingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MicroMES.ApiCore.Persistence.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

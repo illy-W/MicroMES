@@ -7,6 +7,12 @@ public record PlannerMaterial(int Id, string Code, MaterialType Type, bool IsAct
 /// <summary>BOM row; ConsumedInStepId null (or not a step of the routing) = first start step.</summary>
 public record PlannerBomLine(int ComponentMaterialId, decimal Quantity, int? ConsumedInStepId = null);
 
+/// <summary>Tooling required by a routing step (current master data, used for the release snapshot).</summary>
+public record PlannerTooling(int Id, string Code, string Name, int SetupMinutes, bool IsActive);
+
+/// <summary>Setup attribute value of a routing step (current master data, used for the release snapshot).</summary>
+public record PlannerSetupValue(int AttributeId, string Code, string Name, int ChangeMinutes, bool IsActive, string Value);
+
 /// <summary>Routing step with the effective times already resolved (step value, else process segment value).</summary>
 public record PlannerStep(
     int StepId,
@@ -16,7 +22,9 @@ public record PlannerStep(
     string ProcessSegmentName,
     decimal SetupMinutes,
     decimal RunMinutesPerUnit,
-    string? Notes);
+    string? Notes,
+    IReadOnlyList<PlannerTooling>? Tooling = null,
+    IReadOnlyList<PlannerSetupValue>? SetupValues = null);
 
 public record PlannerRouting(IReadOnlyList<PlannerStep> Steps, IReadOnlyList<(int PredecessorStepId, int SuccessorStepId)> Dependencies);
 

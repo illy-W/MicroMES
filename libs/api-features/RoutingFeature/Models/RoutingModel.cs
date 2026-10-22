@@ -56,6 +56,26 @@ public class RoutingStepModel
     public double? PositionX { get; set; }
     public double? PositionY { get; set; }
     public List<RoutingStepComponentModel> ConsumedComponents { get; set; } = [];
+    /// <summary>Toolings required by the step, ordered by code.</summary>
+    public List<RoutingStepToolingModel> Tooling { get; set; } = [];
+    /// <summary>Setup attribute values of the step, ordered by attribute code.</summary>
+    public List<RoutingStepSetupValueModel> SetupValues { get; set; } = [];
+}
+
+public class RoutingStepToolingModel
+{
+    public required int Id { get; set; }
+    public required string Code { get; set; }
+    public required string Name { get; set; }
+    public required bool IsActive { get; set; }
+}
+
+public class RoutingStepSetupValueModel
+{
+    public required int AttributeId { get; set; }
+    public required string Code { get; set; }
+    public required string Name { get; set; }
+    public required string Value { get; set; }
 }
 
 public class RoutingDependencyModel

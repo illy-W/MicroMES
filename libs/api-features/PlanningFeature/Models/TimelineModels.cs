@@ -66,6 +66,10 @@ public class TimelineWorkOrderModel
     /// </summary>
     public required int Lane { get; set; }
     public required int Priority { get; set; }
+    /// <summary>Toolings required (snapshot taken at release).</summary>
+    public List<MicroMES.ApiFeatures.ProductionOrderFeature.Models.WorkOrderToolingModel> Tooling { get; set; } = [];
+    /// <summary>Setup attribute values (snapshot taken at release).</summary>
+    public List<MicroMES.ApiFeatures.ProductionOrderFeature.Models.WorkOrderSetupValueModel> SetupValues { get; set; } = [];
 }
 
 public class TimelineNonWorkingModel

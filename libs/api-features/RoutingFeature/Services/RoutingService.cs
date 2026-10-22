@@ -6,6 +6,8 @@ using MicroMES.ApiFeatures.MaterialFeature.Repositories;
 using MicroMES.ApiFeatures.ProcessSegmentFeature.Repositories;
 using MicroMES.ApiFeatures.RoutingFeature.Models;
 using MicroMES.ApiFeatures.RoutingFeature.Repositories;
+using MicroMES.ApiFeatures.ToolingFeature.Repositories;
+using System.Text.RegularExpressions;
 
 namespace MicroMES.ApiFeatures.RoutingFeature.Services;
 
@@ -30,6 +32,10 @@ public class RoutingService(
     private IRoutingStepDependencyRepository Dependencies => unitOfWork.GetRepository<IRoutingStepDependencyRepository>();
     private IBomItemRepository BomItems => unitOfWork.GetRepository<IBomItemRepository>();
     private IMaterialRepository Materials => unitOfWork.GetRepository<IMaterialRepository>();
+    private IRoutingStepToolingRepository StepTooling => unitOfWork.GetRepository<IRoutingStepToolingRepository>();
+    private IRoutingStepSetupValueRepository StepValues => unitOfWork.GetRepository<IRoutingStepSetupValueRepository>();
+    private IToolingRepository ToolingItems => unitOfWork.GetRepository<IToolingRepository>();
+    private ISetupAttributeRepository Attributes => unitOfWork.GetRepository<ISetupAttributeRepository>();
     private IProcessSegmentRepository Segments => unitOfWork.GetRepository<IProcessSegmentRepository>();
 
     public async Task<RoutingResult<RoutingModel>> GetAsync(int materialId)
@@ -79,6 +85,9 @@ public class RoutingService(
                 errors.Add($"Process segment '{seg.Code}' is not active.");
         }
         if (errors.Count > 0) return Failed(RoutingFailure.Invalid, errors);
+
+        // Toolings and setup attributes: must exist (404); must be active when newly added (422).
+        if (await CheckToolingAndAttributesAsync(request, existing) is { } linkError) return linkError;
 
         // Dependencies and graph rules.
         var edges = new HashSet<(string, string)>();
@@ -194,6 +203,10 @@ public class RoutingService(
             keyToId[s.Key] = added.Data.Id;
         }
 
+        // 4b. Toolings and setup values of every step.
+        foreach (var s in request.Steps)
+            if (await SyncLinksAsync(keyToId[s.Key], s) is { } linkError) return linkError;
+
         // 5. Create the dependencies.
         foreach (var (pred, succ) in edges)
         {
@@ -205,6 +218,95 @@ public class RoutingService(
             if (!added.IsSuccessful) return "Unable to create a dependency.";
         }
 
+        return null;
+    }
+
+    /// <summary>Trim and collapse inner whitespace; empty = null.</summary>
+    public static string? NormalizeValue(string? value)
+    {
+        var v = Regex.Replace(value ?? string.Empty, @"\s+", " ").Trim();
+        return v.Length == 0 ? null : v;
+    }
+
+    private async Task<RoutingResult<RoutingModel>?> CheckToolingAndAttributesAsync(
+        UpdateRoutingRequest request, Dictionary<int, RoutingStep> existing)
+    {
+        var toolingIds = request.Steps.SelectMany(s => s.ToolingIds ?? []).Distinct().ToList();
+        var attributeIds = request.Steps.SelectMany(s => s.SetupValues ?? []).Select(v => v.AttributeId!.Value).Distinct().ToList();
+        if (toolingIds.Count == 0 && attributeIds.Count == 0) return null;
+
+        var toolings = new Dictionary<int, Tooling>();
+        await foreach (var t in ToolingItems.FetchAsync(x => toolingIds.Contains(x.Id))) toolings[t.Id] = t;
+        var attributes = new Dictionary<int, SetupAttribute>();
+        await foreach (var a in Attributes.FetchAsync(x => attributeIds.Contains(x.Id))) attributes[a.Id] = a;
+        var missingTooling = toolingIds.FirstOrDefault(i => !toolings.ContainsKey(i));
+        if (missingTooling != 0) return Failed(RoutingFailure.NotFound, $"Attrezzatura {missingTooling} non trovata.");
+        var missingAttribute = attributeIds.FirstOrDefault(i => !attributes.ContainsKey(i));
+        if (missingAttribute != 0) return Failed(RoutingFailure.NotFound, $"Attributo di cambio {missingAttribute} non trovato.");
+
+        var existingIds = existing.Keys.ToList();
+        var linkedTooling = new HashSet<(int, int)>();
+        await foreach (var l in StepTooling.FetchAsync(x => existingIds.Contains(x.RoutingStepId))) linkedTooling.Add((l.RoutingStepId, l.ToolingId));
+        var linkedValues = new HashSet<(int, int)>();
+        await foreach (var l in StepValues.FetchAsync(x => existingIds.Contains(x.RoutingStepId))) linkedValues.Add((l.RoutingStepId, l.SetupAttributeId));
+
+        var errors = new List<string>();
+        foreach (var s in request.Steps)
+        {
+            foreach (var id in (s.ToolingIds ?? []).Distinct())
+            {
+                var t = toolings[id];
+                var already = s.Id is { } sid && linkedTooling.Contains((sid, id));
+                if (!t.IsActive && !already) errors.Add($"L'attrezzatura {t.Code} è disattivata: non si può aggiungere al passo {s.OperationNumber}.");
+            }
+            foreach (var v in s.SetupValues ?? [])
+            {
+                if (NormalizeValue(v.Value) is null) continue;
+                var a = attributes[v.AttributeId!.Value];
+                var already = s.Id is { } sid && linkedValues.Contains((sid, a.Id));
+                if (!a.IsActive && !already) errors.Add($"L'attributo di cambio {a.Code} è disattivato: non si può aggiungere al passo {s.OperationNumber}.");
+            }
+        }
+        return errors.Count == 0 ? null : Failed(RoutingFailure.Invalid, errors.Distinct());
+    }
+
+    /// <summary>Aligns tooling and setup values of a step with the request (null list = unchanged).</summary>
+    private async Task<string?> SyncLinksAsync(int stepId, UpdateRoutingStepRequest s)
+    {
+        if (s.ToolingIds is { } wanted)
+        {
+            var ids = wanted.Distinct().ToList();
+            var current = new List<RoutingStepTooling>();
+            await foreach (var l in StepTooling.FetchAsync(x => x.RoutingStepId == stepId)) current.Add(l);
+            foreach (var l in current.Where(l => !ids.Contains(l.ToolingId)))
+                if (!(await StepTooling.DeleteAsync(l)).IsSuccessful) return "Unable to remove a step tooling.";
+            foreach (var id in ids.Where(id => current.All(l => l.ToolingId != id)))
+                if (!(await StepTooling.AddAsync(new RoutingStepTooling { RoutingStepId = stepId, ToolingId = id })).IsSuccessful)
+                    return "Unable to add a step tooling.";
+        }
+        if (s.SetupValues is { } values)
+        {
+            var wantedValues = new Dictionary<int, string?>();
+            foreach (var v in values) wantedValues[v.AttributeId!.Value] = NormalizeValue(v.Value); // last wins
+            var current = new List<RoutingStepSetupValue>();
+            await foreach (var l in StepValues.FetchAsync(x => x.RoutingStepId == stepId)) current.Add(l);
+            foreach (var l in current)
+            {
+                if (!wantedValues.TryGetValue(l.SetupAttributeId, out var nv)) continue;
+                if (nv is null)
+                {
+                    if (!(await StepValues.DeleteAsync(l)).IsSuccessful) return "Unable to remove a setup value.";
+                }
+                else if (l.Value != nv)
+                {
+                    l.Value = nv;
+                    if (!(await StepValues.UpdateAsync(l)).IsSuccessful) return "Unable to update a setup value.";
+                }
+            }
+            foreach (var (attr, nv) in wantedValues.Where(kv => kv.Value is not null && current.All(l => l.SetupAttributeId != kv.Key)))
+                if (!(await StepValues.AddAsync(new RoutingStepSetupValue { RoutingStepId = stepId, SetupAttributeId = attr, Value = nv! })).IsSuccessful)
+                    return "Unable to add a setup value.";
+        }
         return null;
     }
 
@@ -271,6 +373,16 @@ public class RoutingService(
         var compIds = bomRows.Select(b => b.ComponentMaterialId).ToList();
         var compMap = new Dictionary<int, Material>();
         await foreach (var m in Materials.FetchAsync(x => compIds.Contains(x.Id))) compMap[m.Id] = m;
+        var toolLinks = new List<RoutingStepTooling>();
+        await foreach (var l in StepTooling.FetchAsync(x => stepIds.Contains(x.RoutingStepId))) toolLinks.Add(l);
+        var valueLinks = new List<RoutingStepSetupValue>();
+        await foreach (var l in StepValues.FetchAsync(x => stepIds.Contains(x.RoutingStepId))) valueLinks.Add(l);
+        var toolIds = toolLinks.Select(l => l.ToolingId).Distinct().ToList();
+        var toolMap = new Dictionary<int, Tooling>();
+        await foreach (var t in ToolingItems.FetchAsync(x => toolIds.Contains(x.Id))) toolMap[t.Id] = t;
+        var attrIds = valueLinks.Select(l => l.SetupAttributeId).Distinct().ToList();
+        var attrMap = new Dictionary<int, SetupAttribute>();
+        await foreach (var a in Attributes.FetchAsync(x => attrIds.Contains(x.Id))) attrMap[a.Id] = a;
         var firstStartId = RoutingStepRules.FirstStartStep(stepList, depList)?.Id;
         int? EffectiveStepId(BomItem b) => b.ConsumedInStepId ?? firstStartId;
 
@@ -295,6 +407,12 @@ public class RoutingService(
                     Notes = s.Notes,
                     PositionX = s.PositionX,
                     PositionY = s.PositionY,
+                    Tooling = toolLinks.Where(l => l.RoutingStepId == s.Id).Select(l => toolMap[l.ToolingId])
+                        .OrderBy(t => t.Code, StringComparer.Ordinal)
+                        .Select(t => new RoutingStepToolingModel { Id = t.Id, Code = t.Code, Name = t.Name, IsActive = t.IsActive }).ToList(),
+                    SetupValues = valueLinks.Where(l => l.RoutingStepId == s.Id)
+                        .Select(l => new RoutingStepSetupValueModel { AttributeId = l.SetupAttributeId, Code = attrMap[l.SetupAttributeId].Code, Name = attrMap[l.SetupAttributeId].Name, Value = l.Value })
+                        .OrderBy(v => v.Code, StringComparer.Ordinal).ToList(),
                     ConsumedComponents = bomRows.Where(b => EffectiveStepId(b) == s.Id)
                         .OrderBy(b => compMap[b.ComponentMaterialId].Code, StringComparer.Ordinal)
                         .Select(b => new RoutingStepComponentModel

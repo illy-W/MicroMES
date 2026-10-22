@@ -17,6 +17,8 @@ public class ProductionData(TimeProvider timeProvider)
     public List<WorkOrderDependency> Dependencies { get; } = [];
     public List<WorkOrderResponse> Sessions { get; } = [];
     public List<WorkOrderMaterial> Lines { get; } = [];
+    public List<WorkOrderTooling> ToolingLines { get; } = [];
+    public List<WorkOrderSetupValue> SetupValueLines { get; } = [];
     public List<WorkOrderResponseScrap> Scraps { get; } = [];
     public List<WorkOrderResponseCorrection> Corrections { get; } = [];
     public Dictionary<int, Material> Materials { get; } = [];
@@ -169,6 +171,14 @@ public class ProductionData(TimeProvider timeProvider)
         };
     }
 
+    public List<WorkOrderToolingModel> ToolingOf(int workOrderId)
+        => ToolingLines.Where(l => l.WorkOrderId == workOrderId).OrderBy(l => l.ToolingCode, StringComparer.Ordinal)
+            .Select(l => new WorkOrderToolingModel { ToolingId = l.ToolingId, Code = l.ToolingCode, Name = l.ToolingName }).ToList();
+
+    public List<WorkOrderSetupValueModel> SetupValuesOf(int workOrderId)
+        => SetupValueLines.Where(l => l.WorkOrderId == workOrderId).OrderBy(l => l.AttributeCode, StringComparer.Ordinal)
+            .Select(l => new WorkOrderSetupValueModel { Code = l.AttributeCode, Name = l.AttributeName, Value = l.Value }).ToList();
+
     public WorkOrderModel ToWorkOrderModel(WorkOrder wo)
     {
         var order = Orders[wo.ProductionOrderId];
@@ -311,6 +321,7 @@ public class ProductionData(TimeProvider timeProvider)
             StartedAt = m.StartedAt, EndedAt = m.EndedAt, PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt,
             PlannedAt = m.PlannedAt, PlanStatus = m.PlanStatus, PlanStatusReason = m.PlanStatusReason, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt, Predecessors = m.Predecessors, Successors = m.Successors,
             AllowedActions = m.AllowedActions,
+            Tooling = ToolingOf(wo.Id), SetupValues = SetupValuesOf(wo.Id),
             Sessions = SessionsOf(wo.Id).Select(s => new WorkOrderSessionModel
             {
                 Id = s.Id,
@@ -474,6 +485,7 @@ public class ProductionData(TimeProvider timeProvider)
                     PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes,
                     PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt, PlanStatus = m.PlanStatus, PlanStatusReason = m.PlanStatusReason, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt,
                     AllowedActions = m.AllowedActions,
+                    Tooling = ToolingOf(w.Id), SetupValues = SetupValuesOf(w.Id),
                     Materials = Lines.Where(l => l.WorkOrderId == w.Id).OrderBy(l => l.Id).Select(ToMaterialModel).ToList()
                 };
             }).ToList(),

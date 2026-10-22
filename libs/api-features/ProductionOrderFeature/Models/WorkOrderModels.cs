@@ -127,8 +127,26 @@ public class WorkOrderModel
     public required List<string> AllowedActions { get; set; }
 }
 
+/// <summary>Tooling required by a work order (snapshot taken at release).</summary>
+public class WorkOrderToolingModel
+{
+    public required int ToolingId { get; set; }
+    public required string Code { get; set; }
+    public required string Name { get; set; }
+}
+
+/// <summary>Setup attribute value of a work order (snapshot taken at release).</summary>
+public class WorkOrderSetupValueModel
+{
+    public required string Code { get; set; }
+    public required string Name { get; set; }
+    public required string Value { get; set; }
+}
+
 public class WorkOrderDetailModel : WorkOrderModel
 {
+    public List<WorkOrderToolingModel> Tooling { get; set; } = [];
+    public List<WorkOrderSetupValueModel> SetupValues { get; set; } = [];
     public required List<WorkOrderSessionModel> Sessions { get; set; }
     public required List<WorkOrderMaterialModel> Materials { get; set; }
 }

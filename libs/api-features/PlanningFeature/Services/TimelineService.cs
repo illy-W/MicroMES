@@ -145,7 +145,8 @@ public class TimelineService(
             ActualEndAt = wo.Status is WorkOrderStatus.Ended or WorkOrderStatus.Aborted ? Utc(wo.EndedAt ?? sessions.LastOrDefault()?.EndedAt) : null,
             Status = wo.Status, PlanStatus = data.PlanStatusOf(wo), PlanStatusReason = data.PlanStatusReasonOf(wo), IsPlanLocked = wo.IsPlanLocked, PlanLockedAt = Utc(wo.PlanLockedAt), IsLate = late,
             LateDays = late ? (int)Math.Ceiling((wo.PlannedEndAt!.Value - order.RequestedEnd!.Value).TotalDays) : 0,
-            PredecessorIds = data.PredecessorIds(wo.Id).OrderBy(i => i).ToList(), Lane = lane, Priority = order.Priority
+            PredecessorIds = data.PredecessorIds(wo.Id).OrderBy(i => i).ToList(), Lane = lane, Priority = order.Priority,
+            Tooling = data.ToolingOf(wo.Id), SetupValues = data.SetupValuesOf(wo.Id)
         };
     }
 }

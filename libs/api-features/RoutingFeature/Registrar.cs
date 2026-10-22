@@ -12,6 +12,8 @@ public static class Registrar
     {
         services.AddRepository<IRoutingStepRepository, RoutingStepRepository>();
         services.AddRepository<IRoutingStepDependencyRepository, RoutingStepDependencyRepository>();
+        services.AddRepository<IRoutingStepToolingRepository, RoutingStepToolingRepository>();
+        services.AddRepository<IRoutingStepSetupValueRepository, RoutingStepSetupValueRepository>();
         services.AddUnitOfWork<AppDbContext>();
         services.AddScoped<RoutingService>();
         return services;

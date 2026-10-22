@@ -48,6 +48,8 @@ public class ProductionOrderOverviewWorkOrderModel
     public DateTime? PlanLockedAt { get; set; }
     /// <summary>Commands the UI may offer now: Start, Pause, Resume, Stop, Abort.</summary>
     public required List<string> AllowedActions { get; set; }
+    public List<WorkOrderToolingModel> Tooling { get; set; } = [];
+    public List<WorkOrderSetupValueModel> SetupValues { get; set; } = [];
     /// <summary>Materials consumed by this work order (ChildProductionOrderId set for intermediates made by a child order).</summary>
     public required List<WorkOrderMaterialModel> Materials { get; set; }
 }

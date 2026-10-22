@@ -21,6 +21,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Tooling> Tooling { get; set; } = null!;
     public DbSet<ToolingEquipment> ToolingEquipment { get; set; } = null!;
     public DbSet<SetupAttribute> SetupAttributes { get; set; } = null!;
+    public DbSet<RoutingStepTooling> RoutingStepTooling { get; set; } = null!;
+    public DbSet<RoutingStepSetupValue> RoutingStepSetupValues { get; set; } = null!;
+    public DbSet<WorkOrderTooling> WorkOrderTooling { get; set; } = null!;
+    public DbSet<WorkOrderSetupValue> WorkOrderSetupValues { get; set; } = null!;
     public DbSet<EquipmentProcessSegment> EquipmentProcessSegments { get; set; } = null!;
     public DbSet<WorkOrderResponseScrap> WorkOrderResponseScraps { get; set; } = null!;
     public DbSet<WorkOrderResponseCorrection> WorkOrderResponseCorrections { get; set; } = null!;
@@ -227,6 +231,51 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.IsActive).HasDefaultValue(true);
             entity.Property(x => x.ChangeMinutes).HasDefaultValue(0);
             entity.HasIndex(x => x.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<RoutingStepTooling>(entity =>
+        {
+            entity.ToTable("RoutingStepTooling");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.RoutingStepId, x.ToolingId }).IsUnique();
+            entity.HasIndex(x => x.ToolingId);
+            entity.HasOne<RoutingStep>().WithMany().HasForeignKey(x => x.RoutingStepId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Tooling>().WithMany().HasForeignKey(x => x.ToolingId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<RoutingStepSetupValue>(entity =>
+        {
+            entity.ToTable("RoutingStepSetupValues");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Value).IsRequired().HasMaxLength(200);
+            entity.HasIndex(x => new { x.RoutingStepId, x.SetupAttributeId }).IsUnique();
+            entity.HasIndex(x => x.SetupAttributeId);
+            entity.HasOne<RoutingStep>().WithMany().HasForeignKey(x => x.RoutingStepId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<SetupAttribute>().WithMany().HasForeignKey(x => x.SetupAttributeId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkOrderTooling>(entity =>
+        {
+            entity.ToTable("WorkOrderTooling");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ToolingCode).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.ToolingName).IsRequired().HasMaxLength(200);
+            entity.HasIndex(x => new { x.WorkOrderId, x.ToolingId }).IsUnique();
+            entity.HasIndex(x => x.ToolingId);
+            entity.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Tooling>().WithMany().HasForeignKey(x => x.ToolingId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkOrderSetupValue>(entity =>
+        {
+            entity.ToTable("WorkOrderSetupValues");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.AttributeCode).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.AttributeName).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Value).IsRequired().HasMaxLength(200);
+            entity.HasIndex(x => new { x.WorkOrderId, x.SetupAttributeId }).IsUnique();
+            entity.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<SetupAttribute>().WithMany().HasForeignKey(x => x.SetupAttributeId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<EquipmentProcessSegment>(entity =>

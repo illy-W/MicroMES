@@ -37,6 +37,21 @@ public class UpdateRoutingStepRequest
 
     public double? PositionX { get; set; }
     public double? PositionY { get; set; }
+
+    /// <summary>Toolings required by the step (one unit each; duplicates ignored). Null = unchanged (empty for a new step), empty = none.</summary>
+    public List<int>? ToolingIds { get; set; }
+
+    /// <summary>Setup attribute values of the step. Null = unchanged (none for a new step); an empty value removes the attribute.</summary>
+    public List<UpdateRoutingSetupValueRequest>? SetupValues { get; set; }
+}
+
+public class UpdateRoutingSetupValueRequest
+{
+    [Required]
+    public int? AttributeId { get; set; }
+
+    [StringLength(200)]
+    public string? Value { get; set; }
 }
 
 public class UpdateRoutingDependencyRequest

@@ -1,6 +1,10 @@
 using illyW.Framework.Core.RepositoryPattern;
 using MicroMES.ApiCore.Persistence.Entities;
 using MicroMES.ApiFeatures.EquipmentFeature.Repositories;
+using MicroMES.ApiFeatures.MaterialFeature.Repositories;
+using MicroMES.ApiFeatures.ProcessSegmentFeature.Repositories;
+using MicroMES.ApiFeatures.ProductionOrderFeature.Repositories;
+using MicroMES.ApiFeatures.RoutingFeature.Repositories;
 using MicroMES.ApiFeatures.ToolingFeature.Models;
 using MicroMES.ApiFeatures.ToolingFeature.Repositories;
 
@@ -10,6 +14,13 @@ public class ToolingService(IUnitOfWork unitOfWork)
 {
     private IToolingRepository Repo => unitOfWork.GetRepository<IToolingRepository>();
     private IToolingEquipmentRepository Links => unitOfWork.GetRepository<IToolingEquipmentRepository>();
+    private IRoutingStepToolingRepository StepLinks => unitOfWork.GetRepository<IRoutingStepToolingRepository>();
+    private IRoutingStepRepository RoutingSteps => unitOfWork.GetRepository<IRoutingStepRepository>();
+    private IMaterialRepository Materials => unitOfWork.GetRepository<IMaterialRepository>();
+    private IProcessSegmentRepository Segments => unitOfWork.GetRepository<IProcessSegmentRepository>();
+    private IWorkOrderToolingRepository WorkOrderLinks => unitOfWork.GetRepository<IWorkOrderToolingRepository>();
+    private IWorkOrderRepository WorkOrders => unitOfWork.GetRepository<IWorkOrderRepository>();
+    private IProductionOrderRepository Orders => unitOfWork.GetRepository<IProductionOrderRepository>();
     private IEquipmentRepository EquipmentItems => unitOfWork.GetRepository<IEquipmentRepository>();
 
     /// <summary>Toolings; q matches code or name (case-insensitive); isActive null = all.</summary>
@@ -161,8 +172,43 @@ public class ToolingService(IUnitOfWork unitOfWork)
             Id = b.Id, Code = b.Code, Name = b.Name, Description = b.Description, Quantity = b.Quantity,
             SetupMinutes = b.SetupMinutes, IsActive = b.IsActive, EquipmentCount = b.EquipmentCount,
             CreatedAt = b.CreatedAt, UpdatedAt = b.UpdatedAt,
-            Equipment = equipment, RoutingSteps = [], WorkOrders = []
+            Equipment = equipment, RoutingSteps = await RoutingStepsOfAsync(t.Id), WorkOrders = await OpenWorkOrdersOfAsync(t.Id)
         };
+    }
+
+    /// <summary>Routing steps requiring the tooling: code '{material code} / op {n}', name = process segment name.</summary>
+    private async Task<List<ToolingUsageModel>> RoutingStepsOfAsync(int toolingId)
+    {
+        var stepIds = new List<int>();
+        await foreach (var l in StepLinks.FetchAsync(x => x.ToolingId == toolingId)) stepIds.Add(l.RoutingStepId);
+        var steps = new List<RoutingStep>();
+        await foreach (var st in RoutingSteps.FetchAsync(x => stepIds.Contains(x.Id))) steps.Add(st);
+        var materialIds = steps.Select(x => x.MaterialId).Distinct().ToList();
+        var materials = new Dictionary<int, Material>();
+        await foreach (var m in Materials.FetchAsync(x => materialIds.Contains(x.Id))) materials[m.Id] = m;
+        var segmentIds = steps.Select(x => x.ProcessSegmentId).Distinct().ToList();
+        var segments = new Dictionary<int, ProcessSegment>();
+        await foreach (var sg in Segments.FetchAsync(x => segmentIds.Contains(x.Id))) segments[sg.Id] = sg;
+        return steps.OrderBy(x => materials[x.MaterialId].Code, StringComparer.Ordinal).ThenBy(x => x.OperationNumber)
+            .Select(x => new ToolingUsageModel
+            {
+                Id = x.Id, Code = $"{materials[x.MaterialId].Code} / op {x.OperationNumber}", Name = segments[x.ProcessSegmentId].Name
+            }).ToList();
+    }
+
+    /// <summary>Open (not Ended/Aborted) work orders requiring the tooling: code '{order}/{op}', name = process segment name.</summary>
+    private async Task<List<ToolingUsageModel>> OpenWorkOrdersOfAsync(int toolingId)
+    {
+        var woIds = new List<int>();
+        await foreach (var l in WorkOrderLinks.FetchAsync(x => x.ToolingId == toolingId)) woIds.Add(l.WorkOrderId);
+        var items = new List<WorkOrder>();
+        await foreach (var w in WorkOrders.FetchAsync(x => woIds.Contains(x.Id)
+                         && x.Status != WorkOrderStatus.Ended && x.Status != WorkOrderStatus.Aborted)) items.Add(w);
+        var orderIds = items.Select(w => w.ProductionOrderId).Distinct().ToList();
+        var orders = new Dictionary<int, ProductionOrder>();
+        await foreach (var o in Orders.FetchAsync(x => orderIds.Contains(x.Id))) orders[o.Id] = o;
+        return items.OrderBy(w => orders[w.ProductionOrderId].Code, StringComparer.Ordinal).ThenBy(w => w.OperationNumber)
+            .Select(w => new ToolingUsageModel { Id = w.Id, Code = $"{orders[w.ProductionOrderId].Code}/{w.OperationNumber}", Name = w.ProcessSegmentName }).ToList();
     }
 
     private static ToolingModel ToModel(Tooling t, int equipmentCount) => new()

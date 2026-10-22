@@ -10,6 +10,7 @@ using MicroMES.ApiFeatures.ProductionOrderFeature.Models;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Planning;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Repositories;
 using MicroMES.ApiFeatures.RoutingFeature.Repositories;
+using MicroMES.ApiFeatures.ToolingFeature.Repositories;
 
 namespace MicroMES.ApiFeatures.ProductionOrderFeature.Services;
 
@@ -31,6 +32,12 @@ public class ProductionOrderService(
     private IBomItemRepository BomItems => unitOfWork.GetRepository<IBomItemRepository>();
     private IRoutingStepRepository RoutingSteps => unitOfWork.GetRepository<IRoutingStepRepository>();
     private IRoutingStepDependencyRepository RoutingDependencies => unitOfWork.GetRepository<IRoutingStepDependencyRepository>();
+    private IRoutingStepToolingRepository RoutingStepTooling => unitOfWork.GetRepository<IRoutingStepToolingRepository>();
+    private IRoutingStepSetupValueRepository RoutingStepValues => unitOfWork.GetRepository<IRoutingStepSetupValueRepository>();
+    private IToolingRepository ToolingItems => unitOfWork.GetRepository<IToolingRepository>();
+    private ISetupAttributeRepository SetupAttributes => unitOfWork.GetRepository<ISetupAttributeRepository>();
+    private IWorkOrderToolingRepository WorkOrderTooling => unitOfWork.GetRepository<IWorkOrderToolingRepository>();
+    private IWorkOrderSetupValueRepository WorkOrderValues => unitOfWork.GetRepository<IWorkOrderSetupValueRepository>();
     private IProcessSegmentRepository Segments => unitOfWork.GetRepository<IProcessSegmentRepository>();
 
     // ---- queries ------------------------------------------------------------------------------------
@@ -155,6 +162,9 @@ public class ProductionOrderService(
         var plan = ProductionOrderPlanner.Plan(order.MaterialId, order.Quantity, catalog);
         if (plan.Order is null) return ProductionOrderResult<ProductionOrderDetailModel>.Invalid(plan.Message!);
 
+        if (InactiveToolingMessage(plan.Order, catalog) is { } toolingError)
+            return ProductionOrderResult<ProductionOrderDetailModel>.Invalid(toolingError);
+
         try
         {
             unitOfWork.BeginTransaction();
@@ -173,6 +183,18 @@ public class ProductionOrderService(
         }
 
         return ProductionOrderResult<ProductionOrderDetailModel>.Ok(data.ToOrderDetail(order));
+    }
+
+    /// <summary>422 message when a required tooling (of the order or of a child) is inactive at release; null otherwise.</summary>
+    private static string? InactiveToolingMessage(PlannedOrder plan, PlannerCatalog catalog)
+    {
+        foreach (var w in plan.WorkOrders)
+            foreach (var t in w.Step.Tooling ?? [])
+                if (!t.IsActive)
+                    return $"L'attrezzatura {t.Code} richiesta dal passo {w.Step.OperationNumber} {w.Step.ProcessSegmentName} di {catalog.Materials[plan.MaterialId].Code} è disattivata.";
+        foreach (var c in plan.Children)
+            if (InactiveToolingMessage(c, catalog) is { } m) return m;
+        return null;
     }
 
     private async Task<PlannerCatalog> LoadCatalogAsync(int rootMaterialId)
@@ -210,6 +232,17 @@ public class ProductionOrderService(
         var deps = new List<RoutingStepDependency>();
         await foreach (var d in RoutingDependencies.FetchAsync(x => stepIds.Contains(x.PredecessorStepId))) deps.Add(d);
 
+        var toolLinks = new List<RoutingStepTooling>();
+        await foreach (var l in RoutingStepTooling.FetchAsync(x => stepIds.Contains(x.RoutingStepId))) toolLinks.Add(l);
+        var valueLinks = new List<RoutingStepSetupValue>();
+        await foreach (var l in RoutingStepValues.FetchAsync(x => stepIds.Contains(x.RoutingStepId))) valueLinks.Add(l);
+        var toolIds = toolLinks.Select(l => l.ToolingId).Distinct().ToList();
+        var toolMap = new Dictionary<int, Tooling>();
+        await foreach (var t in ToolingItems.FetchAsync(x => toolIds.Contains(x.Id))) toolMap[t.Id] = t;
+        var attrIds = valueLinks.Select(l => l.SetupAttributeId).Distinct().ToList();
+        var attrMap = new Dictionary<int, SetupAttribute>();
+        await foreach (var a in SetupAttributes.FetchAsync(x => attrIds.Contains(x.Id))) attrMap[a.Id] = a;
+
         foreach (var group in steps.GroupBy(s => s.MaterialId))
         {
             var groupIds = group.Select(s => s.Id).ToHashSet();
@@ -219,7 +252,12 @@ public class ProductionOrderService(
                     var seg = segmentMap[s.ProcessSegmentId];
                     return new PlannerStep(
                         s.Id, s.OperationNumber, seg.Id, seg.Code, seg.Name,
-                        s.SetupMinutes ?? seg.SetupMinutes, s.RunMinutesPerUnit ?? seg.RunMinutesPerUnit, s.Notes);
+                        s.SetupMinutes ?? seg.SetupMinutes, s.RunMinutesPerUnit ?? seg.RunMinutesPerUnit, s.Notes,
+                        toolLinks.Where(l => l.RoutingStepId == s.Id).Select(l => toolMap[l.ToolingId]).OrderBy(t => t.Code, StringComparer.Ordinal)
+                            .Select(t => new PlannerTooling(t.Id, t.Code, t.Name, t.SetupMinutes, t.IsActive)).ToList(),
+                        valueLinks.Where(l => l.RoutingStepId == s.Id).Select(l => (Link: l, Attr: attrMap[l.SetupAttributeId]))
+                            .OrderBy(x => x.Attr.Code, StringComparer.Ordinal)
+                            .Select(x => new PlannerSetupValue(x.Attr.Id, x.Attr.Code, x.Attr.Name, x.Attr.ChangeMinutes, x.Attr.IsActive, x.Link.Value)).ToList());
                 }).ToList(),
                 deps.Where(d => groupIds.Contains(d.PredecessorStepId)).Select(d => (d.PredecessorStepId, d.SuccessorStepId)).ToList());
         }
@@ -255,6 +293,18 @@ public class ProductionOrderService(
             }), "Impossibile creare un ordine di lavoro.");
             created[planned] = wo;
             data.WorkOrders[wo.Id] = wo;
+            foreach (var t in planned.Step.Tooling ?? [])
+                data.ToolingLines.Add(Persist.Ensure(await WorkOrderTooling.AddAsync(new WorkOrderTooling
+                {
+                    WorkOrderId = wo.Id, ToolingId = t.Id, ToolingCode = t.Code, ToolingName = t.Name, ToolingSetupMinutes = t.SetupMinutes
+                }), "Impossibile copiare un'attrezzatura richiesta."));
+            // Only values of ACTIVE attributes are copied: an inactive attribute no longer drives setup times.
+            foreach (var v in (planned.Step.SetupValues ?? []).Where(v => v.IsActive))
+                data.SetupValueLines.Add(Persist.Ensure(await WorkOrderValues.AddAsync(new WorkOrderSetupValue
+                {
+                    WorkOrderId = wo.Id, SetupAttributeId = v.AttributeId, AttributeCode = v.Code, AttributeName = v.Name,
+                    AttributeChangeMinutes = v.ChangeMinutes, Value = v.Value
+                }), "Impossibile copiare un attributo di cambio."));
             foreach (var m in machinesOfPhase ?? [])
                 data.EquipmentLinks.Add((m.Equipment.Id, wo.ProcessSegmentId));
             if (assigned is not null) data.Equipment[assigned.Id] = assigned;
