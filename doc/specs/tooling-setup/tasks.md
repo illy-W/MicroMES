@@ -12,8 +12,8 @@
 
 ## Backend
 
-- [ ] 1.1 [Backend] Entità e migration: `Tooling` (codice univoco maiuscolo, nome, descrizione, `Quantity` ≥ 1, `SetupMinutes` ≥ 0, `IsActive`), `ToolingEquipment`, `SetupAttribute` (codice univoco, nome, `ChangeMinutes` ≥ 0, `IsActive`). _Satisfies: REQ-1, REQ-3_
-- [ ] 1.2 [Backend] `ToolingFeature`: CRUD attrezzature (con compatibilità macchine, disattivazione, dettaglio con passi e lavori che le usano) e CRUD attributi di cambio; 404/409/422 specifici; test unitari e di integrazione. _Satisfies: REQ-1, REQ-3_
+- [x] 1.1 [Backend] Entità e migration: `Tooling` (codice univoco maiuscolo, nome, descrizione, `Quantity` ≥ 1, `SetupMinutes` ≥ 0, `IsActive`), `ToolingEquipment`, `SetupAttribute` (codice univoco, nome, `ChangeMinutes` ≥ 0, `IsActive`). _Satisfies: REQ-1, REQ-3_
+- [x] 1.2 [Backend] `ToolingFeature`: CRUD attrezzature (con compatibilità macchine, disattivazione, dettaglio con passi e lavori che le usano) e CRUD attributi di cambio; 404/409/422 specifici; test unitari e di integrazione. _Satisfies: REQ-1, REQ-3_
 - [ ] 1.3 [Backend] Passo di ciclo: attrezzature richieste (N:M, una unità) e valori degli attributi; validazione (attive, valori normalizzati); modelli e endpoint del ciclo estesi; test. _Satisfies: REQ-2, REQ-3_
 - [ ] 1.4 [Backend] Snapshot al rilascio: `WorkOrderTooling` e `WorkOrderSetupValue` con codici/nomi istantanei; 422 se un'attrezzatura richiesta è disattivata; esposti nei modelli del lavoro e dell'ordine. _Satisfies: REQ-2, REQ-3_
 - [ ] 1.5 [Backend] `SetupCalculator` puro (stato macchina → minuti e motivazione, tetto del passo, stato ignoto) con test dell'esempio guida (15 / 5 / 0 / tetto 12) e casi limite (attributo assente, attrezzatura già montata, nessun attributo); integrazione nella durata e nella stima di fine ordine senza duplicare la formula. _Satisfies: REQ-4_

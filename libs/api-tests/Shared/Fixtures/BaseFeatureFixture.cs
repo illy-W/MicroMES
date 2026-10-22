@@ -7,6 +7,7 @@ using MicroMES.ApiFeatures.ProcessSegmentFeature;
 using MicroMES.ApiFeatures.PlanningFeature;
 using MicroMES.ApiFeatures.ProductionOrderFeature;
 using MicroMES.ApiFeatures.ScrapFeature;
+using MicroMES.ApiFeatures.ToolingFeature;
 using MicroMES.ApiFeatures.RoutingFeature;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +39,7 @@ public abstract class BaseFeatureFixture : IDisposable
         services.AddBomFeature();
         services.AddProcessSegmentFeature();
         services.AddEquipmentFeature();
+        services.AddToolingFeature();
         services.AddRoutingFeature();
         services.AddScrapFeature();
         services.AddProductionOrderFeature();

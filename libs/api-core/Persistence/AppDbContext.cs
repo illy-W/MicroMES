@@ -18,6 +18,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ScrapReason> ScrapReasons { get; set; } = null!;
     public DbSet<ScrapReasonProcessSegment> ScrapReasonProcessSegments { get; set; } = null!;
     public DbSet<Equipment> Equipment { get; set; } = null!;
+    public DbSet<Tooling> Tooling { get; set; } = null!;
+    public DbSet<ToolingEquipment> ToolingEquipment { get; set; } = null!;
+    public DbSet<SetupAttribute> SetupAttributes { get; set; } = null!;
     public DbSet<EquipmentProcessSegment> EquipmentProcessSegments { get; set; } = null!;
     public DbSet<WorkOrderResponseScrap> WorkOrderResponseScraps { get; set; } = null!;
     public DbSet<WorkOrderResponseCorrection> WorkOrderResponseCorrections { get; set; } = null!;
@@ -187,6 +190,43 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.EfficiencyPercent).HasPrecision(7, 2).HasDefaultValue(100m);
             entity.HasIndex(x => x.Code).IsUnique();
             entity.HasOne<WorkCalendar>().WithMany().HasForeignKey(x => x.WorkCalendarId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Tooling>(entity =>
+        {
+            entity.ToTable("Tooling", t =>
+            {
+                t.HasCheckConstraint("CK_Tooling_Quantity", "\"Quantity\" >= 1");
+                t.HasCheckConstraint("CK_Tooling_SetupMinutes", "\"SetupMinutes\" >= 0");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.Property(x => x.Quantity).HasDefaultValue(1);
+            entity.Property(x => x.SetupMinutes).HasDefaultValue(0);
+            entity.HasIndex(x => x.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<ToolingEquipment>(entity =>
+        {
+            entity.ToTable("ToolingEquipment");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.ToolingId, x.EquipmentId }).IsUnique();
+            entity.HasOne<Tooling>().WithMany().HasForeignKey(x => x.ToolingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Equipment>().WithMany().HasForeignKey(x => x.EquipmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SetupAttribute>(entity =>
+        {
+            entity.ToTable("SetupAttributes", t => t.HasCheckConstraint("CK_SetupAttributes_ChangeMinutes", "\"ChangeMinutes\" >= 0"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.Property(x => x.ChangeMinutes).HasDefaultValue(0);
+            entity.HasIndex(x => x.Code).IsUnique();
         });
 
         modelBuilder.Entity<EquipmentProcessSegment>(entity =>
