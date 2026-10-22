@@ -1,5 +1,5 @@
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideAlarmClock,
@@ -52,6 +52,7 @@ import { allowsDashedBorder, layoutBar, type LabelPlacement } from './bar-label'
 import { type Axis, buildAxis, centreTime, clampSpan, commonClosedRanges, type Range, scrollForCentre, visibleTimeRange } from './timeline-axis';
 import { adaptiveDayPph, dayAxisHours, shouldAutoScale } from './adaptive-scale';
 import { capRange, formatAt, initialRange, loadedUnion, parseAt, planCover, planExtension, resolveLanes } from './timeline-nav';
+import { TIMELINE_EMBED } from './timeline-embed';
 import { operationNumber, orderColor, STATUS_STYLE } from './timeline-style';
 import { dayKey, daysBetween, dayStart, formatDateTime, formatDay, formatDuration, formatRangeTitle, formatWeekday, HOUR, hourLabel, startOfDay } from './timeline-time';
 
@@ -190,7 +191,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
 /** Timeline di pianificazione a griglia CSS (nessuna libreria), con pannello di dettaglio e filtri. */
 @Component({
   selector: 'app-planning-timeline',
-  imports: [HlmButton, HlmEmptyImports, HlmInput, HlmPopoverImports, HlmSelectImports, HlmSheetImports, HlmSkeleton, HlmTooltip, NgIcon, PlanningWorkPanelComponent],
+  imports: [HlmButton, HlmEmptyImports, HlmInput, HlmPopoverImports, HlmSelectImports, HlmSheetImports, HlmSkeleton, HlmTooltip, NgIcon, PlanningWorkPanelComponent, RouterLink],
   providers: [
     provideIcons({
       lucideAlarmClock, lucideCalendarX, lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideCircleCheck, lucideCircleDot, lucideClock, lucideEyeOff,
@@ -202,11 +203,13 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
   template: `
     <section class="bg-card text-card-foreground flex min-h-0 min-w-0 flex-1 flex-col gap-2 rounded-xl border p-2" aria-label="Timeline di pianificazione">
       <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <div class="bg-muted inline-flex gap-0.5 rounded-md p-0.5" role="group" aria-label="Zoom">
-          @for (z of zooms; track z.value) {
-            <button hlmBtn type="button" size="sm" class="h-7" [variant]="zoom() === z.value ? 'default' : 'ghost'" [attr.aria-pressed]="zoom() === z.value" (click)="setZoom(z.value)">{{ z.label }}</button>
-          }
-        </div>
+        @if (!embedded) {
+          <div class="bg-muted inline-flex gap-0.5 rounded-md p-0.5" role="group" aria-label="Zoom">
+            @for (z of zooms; track z.value) {
+              <button hlmBtn type="button" size="sm" class="h-7" [variant]="zoom() === z.value ? 'default' : 'ghost'" [attr.aria-pressed]="zoom() === z.value" (click)="setZoom(z.value)">{{ z.label }}</button>
+            }
+          </div>
+        }
         <div class="flex items-center gap-1">
           <button hlmBtn type="button" size="icon-sm" variant="outline" [attr.aria-label]="navLabel(-1)" [hlmTooltip]="navLabel(-1)" (click)="shift(-1)"><ng-icon name="lucideChevronLeft" aria-hidden="true" /></button>
           <button hlmBtn type="button" size="sm" variant="outline" (click)="today()">Oggi</button>
@@ -285,6 +288,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           </hlm-popover>
         </div>
       </div>
+      @if (!embedded) {
       <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <div class="relative shrink-0">
           <ng-icon name="lucideSearch" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2" aria-hidden="true" />
@@ -353,6 +357,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           </div>
         }
       </div>
+      }
 
       @if (error()) {
         <hlm-empty>
@@ -458,7 +463,11 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                   <div class="relative flex border-b" role="group" [attr.aria-label]="'Macchina ' + r.code" [attr.data-row]="r.key">
                     <div class="bg-card sticky left-0 z-10 flex shrink-0 flex-col justify-center gap-0.5 border-r px-2 py-1" [style.width.px]="LEFT">
                       <div class="flex items-center gap-1.5 text-xs">
-                        <span class="truncate font-semibold">{{ r.code }}</span>
+                        @if (r.key === NONE_ROW || embedded) {
+                          <span class="truncate font-semibold">{{ r.code }}</span>
+                        } @else {
+                          <a class="truncate font-semibold underline-offset-2 hover:underline" [routerLink]="['/equipment', r.key]" [attr.aria-label]="'Apri la pagina della macchina ' + r.code">{{ r.code }}</a>
+                        }
                         @if (r.capacity > 1) { <span class="bg-secondary text-secondary-foreground shrink-0 rounded px-1" [title]="'Capacità ' + r.capacity">×{{ r.capacity }}</span> }
                         @if (r.key === NONE_ROW) {
                           <span tabindex="0" role="img" class="text-muted-foreground inline-flex shrink-0" aria-label="Fasi senza macchine collegate" hlmTooltip="Fasi senza macchine collegate"><ng-icon name="lucideInfo" size="14" aria-hidden="true" /></span>
@@ -647,7 +656,10 @@ export class PlanningTimelineComponent {
   protected readonly setupHatch = SETUP_HATCH;
 
   // --- stato (inizializzato dai query params) ---
-  private readonly qp = this.route.snapshot.queryParamMap;
+  private readonly embed = inject(TIMELINE_EMBED, { optional: true });
+  /** `true` se incorporata in un'altra pagina: macchina fissa, niente URL né filtri. */
+  protected readonly embedded = this.embed !== null;
+  private readonly qp = this.embed ? convertToParamMap({}) : this.route.snapshot.queryParamMap;
   private readonly bootTz = bootstrapTz();
   protected readonly zoom = signal<Zoom>((['day', 'week', 'month'] as const).find((z) => z === this.qp.get('zoom')) ?? 'week');
   /** Istante al centro dell'area visibile (URL `at`, con lettura del vecchio `from`); `null` finché non c'è stato scorrimento. */
@@ -655,7 +667,7 @@ export class PlanningTimelineComponent {
   private readonly atMs = signal<number | null>(this.initialAt);
   protected readonly orderFilter = signal(this.qp.get('order') ?? ALL);
   protected readonly statusFilter = signal(this.qp.get('status') ?? ALL);
-  protected readonly machineFilter = signal(this.qp.get('machine') ?? ALL);
+  protected readonly machineFilter = signal(this.embed ? String(this.embed.equipmentId) : (this.qp.get('machine') ?? ALL));
   protected readonly toolingFilter = signal(this.qp.get('tooling') ?? ALL);
   protected readonly search = signal(this.qp.get('q') ?? '');
   protected readonly selectedId = signal<number | null>(null);
@@ -1298,7 +1310,7 @@ export class PlanningTimelineComponent {
     void this.resetAround(this.initialAt ?? Date.now());
 
     effect(() => {
-      const req = this.store.focusRequest();
+      const req = this.embedded ? null : this.store.focusRequest();
       if (req) untracked(() => this.focusRequested(req.workOrderId, req.productionOrderId));
     });
 
@@ -1328,6 +1340,7 @@ export class PlanningTimelineComponent {
       });
     });
 
+    if (this.embedded) return;
     effect(() => {
       const z = this.zoom();
       const at = this.atMs();
@@ -1356,7 +1369,7 @@ export class PlanningTimelineComponent {
   /** Richiesta di un intervallo (<= 28 giorni), con cache per [from,to] + filtri e coalescenza delle richieste identiche. */
   private fetchChunk(range: Range): Promise<TimelineModel> {
     const q = this.filters();
-    const key = `${range.start}|${range.end}|${q.order}|${q.status}|${q.tooling}|${q.locked ? 'L' : ''}`;
+    const key = `${range.start}|${range.end}|${this.embed?.equipmentId ?? ''}|${q.order}|${q.status}|${q.tooling}|${q.locked ? 'L' : ''}`;
     const hit = this.cache.get(key);
     if (hit) return hit;
     const p = firstValueFrom(
@@ -1367,6 +1380,7 @@ export class PlanningTimelineComponent {
         ...(q.status !== ALL ? { status: q.status as WorkOrderStatus } : {}),
         ...(q.tooling !== ALL ? { toolingId: Number(q.tooling) } : {}),
         ...(q.locked ? { locked: true } : {}),
+        ...(this.embed ? { equipmentId: this.embed.equipmentId } : {}),
       }),
     );
     this.cache.set(key, p);
@@ -1585,13 +1599,17 @@ export class PlanningTimelineComponent {
   }
 
   /** Lavori in una finestra ampia (-30/+90 giorni) in due richieste entro il limite di 62 giorni. */
+  private probeScope(): { equipmentId?: number } {
+    return this.embed ? { equipmentId: this.embed.equipmentId } : {};
+  }
+
   private async loadProbe(): Promise<void> {
     const tz = this.tz();
     const today = dayStart(dayKey(Date.now(), tz), tz);
     const at = (days: number) => new Date(today + days * 24 * HOUR).toISOString();
     const parts = await Promise.allSettled([
-      firstValueFrom(this.api.getPlanningTimeline({ from: at(-30), to: at(30) })),
-      firstValueFrom(this.api.getPlanningTimeline({ from: at(30), to: at(90) })),
+      firstValueFrom(this.api.getPlanningTimeline({ from: at(-30), to: at(30), ...this.probeScope() })),
+      firstValueFrom(this.api.getPlanningTimeline({ from: at(30), to: at(90), ...this.probeScope() })),
     ]);
     const all = parts.flatMap((p) => (p.status === 'fulfilled' ? p.value.workOrders : []));
     // La seconda richiesta può ripetere lavori a cavallo del confine.

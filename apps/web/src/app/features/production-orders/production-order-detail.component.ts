@@ -309,9 +309,9 @@ const columns = columnHelper.columns([
                           @if (hasMachines(o.workOrders)) {
                             <td hlmTd>
                               @if (w.status === 'Running' && w.currentEquipment; as cur) {
-                                <span class="font-medium">{{ cur.code }}</span>
+                                <a class="font-medium underline underline-offset-2" [routerLink]="['/equipment', cur.id]" [attr.aria-label]="'Apri la pagina della macchina ' + cur.code">{{ cur.code }}</a>
                               } @else if (w.assignedEquipment; as eq) {
-                                <span class="font-medium">{{ eq.code }}</span>
+                                <a class="font-medium underline underline-offset-2" [routerLink]="['/equipment', eq.id]" [attr.aria-label]="'Apri la pagina della macchina ' + eq.code">{{ eq.code }}</a>
                                 @if (!eq.isEnabled) {
                                   <span hlmBadge variant="outline" class="text-destructive ml-1 px-1.5">non più abilitata</span>
                                 }

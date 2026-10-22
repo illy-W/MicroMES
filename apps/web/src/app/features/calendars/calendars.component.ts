@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCalendarDays, lucideCircleCheck, lucideCircleOff, lucidePlus, lucideSearch, lucideSearchX, lucideStar, lucideTriangleAlert } from '@ng-icons/lucide';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -162,7 +163,8 @@ export class CalendarsComponent implements OnInit {
 
   protected readonly search = signal('');
   protected readonly showInactive = signal(false);
-  protected readonly selectedId = signal<number | null>(null);
+  /** Calendario aperto all'ingresso: `?calendar=<id>` (es. dal dettaglio macchina). */
+  protected readonly selectedId = signal<number | null>(Number(inject(ActivatedRoute).snapshot.queryParamMap.get('calendar')) || null);
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<WorkCalendarModel | null>(null);
   protected readonly duplicating = signal<WorkCalendarModel | null>(null);

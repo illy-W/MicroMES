@@ -63,6 +63,9 @@ import { PlanningStore } from './planning.store';
                         @if (a.toolingId) {
                           <a class="inline-flex items-center gap-1 underline underline-offset-2" routerLink="/tooling" [attr.aria-label]="'Apri Attrezzature: ' + (a.toolingCode ?? '')" (click)="popState.set('closed')"><ng-icon name="lucideWrench" size="12" aria-hidden="true" /> Attrezzatura {{ a.toolingCode }}</a>
                         }
+                        @if (a.equipmentId; as eid) {
+                          <a class="underline underline-offset-2" [routerLink]="['/equipment', eid]" (click)="popState.set('closed')">Macchina {{ a.equipmentCode }}</a>
+                        }
                         @if (a.productionOrderId; as oid) {
                           <a class="underline underline-offset-2" [routerLink]="['/production-orders', oid]" (click)="popState.set('closed')">Ordine {{ a.productionOrderCode }}</a>
                           <a class="underline underline-offset-2" routerLink="/work-orders" [queryParams]="{ order: oid }" (click)="popState.set('closed')">Lavori dell'ordine</a>

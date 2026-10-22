@@ -133,6 +133,11 @@ See `AGENTS.md` for the project table and dependency direction.
 - Persisted `WorkOrder.PlannedSetupMinutes/Reasons/IsFull`; preview/apply/move/timeline expose `setup*` and `tooling[]`; `toolingId` filter on the timeline; alerts `ToolingOverbooked`, `ToolingIncompatibleMachine`, `ToolingInactive`, `UnplannableForTooling`; move conflicts `ToolingOverCapacity`, `ToolingIncompatible`.
 - Web: `features/tooling`, `features/setup-attributes`, routing step extras (`features/routing/routing-step-extras*`), `features/planning/setup.ts` (setup segment geometry on the compressed axis, summary delta).
 
+### Equipment page (specs/equipment-detail)
+
+- Read-only aggregation, no new entities: `GET /api/equipment/{id}/overview` (state now, running, queue of 20, mounted state from `MachineStartingState`, load today/7/30 via `TimelineService`, machine alerts) and `GET /api/equipment/{id}/history?days=7|30|90&page=&pageSize=` (summary with utilization = worked minutes / calendar available minutes, scrap % and by reason, paged sessions by the session's machine). Both live in `PlanningFeature` (`EquipmentOverview*`, `EquipmentHistory*`) to avoid cycles between Equipment, Tooling and Planning; `GET /api/equipment/{id}` gains `compatibleTooling[]`/`universalTooling[]` through `IEquipmentDetailEnricher`. Utilization is not OEE (no downtime reasons).
+- Web: `/equipment/:id` (lazy) with tabs `?tab=panoramica|fasi|calendario|pianificazione|storico`; the old side panel of the list is gone. The planning timeline is embedded in the Pianificazione tab through the `TIMELINE_EMBED` token (fixed machine filter, no URL state); the weekly shifts summary is shared (`calendar-weekly-summary`). Links to the page from timeline rows, work panel, tooling detail, order and work order tables and alerts.
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.

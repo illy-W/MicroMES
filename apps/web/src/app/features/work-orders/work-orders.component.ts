@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideCircleCheck,
@@ -89,6 +89,7 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
 @Component({
   selector: 'app-work-orders',
   imports: [
+    RouterLink,
     HlmTableImports,
     HlmEmptyImports,
     HlmSelectImports,
@@ -287,7 +288,7 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
                           @case ('equipment') {
                             @if (w.assignedEquipment; as eq) {
                               <span class="flex flex-wrap items-center gap-1">
-                                <span class="font-medium">{{ eq.code }}</span>
+                                <a class="font-medium underline underline-offset-2" [routerLink]="['/equipment', eq.id]" [attr.aria-label]="'Apri la pagina della macchina ' + eq.code">{{ eq.code }}</a>
                                 @if (!eq.isEnabled) {
                                   <span hlmBadge variant="outline" class="text-destructive px-1.5">non più abilitata</span>
                                 }

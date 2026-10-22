@@ -97,7 +97,13 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
         <dt class="text-muted-foreground">Ordine</dt>
         <dd>{{ item().productionOrderCode }}</dd>
         <dt class="text-muted-foreground">Macchina</dt>
-        <dd>{{ machineName() }}</dd>
+        <dd>
+          @if (item().equipmentId; as eqId) {
+            <a class="underline underline-offset-2" [routerLink]="['/equipment', eqId]" [attr.aria-label]="'Apri la pagina della macchina ' + machineName()">{{ machineName() }}</a>
+          } @else {
+            {{ machineName() }}
+          }
+        </dd>
         <dt class="text-muted-foreground">Inizio previsto</dt>
         <dd>{{ fmt(item().plannedStartAt) }}</dd>
         <dt class="text-muted-foreground">Fine prevista</dt>

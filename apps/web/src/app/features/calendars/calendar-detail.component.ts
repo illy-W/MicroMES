@@ -1,18 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideArrowLeft, lucideCircleCheck, lucideCircleOff, lucideStar } from '@ng-icons/lucide';
 import type { WorkCalendarModel } from '@micromes/api-client/models';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmTabsImports } from '@spartan-ng/helm/tabs';
-import { formatHours, slotsToDays, summarizeRanges, WEEK_DAYS, weekMinutes } from './calendar-time';
+import { CalendarWeeklySummaryComponent } from './calendar-weekly-summary.component';
 import { CalendarExceptionsComponent } from './calendar-exceptions.component';
 import { CalendarViewComponent } from './calendar-view.component';
 import { CalendarPreviewComponent } from './calendar-preview.component';
 
 @Component({
   selector: 'app-calendar-detail',
-  imports: [HlmBadge, HlmButton, HlmTabsImports, NgIcon, CalendarExceptionsComponent, CalendarPreviewComponent, CalendarViewComponent],
+  imports: [HlmBadge, HlmButton, HlmTabsImports, NgIcon, CalendarExceptionsComponent, CalendarPreviewComponent, CalendarViewComponent, CalendarWeeklySummaryComponent],
   providers: [provideIcons({ lucideArrowLeft, lucideCircleCheck, lucideCircleOff, lucideStar })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -51,16 +51,7 @@ import { CalendarPreviewComponent } from './calendar-preview.component';
 
       @if (tab() === 'hours') {
         <div class="grid gap-4 lg:grid-cols-2">
-          <section class="flex flex-col gap-2 rounded-md border p-4" aria-labelledby="week-title">
-            <h3 id="week-title" class="text-sm font-semibold">Orario settimanale</h3>
-            <dl class="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 text-sm">
-              @for (d of days; track d.key; let i = $index) {
-                <dt class="font-medium">{{ d.label }}</dt>
-                <dd class="tabular-nums" [class.text-muted-foreground]="!week()[i].length">{{ summary(i) }}</dd>
-              }
-            </dl>
-            <p class="text-muted-foreground text-sm">Totale settimanale: <span class="text-foreground font-semibold tabular-nums">{{ total() }}</span></p>
-          </section>
+          <app-calendar-weekly-summary [slots]="calendar().slots" />
           <app-calendar-preview [calendarId]="calendar().id" />
         </div>
       } @else if (tab() === 'calendar') {
@@ -77,10 +68,4 @@ export class CalendarDetailComponent {
   readonly edit = output<WorkCalendarModel>();
 
   protected readonly tab = signal<string>('hours');
-  protected readonly days = WEEK_DAYS;
-  protected readonly week = computed(() => slotsToDays(this.calendar().slots));
-  protected readonly total = computed(() => formatHours(weekMinutes(this.week())));
-  protected summary(i: number): string {
-    return summarizeRanges(this.week()[i]);
-  }
 }

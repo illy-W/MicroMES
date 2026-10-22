@@ -51,7 +51,7 @@ import { ToolingStore } from './tooling.store';
               <ul class="flex flex-col gap-1 text-sm">
                 @for (e of d.equipment; track e.id) {
                   <li>
-                    <span class="font-medium">{{ e.code }}</span> <span class="text-muted-foreground">{{ e.name }}{{ e.isActive ? '' : ' (disattivata)' }}</span>
+                    <a class="font-medium underline underline-offset-2" [routerLink]="['/equipment', e.id]" [attr.aria-label]="'Apri la pagina della macchina ' + e.code">{{ e.code }}</a> <span class="text-muted-foreground">{{ e.name }}{{ e.isActive ? '' : ' (disattivata)' }}</span>
                   </li>
                 }
               </ul>

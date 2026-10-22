@@ -15,6 +15,7 @@ import type { EquipmentOverviewModel } from '@micromes/api-client/models';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmTableImports } from '@spartan-ng/helm/table';
+import { CalendarsStore } from '../calendars/calendars.store';
 import { PlanStatusBadgeComponent } from '../planning/plan-status-badge.component';
 import { PlanningStore } from '../planning/planning.store';
 import { formatDateTime } from '../planning/timeline-time';
@@ -160,7 +161,11 @@ export class EquipmentOverviewTabComponent {
   readonly overview = input.required<EquipmentOverviewModel>();
   private readonly planning = inject(PlanningStore);
   private readonly router = inject(Router);
-  private readonly tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  private readonly calendars = inject(CalendarsStore);
+
+  constructor() {
+    void this.calendars.loadTimeZone();
+  }
 
   protected readonly stateIcon = computed(() => STATE_ICON[this.overview().state]);
   protected readonly stateText = computed(() => stateLabel(this.overview().state, this.overview().closedReason));
@@ -174,7 +179,7 @@ export class EquipmentOverviewTabComponent {
   });
   protected readonly elapsed = formatElapsed;
   protected dt(iso: string): string {
-    return formatDateTime(iso, this.tz);
+    return formatDateTime(iso, this.calendars.timeZone());
   }
   protected show(wo: number | null, order?: number | null): void {
     this.planning.showInPlan(wo, order);

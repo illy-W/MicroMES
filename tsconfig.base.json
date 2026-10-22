@@ -47,7 +47,10 @@
       "@spartan-ng/helm/progress": ["./libs/ui/progress/src/index.ts"],
       "@spartan-ng/helm/checkbox": ["./libs/ui/checkbox/src/index.ts"],
       "@spartan-ng/helm/calendar": ["./libs/ui/calendar/src/index.ts"],
-      "@spartan-ng/helm/popover": ["./libs/ui/popover/src/index.ts"]
+      "@spartan-ng/helm/popover": ["./libs/ui/popover/src/index.ts"],
+      "@spartan-ng/helm/pagination": ["./libs/ui/pagination/src/index.ts"],
+      "@spartan-ng/helm/toggle-group": ["./libs/ui/toggle-group/src/index.ts"],
+      "@spartan-ng/helm/toggle": ["./libs/ui/toggle/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

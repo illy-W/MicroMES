@@ -12,8 +12,11 @@ import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
 import { HlmTabsImports } from '@spartan-ng/helm/tabs';
 import { toFailure } from '../materials/materials.service';
+import { EquipmentCalendarTabComponent } from './equipment-calendar-tab.component';
 import { EquipmentFormDialogComponent } from './equipment-form-dialog.component';
+import { EquipmentHistoryTabComponent } from './equipment-history-tab.component';
 import { EquipmentOverviewTabComponent } from './equipment-overview-tab.component';
+import { EquipmentPlanTabComponent } from './equipment-plan-tab.component';
 import { EquipmentPageStore } from './equipment-page.store';
 import { EquipmentSegmentsTabComponent } from './equipment-segments-tab.component';
 import { EquipmentStore } from './equipment.store';
@@ -39,8 +42,11 @@ type TabKey = (typeof EQUIPMENT_TABS)[number]['key'];
     HlmTabsImports,
     NgIcon,
     RouterLink,
+    EquipmentCalendarTabComponent,
     EquipmentFormDialogComponent,
+    EquipmentHistoryTabComponent,
     EquipmentOverviewTabComponent,
+    EquipmentPlanTabComponent,
     EquipmentSegmentsTabComponent,
   ],
   providers: [
@@ -141,8 +147,20 @@ type TabKey = (typeof EQUIPMENT_TABS)[number]['key'];
             @case ('fasi') {
               <app-equipment-segments-tab [equipment]="m" />
             }
-            @default {
-              <p class="text-muted-foreground rounded-md border p-4 text-sm">In arrivo</p>
+            @case ('calendario') {
+              @for (id of [m.id]; track id) {
+                <app-equipment-calendar-tab [equipment]="m" />
+              }
+            }
+            @case ('pianificazione') {
+              @for (id of [m.id]; track id) {
+                <app-equipment-plan-tab [equipment]="m" />
+              }
+            }
+            @case ('storico') {
+              @for (id of [m.id]; track id) {
+                <app-equipment-history-tab [equipmentId]="m.id" />
+              }
             }
           }
         </div>
