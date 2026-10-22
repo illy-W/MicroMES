@@ -254,4 +254,39 @@ public class PlanningInputBuilderTests
         input.Zone.Id.Should().Be(Rome.Id);
         input.DefaultAvailability.WeeklySlots.Should().HaveCount(10);
     }
+
+    // ---- tooling and setup state ---------------------------------------------------------------
+
+    [Fact]
+    public void Build_CarriesToolingValuesFullSetupAndMachineStateAndResources()
+    {
+        Order(1);
+        Wo(10, 1, 15, WorkOrderStatus.Ended, machine: 1, endedAt: Now.AddDays(-1));
+        _data.Sessions.Add(new WorkOrderResponse { Id = 1, WorkOrderId = 10, StartedAt = Now.AddDays(-1).AddHours(-2), EndedAt = Now.AddDays(-1), EquipmentId = 1 });
+        _data.ToolingLines.Add(new WorkOrderTooling { Id = 1, WorkOrderId = 10, ToolingId = 7, ToolingCode = "ST-07", ToolingName = "x", ToolingSetupMinutes = 9 });
+        Wo(11, 1, 60);
+        _data.ToolingLines.Add(new WorkOrderTooling { Id = 2, WorkOrderId = 11, ToolingId = 8, ToolingCode = "ST-08", ToolingName = "y", ToolingSetupMinutes = 10 });
+        _data.SetupValueLines.Add(new WorkOrderSetupValue { Id = 1, WorkOrderId = 11, SetupAttributeId = 3, AttributeCode = "COLORE", AttributeName = "Colore", AttributeChangeMinutes = 5, Value = "blu" });
+        Wo(12, 1, 30, WorkOrderStatus.Running, machine: 2);
+        _data.Sessions.Add(new WorkOrderResponse { Id = 2, WorkOrderId = 12, StartedAt = Now.AddMinutes(-10), EquipmentId = 2 });
+        _data.ToolingLines.Add(new WorkOrderTooling { Id = 3, WorkOrderId = 12, ToolingId = 9, ToolingCode = "ST-09", ToolingName = "z", ToolingSetupMinutes = 3 });
+
+        var calendars = new Dictionary<int, WorkCalendar> { [1] = new() { Id = 1, Code = "STANDARD", IsDefault = true, IsActive = true } };
+        var directory = new AvailabilityDirectory(Rome, calendars, new() { [1] = Standard() }, [], _machines, []);
+        var catalog = new PlanningCatalog(_machines, _links,
+            [new Tooling { Id = 8, Code = "ST-08", Quantity = 2, IsActive = false }],
+            [new ToolingEquipment { Id = 1, ToolingId = 8, EquipmentId = 2 }]);
+        var input = PlanningInputBuilder.Build(_data, catalog, directory, PlanningScope.All, null, Now).Input;
+
+        var free = input.Jobs.Single(j => j.WorkOrderId == 11);
+        free.FullSetupMinutes.Should().Be(60);
+        free.Tooling!.Single().ToolingId.Should().Be(8);
+        free.SetupValues!.Single().Value.Should().Be("blu");
+        input.Jobs.Single(j => j.WorkOrderId == 12).Tooling!.Single().ToolingId.Should().Be(9); // fixed jobs carry it too
+        input.Equipment.Single(e => e.Id == 1).InitialState!.ToolingIds.Should().BeEquivalentTo([7]);
+        input.Equipment.Single(e => e.Id == 2).InitialState!.ToolingIds.Should().BeEquivalentTo([9]); // the Running one
+        var res = input.ToolingResources!.Single();
+        (res.Quantity, res.IsActive).Should().Be((2, false));
+        res.CompatibleEquipmentIds.Should().Equal(2);
+    }
 }

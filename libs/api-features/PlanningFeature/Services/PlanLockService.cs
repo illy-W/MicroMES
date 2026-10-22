@@ -117,11 +117,6 @@ public class PlanLockService(
 
         var calc = directory.Calculator;
         var source = directory.ForEquipment(machine?.Id);
-        var timing = ManualMoveCalculator.Evaluate(calc, source, machine?.Code ?? "Il calendario aziendale", start,
-            ProductionEndEstimator.RemainingMinutes(data, wo, now), directory.EfficiencyOf(machine?.Id));
-        if (timing.Error is not null) return ProductionOrderResult<Move>.Invalid(timing.Error);
-        var end = timing.End!.Value;
-
         var order = data.Orders[wo.ProductionOrderId];
         string Code(WorkOrder w) => ProductionData.CodeOf(data.Orders[w.ProductionOrderId], w);
         MoveJobRef Ref(WorkOrder w, DateTime? s, DateTime? e) => new(w.Id, Code(w), s, e);
@@ -154,6 +149,23 @@ public class PlanLockService(
                 }
             }
         }
+
+        // Setup depends on the sequence: the job before the new start on the machine (planned or running), else the executed history.
+        var requirements = MachineStartingState.RequirementsOf(data, wo);
+        MachineSetupState? previous = null;
+        if (machine is not null)
+        {
+            var before = occupants.Where(o => o.End is { } oe && oe <= start).OrderByDescending(o => o.End).ThenByDescending(o => o.Id).FirstOrDefault();
+            previous = before is not null
+                ? MachineSetupState.After(MachineStartingState.RequirementsOf(data, data.WorkOrders[before.Id]))
+                : occupants.Any(o => o.Start is { } os && os < start) ? null : MachineStartingState.Of(data, machine.Id);
+        }
+        var setup = SetupCalculator.Compute(previous, requirements);
+        var standard = SetupCalculator.WithSetup(ProductionEndEstimator.RemainingMinutes(data, wo, now), requirements.FullSetupMinutes, setup);
+        var timing = ManualMoveCalculator.Evaluate(calc, source, machine?.Code ?? "Il calendario aziendale", start,
+            standard, directory.EfficiencyOf(machine?.Id));
+        if (timing.Error is not null) return ProductionOrderResult<Move>.Invalid(timing.Error);
+        var end = timing.End!.Value;
 
         var conflicts = ManualMoveCalculator.FindConflicts(calc.Zone, Ref(wo, start, end), start, end, predecessors, successors,
             machine?.Id, machine?.Code, machine?.Capacity ?? 1, occupants, AsUtc(order.RequestedEnd));

@@ -10,11 +10,13 @@ using MicroMES.ApiFeatures.PlanningFeature.Models;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Planning;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Repositories;
 using MicroMES.ApiFeatures.ProductionOrderFeature.Services;
+using MicroMES.ApiFeatures.ToolingFeature.Repositories;
 
 namespace MicroMES.ApiFeatures.PlanningFeature.Services;
 
 /// <summary>Loads machines and their links to the phases (read only, no transaction).</summary>
-public class PlanningCatalogLoader(IEquipmentRepository equipment, IEquipmentProcessSegmentRepository links)
+public class PlanningCatalogLoader(IEquipmentRepository equipment, IEquipmentProcessSegmentRepository links,
+    IToolingRepository tooling, IToolingEquipmentRepository toolingLinks)
 {
     public async Task<PlanningCatalog> LoadAsync()
     {
@@ -22,7 +24,11 @@ public class PlanningCatalogLoader(IEquipmentRepository equipment, IEquipmentPro
         await foreach (var e in equipment.FetchAsync(_ => true)) machines[e.Id] = e;
         var all = new List<EquipmentProcessSegment>();
         await foreach (var l in links.FetchAsync(_ => true)) all.Add(l);
-        return new PlanningCatalog(machines, all);
+        var tools = new List<Tooling>();
+        await foreach (var t in tooling.FetchAsync(_ => true)) tools.Add(t);
+        var toolLinks = new List<ToolingEquipment>();
+        await foreach (var l in toolingLinks.FetchAsync(_ => true)) toolLinks.Add(l);
+        return new PlanningCatalog(machines, all, tools, toolLinks);
     }
 }
 

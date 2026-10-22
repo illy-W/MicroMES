@@ -7,7 +7,10 @@ using MicroMES.ApiFeatures.ProductionOrderFeature.Services;
 namespace MicroMES.ApiFeatures.PlanningFeature.Services;
 
 /// <summary>Machines and machine-phase links the planning needs (all machines linked to any segment).</summary>
-public sealed record PlanningCatalog(IReadOnlyDictionary<int, Equipment> Machines, IReadOnlyList<EquipmentProcessSegment> Links);
+/// <param name="Tooling">Tooling resources (empty when not loaded).</param>
+/// <param name="ToolingLinks">Tooling-machine compatibilities (a tooling with none is compatible with any machine).</param>
+public sealed record PlanningCatalog(IReadOnlyDictionary<int, Equipment> Machines, IReadOnlyList<EquipmentProcessSegment> Links,
+    IReadOnlyList<Tooling>? Tooling = null, IReadOnlyList<ToolingEquipment>? ToolingLinks = null);
 
 /// <summary>Input of the engine plus what the caller needs to read the output.</summary>
 /// <param name="ScopeWorkOrderIds">Work orders the run plans (the others in the input are fixed).</param>
@@ -78,7 +81,8 @@ public static class PlanningInputBuilder
         var equipment = machineIds.OrderBy(id => id).Select(id =>
         {
             var m = catalog.Machines[id];
-            return new PlanningEquipment(m.Id, m.Code, Math.Max(1, m.Capacity), m.EfficiencyPercent, directory.ForEquipment(m.Id), busy[id]);
+            return new PlanningEquipment(m.Id, m.Code, Math.Max(1, m.Capacity), m.EfficiencyPercent, directory.ForEquipment(m.Id), busy[id],
+                MachineStartingState.Of(data, m.Id));
         }).ToList();
 
         var jobs = new List<PlanningJob>();
@@ -93,7 +97,8 @@ public static class PlanningInputBuilder
                 ProductionEndEstimator.RemainingMinutes(data, w, now),
                 preds.Where(p => scopeIds.Contains(p) || runningIds.Contains(p) || lockedIds.Contains(p)).ToList(),
                 ClosedEnd(data, preds.Where(p => !scopeIds.Contains(p) && !runningIds.Contains(p) && !lockedIds.Contains(p))),
-                links.Count > 0, candidates, links.FirstOrDefault(l => l.IsDefault)?.EquipmentId, w.AssignedEquipmentId));
+                links.Count > 0, candidates, links.FirstOrDefault(l => l.IsDefault)?.EquipmentId, w.AssignedEquipmentId)
+                .WithSetup(MachineStartingState.RequirementsOf(data, w)));
         }
         foreach (var w in lockedAll)
         {
@@ -101,7 +106,8 @@ public static class PlanningInputBuilder
             var preds = data.PredecessorIds(w.Id).ToList();
             jobs.Add(new PlanningJob(w.Id, order.Id, order.Code, w.OperationNumber, order.Priority, order.RequestedStart, order.RequestedEnd,
                 0m, preds.Where(p => scopeIds.Contains(p) || runningIds.Contains(p) || lockedIds.Contains(p)).ToList(), null, true, [], null,
-                w.AssignedEquipmentId, Locked: true, LockedStart: w.PlannedStartAt, LockedEnd: w.PlannedEndAt));
+                w.AssignedEquipmentId, Locked: true, LockedStart: w.PlannedStartAt, LockedEnd: w.PlannedEndAt)
+                .WithSetup(MachineStartingState.RequirementsOf(data, w)));
         }
         foreach (var w in running)
         {
@@ -109,11 +115,21 @@ public static class PlanningInputBuilder
             var session = data.SessionsOf(w.Id).LastOrDefault(s => s.EndedAt is null);
             jobs.Add(new PlanningJob(w.Id, order.Id, order.Code, w.OperationNumber, order.Priority, order.RequestedStart, order.RequestedEnd,
                 ProductionEndEstimator.RemainingMinutes(data, w, now), [], null, true, [], null, runningMachine[w.Id],
-                IsFixed: true, FixedStart: session?.StartedAt ?? w.StartedAt ?? now));
+                IsFixed: true, FixedStart: session?.StartedAt ?? w.StartedAt ?? now)
+                .WithSetup(MachineStartingState.RequirementsOf(data, w)));
         }
 
-        var input = new PlanningInput(jobs, equipment, directory.ForEquipment(null), directory.Zone, now);
+        var input = new PlanningInput(jobs, equipment, directory.ForEquipment(null), directory.Zone, now,
+            ToolingResources: ToolingResourcesOf(catalog));
         return new PlanningBuild(input, scopeIds, lockedScopeIds);
+    }
+
+    private static List<PlanningTooling> ToolingResourcesOf(PlanningCatalog catalog)
+    {
+        var links = (catalog.ToolingLinks ?? []).GroupBy(l => l.ToolingId)
+            .ToDictionary(g => g.Key, g => g.Select(l => l.EquipmentId).Distinct().OrderBy(i => i).ToList());
+        return (catalog.Tooling ?? []).OrderBy(t => t.Id)
+            .Select(t => new PlanningTooling(t.Id, t.Code, Math.Max(1, t.Quantity), links.GetValueOrDefault(t.Id) ?? [], t.IsActive)).ToList();
     }
 
     private static int? RunningMachineId(ProductionData data, WorkOrder w)

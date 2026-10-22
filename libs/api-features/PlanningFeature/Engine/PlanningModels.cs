@@ -27,6 +27,9 @@ public readonly record struct PlanningInterval(DateTime Start, DateTime End);
 /// <param name="Locked">True for a job whose plan is locked: it is a fixed interval [<paramref name="LockedStart"/>, <paramref name="LockedEnd"/>) on <paramref name="AssignedEquipmentId"/>, never moved. Its <paramref name="PredecessorIds"/> are only checked (conflicts), never waited for.</param>
 /// <param name="LockedStart">Fixed planned start of a locked job.</param>
 /// <param name="LockedEnd">Fixed planned end of a locked job.</param>
+/// <param name="Tooling">Tooling the job needs (id, code, setup minutes); empty = none. Units used = 1 each.</param>
+/// <param name="SetupValues">Setup attribute values of the job; empty = none.</param>
+/// <param name="FullSetupMinutes">Full setup of the step: included in <paramref name="StandardMinutes"/> and the cap of the computed setup (see <see cref="SetupCalculator"/>).</param>
 public sealed record PlanningJob(
     int WorkOrderId,
     int ProductionOrderId,
@@ -46,33 +49,49 @@ public sealed record PlanningJob(
     DateTime? FixedStart = null,
     bool Locked = false,
     DateTime? LockedStart = null,
-    DateTime? LockedEnd = null);
+    DateTime? LockedEnd = null,
+    IReadOnlyList<JobTooling>? Tooling = null,
+    IReadOnlyList<JobSetupValue>? SetupValues = null,
+    decimal FullSetupMinutes = 0m)
+{
+    public SetupRequirements Setup => new(Tooling ?? [], SetupValues ?? [], FullSetupMinutes);
+
+    /// <summary>Copy carrying the tooling, setup values and full setup of <paramref name="r"/>.</summary>
+    public PlanningJob WithSetup(SetupRequirements r) => this with { Tooling = r.Tooling, SetupValues = r.SetupValues, FullSetupMinutes = r.FullSetupMinutes };
+}
 
 /// <summary>A machine as the engine sees it.</summary>
 /// <param name="Capacity">Simultaneous jobs (at least 1).</param>
 /// <param name="EfficiencyPercent">100 = standard speed.</param>
 /// <param name="Availability">Effective availability (weekly slots + exceptions) of the machine.</param>
 /// <param name="BusyIntervals">Fixed occupancy other than the Running jobs of the input (each uses one unit of capacity).</param>
+/// <param name="InitialState">Tooling and values left by the latest executed work order on the machine; null = unknown (full setup).</param>
 public sealed record PlanningEquipment(
     int Id,
     string Code,
     int Capacity,
     decimal EfficiencyPercent,
     IAvailabilitySource Availability,
-    IReadOnlyList<PlanningInterval> BusyIntervals);
+    IReadOnlyList<PlanningInterval> BusyIntervals,
+    MachineSetupState? InitialState = null);
+
+/// <summary>A tooling resource: <paramref name="Quantity"/> pieces, usable only on <paramref name="CompatibleEquipmentIds"/> (empty = any machine).</summary>
+public sealed record PlanningTooling(int Id, string Code, int Quantity, IReadOnlyList<int> CompatibleEquipmentIds, bool IsActive);
 
 /// <summary>Whole input of the engine.</summary>
 /// <param name="DefaultAvailability">Calendar of the jobs of phases without machines (no capacity limit).</param>
 /// <param name="Zone">Company time zone (calendar slots are local times).</param>
 /// <param name="Now">Nothing is planned before this instant (rounded up to the minute).</param>
 /// <param name="Horizon">Nothing is planned ending after Now + Horizon (default: 6 months).</param>
+/// <param name="ToolingResources">Tooling resources referenced by the jobs (data only for now: the engine does not use them yet).</param>
 public sealed record PlanningInput(
     IReadOnlyList<PlanningJob> Jobs,
     IReadOnlyList<PlanningEquipment> Equipment,
     IAvailabilitySource DefaultAvailability,
     TimeZoneInfo Zone,
     DateTime Now,
-    TimeSpan? Horizon = null)
+    TimeSpan? Horizon = null,
+    IReadOnlyList<PlanningTooling>? ToolingResources = null)
 {
     public static readonly TimeSpan DefaultHorizon = TimeSpan.FromDays(183);
 }
