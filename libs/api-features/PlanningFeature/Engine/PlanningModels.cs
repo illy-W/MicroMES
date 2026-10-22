@@ -24,6 +24,9 @@ public readonly record struct PlanningInterval(DateTime Start, DateTime End);
 /// <param name="AssignedEquipmentId">Machine already assigned; kept when it is among the candidates.</param>
 /// <param name="IsFixed">True for Running jobs: they do not move, they occupy the machine from <paramref name="FixedStart"/> to the end computed from the remaining minutes.</param>
 /// <param name="FixedStart">Real start of a fixed job.</param>
+/// <param name="Locked">True for a job whose plan is locked: it is a fixed interval [<paramref name="LockedStart"/>, <paramref name="LockedEnd"/>) on <paramref name="AssignedEquipmentId"/>, never moved. Its <paramref name="PredecessorIds"/> are only checked (conflicts), never waited for.</param>
+/// <param name="LockedStart">Fixed planned start of a locked job.</param>
+/// <param name="LockedEnd">Fixed planned end of a locked job.</param>
 public sealed record PlanningJob(
     int WorkOrderId,
     int ProductionOrderId,
@@ -40,7 +43,10 @@ public sealed record PlanningJob(
     int? DefaultEquipmentId,
     int? AssignedEquipmentId,
     bool IsFixed = false,
-    DateTime? FixedStart = null);
+    DateTime? FixedStart = null,
+    bool Locked = false,
+    DateTime? LockedStart = null,
+    DateTime? LockedEnd = null);
 
 /// <summary>A machine as the engine sees it.</summary>
 /// <param name="Capacity">Simultaneous jobs (at least 1).</param>
@@ -83,7 +89,9 @@ public enum PlanningReasonCode
     /// <summary>The machine (RelatedEquipmentId) is at full capacity until Until.</summary>
     MachineBusy,
     /// <summary>The assigned machine is not among the candidates: another one was chosen.</summary>
-    AssignedMachineNotEnabled
+    AssignedMachineNotEnabled,
+    /// <summary>The job is locked: it keeps its plan and machine.</summary>
+    Locked
 }
 
 public sealed record PlanningReason(
@@ -100,7 +108,8 @@ public sealed record PlannedJob(
     DateTime Start,
     DateTime End,
     bool IsFixed,
-    IReadOnlyList<PlanningReason> Reasons);
+    IReadOnlyList<PlanningReason> Reasons,
+    bool IsLocked = false);
 
 public enum UnplannedReasonCode
 {
@@ -118,5 +127,34 @@ public enum UnplannedReasonCode
 
 public sealed record UnplannedJob(int WorkOrderId, UnplannedReasonCode Code, string Message, int? RelatedWorkOrderId = null);
 
-/// <summary>Output: planned jobs in the order they were processed, plus the jobs left unplanned (ordered by work order id).</summary>
-public sealed record PlanningResult(IReadOnlyList<PlannedJob> Planned, IReadOnlyList<UnplannedJob> Unplanned);
+public enum PlanningConflictCode
+{
+    /// <summary>A predecessor (RelatedWorkOrderId) ends after the start of the locked job (WorkOrderId).</summary>
+    PredecessorAfterLockedStart,
+    /// <summary>Locked (and running) jobs (WorkOrderIds) overlap beyond the capacity of the machine.</summary>
+    LockedOverCapacity
+}
+
+/// <summary>
+/// A problem the engine reports instead of fixing it (locked jobs never move). Data only: the caller writes the message.
+/// For <see cref="PlanningConflictCode.PredecessorAfterLockedStart"/>: WorkOrderId = locked job, RelatedWorkOrderId = predecessor,
+/// PredecessorEnd/LockedStart and Minutes of overlap. For <see cref="PlanningConflictCode.LockedOverCapacity"/>: EquipmentId,
+/// WorkOrderIds (involved, ordered), the overlap [LockedStart, PredecessorEnd) = [At, Until) and its Minutes.
+/// </summary>
+public sealed record PlanningConflict(
+    PlanningConflictCode Code,
+    int WorkOrderId,
+    int? RelatedWorkOrderId,
+    int? EquipmentId,
+    IReadOnlyList<int> WorkOrderIds,
+    DateTime Start,
+    DateTime End,
+    int Minutes);
+
+/// <summary>Output: planned jobs in the order they were processed, plus the jobs left unplanned (ordered by work order id) and the conflicts of the locked jobs.</summary>
+public sealed record PlanningResult(IReadOnlyList<PlannedJob> Planned, IReadOnlyList<UnplannedJob> Unplanned, IReadOnlyList<PlanningConflict>? Conflicts = null)
+{
+    public IReadOnlyList<PlanningConflict> ConflictList => Conflicts ?? [];
+    public int LockedCount => Planned.Count(p => p.IsLocked);
+    public int ConflictCount => ConflictList.Count;
+}

@@ -86,8 +86,49 @@ public class PlanningUnplannedModel
     public required bool HadPlan { get; set; }
 }
 
+/// <summary>A locked work order of the scope: kept as it is ("Fissato: non spostato"), it only occupies its machine.</summary>
+public class PlanningNotMovedModel
+{
+    public required int WorkOrderId { get; set; }
+    /// <summary>{order code}/{operation number}</summary>
+    public required string Code { get; set; }
+    public required int ProductionOrderId { get; set; }
+    public required string ProductionOrderCode { get; set; }
+    public required string ProcessSegmentCode { get; set; }
+    public required string ProcessSegmentName { get; set; }
+    public WorkOrderEquipmentModel? Equipment { get; set; }
+    public required DateTime Start { get; set; }
+    public required DateTime End { get; set; }
+    public required bool IsLocked { get; set; }
+    /// <summary>Always "Fissato: non spostato".</summary>
+    public required string Message { get; set; }
+}
+
+/// <summary>A problem caused by a locked work order that the planning does not fix (nothing locked is ever moved).</summary>
+public class PlanningConflictModel
+{
+    public required PlanningConflictCode Code { get; set; }
+    /// <summary>The locked work order the conflict is about.</summary>
+    public required int WorkOrderId { get; set; }
+    /// <summary>The predecessor that ends too late (PredecessorAfterLockedStart only).</summary>
+    public int? RelatedWorkOrderId { get; set; }
+    /// <summary>The machine (LockedOverCapacity only).</summary>
+    public int? EquipmentId { get; set; }
+    public required List<int> WorkOrderIds { get; set; }
+    /// <summary>Start and end of the overlap.</summary>
+    public required DateTime Start { get; set; }
+    public required DateTime End { get; set; }
+    public required int Minutes { get; set; }
+    /// <summary>Italian text with the dates in the company time zone.</summary>
+    public required string Message { get; set; }
+}
+
 public class PlanningSummaryModel
 {
+    /// <summary>Locked work orders of the scope (kept, not moved).</summary>
+    public int LockedCount { get; set; }
+    /// <summary>Conflicts found around the locked work orders.</summary>
+    public int ConflictCount { get; set; }
     /// <summary>Work orders the run tried to plan.</summary>
     public required int Considered { get; set; }
     public required int Planned { get; set; }
@@ -108,6 +149,9 @@ public class PlanningPreviewModel
     public int? ProductionOrderId { get; set; }
     public required List<PlanningItemModel> Items { get; set; }
     public required List<PlanningUnplannedModel> Unplanned { get; set; }
+    /// <summary>Locked work orders of the scope: fixed, never written.</summary>
+    public List<PlanningNotMovedModel> NotMoved { get; set; } = [];
+    public List<PlanningConflictModel> Conflicts { get; set; } = [];
     public required PlanningSummaryModel Summary { get; set; }
     /// <summary>Fingerprint of the proposed plan: send it back to apply to learn whether the plan changed in between.</summary>
     public required string Token { get; set; }
@@ -120,6 +164,9 @@ public class PlanningApplyModel
     public int? ProductionOrderId { get; set; }
     public required List<PlanningItemModel> Items { get; set; }
     public required List<PlanningUnplannedModel> Unplanned { get; set; }
+    /// <summary>Locked work orders of the scope: fixed, never written.</summary>
+    public List<PlanningNotMovedModel> NotMoved { get; set; } = [];
+    public List<PlanningConflictModel> Conflicts { get; set; } = [];
     public required PlanningSummaryModel Summary { get; set; }
     /// <summary>Token of the plan that was applied.</summary>
     public required string Token { get; set; }
@@ -133,4 +180,7 @@ public class RemovePlanModel
     public required int ProductionOrderId { get; set; }
     /// <summary>Work orders whose plan was cleared (the machine assignment is left as it is).</summary>
     public required int ClearedWorkOrders { get; set; }
+    /// <summary>Codes of the locked work orders that kept their plan: unlock them to remove it too.</summary>
+    public List<string> KeptLocked { get; set; } = [];
+    public List<int> KeptLockedWorkOrderIds { get; set; } = [];
 }

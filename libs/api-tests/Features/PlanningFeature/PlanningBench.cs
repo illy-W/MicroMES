@@ -129,6 +129,26 @@ internal static class PlanningBench
         return new("Calendari diversi", Input(jobs, machines));
     }
 
+    /// <summary>Locked jobs (agreed with the customer) on two machines: the others are planned around them, a capacity-2 oven is shared.</summary>
+    public static PlanningScenario LockedJobs()
+    {
+        var machines = new[] { Machine(1, "TAG-1"), Machine(2, "ASS-1"), Machine(3, "FORNO", capacity: 2) };
+        var jobs = new List<PlanningJob>
+        {
+            LockedJob(1, 1, N(2, 10), N(2, 12), order: "FIX-0", orderId: 1),
+            LockedJob(2, 3, N(2, 9), N(2, 11), order: "FIX-1", orderId: 2),
+            LockedJob(3, 2, N(3, 8), N(3, 10), [], order: "FIX-2", orderId: 3)
+        };
+        for (var o = 0; o < 4; o++)
+        {
+            var id = 10 + o * 3;
+            jobs.Add(Job(id, 90, [1], order: $"L-{o}", op: 10, reqEnd: N(3, 17), orderId: 10 + o));
+            jobs.Add(Job(id + 1, 60, [3], [id], order: $"L-{o}", op: 20, reqEnd: N(3, 17), orderId: 10 + o));
+            jobs.Add(Job(id + 2, 45, [2], [id + 1], order: $"L-{o}", op: 30, reqEnd: N(3, 17), orderId: 10 + o));
+        }
+        return new("Lavori fissati", Input(jobs, machines));
+    }
+
     public static IReadOnlyList<PlanningScenario> All()
-        => [WorkshopQueues(), ConcurrentOrders(), BottleneckWithAlternatives(), DifferentCalendars()];
+        => [WorkshopQueues(), ConcurrentOrders(), BottleneckWithAlternatives(), DifferentCalendars(), LockedJobs()];
 }

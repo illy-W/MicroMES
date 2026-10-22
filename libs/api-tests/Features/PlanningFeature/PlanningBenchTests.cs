@@ -16,7 +16,8 @@ public class PlanningBenchTests(ITestOutputHelper output)
         { "Officina con code", 350m, "2026-11-03T15:30:00.0000000Z", 0.358m },
         { "Due ordini concorrenti con scadenze diverse", 960m, "2026-11-03T10:00:00.0000000Z", 0.636m },
         { "Colli di bottiglia con alternative", 652m, "2026-11-03T10:52:00.0000000Z", 0.542m },
-        { "Calendari diversi", 1020m, "2026-11-04T09:00:00.0000000Z", 0.550m }
+        { "Calendari diversi", 1020m, "2026-11-04T09:00:00.0000000Z", 0.550m },
+        { "Lavori fissati", 0m, "2026-11-03T10:30:00.0000000Z", 0.464m }
     };
 
     [Theory]
@@ -31,7 +32,7 @@ public class PlanningBenchTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Bench_covers_at_least_four_scenarios() => PlanningBench.All().Count.Should().BeGreaterThanOrEqualTo(4);
+    public void Bench_covers_at_least_four_scenarios() => PlanningBench.All().Count.Should().BeGreaterThanOrEqualTo(5);
 
     [Fact]
     public void Scenarios_are_planned_without_unplanned_jobs()

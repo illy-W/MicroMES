@@ -11,7 +11,8 @@ public sealed record PlanningCatalog(IReadOnlyDictionary<int, Equipment> Machine
 
 /// <summary>Input of the engine plus what the caller needs to read the output.</summary>
 /// <param name="ScopeWorkOrderIds">Work orders the run plans (the others in the input are fixed).</param>
-public sealed record PlanningBuild(PlanningInput Input, IReadOnlySet<int> ScopeWorkOrderIds);
+/// <param name="LockedWorkOrderIds">Locked work orders of the scope (all of them, or those of the order and its descendants): fixed in the input, never written.</param>
+public sealed record PlanningBuild(PlanningInput Input, IReadOnlySet<int> ScopeWorkOrderIds, IReadOnlySet<int>? LockedWorkOrderIds = null);
 
 /// <summary>
 /// Pure translation of the loaded data into a <see cref="PlanningInput"/>. Rules:
@@ -33,10 +34,14 @@ public static class PlanningInputBuilder
         PlanningScope scope, int? productionOrderId, DateTime now)
     {
         var openOrderIds = data.Orders.Values.Where(IsPlannableOrder).Select(o => o.Id).ToHashSet();
-        var plannable = data.WorkOrders.Values
+        var plannableAll = data.WorkOrders.Values
             .Where(w => openOrderIds.Contains(w.ProductionOrderId)
                         && w.Status is WorkOrderStatus.Waiting or WorkOrderStatus.Ready or WorkOrderStatus.Interrupted)
             .ToList();
+        // Locked work orders with a plan are fixed intervals: never in scope, never changed.
+        var lockedAll = plannableAll.Where(w => w.IsPlanLocked && w.PlannedStartAt is not null && w.PlannedEndAt is not null).ToList();
+        var lockedIds = lockedAll.Select(w => w.Id).ToHashSet();
+        var plannable = plannableAll.Where(w => !lockedIds.Contains(w.Id)).ToList();
         var running = data.WorkOrders.Values
             .Where(w => openOrderIds.Contains(w.ProductionOrderId) && w.Status == WorkOrderStatus.Running).ToList();
 
@@ -50,6 +55,8 @@ public static class PlanningInputBuilder
         }).ToList();
         var scopeIds = inScope.Select(w => w.Id).ToHashSet();
         var runningIds = running.Select(w => w.Id).ToHashSet();
+        var lockedScopeIds = lockedAll.Where(w => scope != PlanningScope.Order || (subtree is not null && subtree.Contains(w.ProductionOrderId)))
+            .Select(w => w.Id).ToHashSet();
 
         var linksBySegment = catalog.Links.GroupBy(l => l.ProcessSegmentId).ToDictionary(g => g.Key, g => g.ToList());
 
@@ -60,6 +67,8 @@ public static class PlanningInputBuilder
                 if (catalog.Machines.TryGetValue(l.EquipmentId, out var m) && m.IsActive) machineIds.Add(m.Id);
         var runningMachine = running.ToDictionary(w => w.Id, w => RunningMachineId(data, w));
         foreach (var id in runningMachine.Values.OfType<int>()) if (catalog.Machines.ContainsKey(id)) machineIds.Add(id);
+        foreach (var w in lockedAll)
+            if (w.AssignedEquipmentId is { } le && catalog.Machines.ContainsKey(le)) machineIds.Add(le);
 
         var busy = machineIds.ToDictionary(id => id, _ => new List<PlanningInterval>());
         foreach (var w in plannable.Where(w => !scopeIds.Contains(w.Id)))
@@ -82,9 +91,17 @@ public static class PlanningInputBuilder
             var preds = data.PredecessorIds(w.Id).ToList();
             jobs.Add(new PlanningJob(w.Id, order.Id, order.Code, w.OperationNumber, order.Priority, order.RequestedStart, order.RequestedEnd,
                 ProductionEndEstimator.RemainingMinutes(data, w, now),
-                preds.Where(p => scopeIds.Contains(p) || runningIds.Contains(p)).ToList(),
-                ClosedEnd(data, preds.Where(p => !scopeIds.Contains(p) && !runningIds.Contains(p))),
+                preds.Where(p => scopeIds.Contains(p) || runningIds.Contains(p) || lockedIds.Contains(p)).ToList(),
+                ClosedEnd(data, preds.Where(p => !scopeIds.Contains(p) && !runningIds.Contains(p) && !lockedIds.Contains(p))),
                 links.Count > 0, candidates, links.FirstOrDefault(l => l.IsDefault)?.EquipmentId, w.AssignedEquipmentId));
+        }
+        foreach (var w in lockedAll)
+        {
+            var order = data.Orders[w.ProductionOrderId];
+            var preds = data.PredecessorIds(w.Id).ToList();
+            jobs.Add(new PlanningJob(w.Id, order.Id, order.Code, w.OperationNumber, order.Priority, order.RequestedStart, order.RequestedEnd,
+                0m, preds.Where(p => scopeIds.Contains(p) || runningIds.Contains(p) || lockedIds.Contains(p)).ToList(), null, true, [], null,
+                w.AssignedEquipmentId, Locked: true, LockedStart: w.PlannedStartAt, LockedEnd: w.PlannedEndAt));
         }
         foreach (var w in running)
         {
@@ -96,7 +113,7 @@ public static class PlanningInputBuilder
         }
 
         var input = new PlanningInput(jobs, equipment, directory.ForEquipment(null), directory.Zone, now);
-        return new PlanningBuild(input, scopeIds);
+        return new PlanningBuild(input, scopeIds, lockedScopeIds);
     }
 
     private static int? RunningMachineId(ProductionData data, WorkOrder w)

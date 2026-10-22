@@ -5,6 +5,7 @@ namespace MicroMES.ApiFeatures.PlanningFeature.Engine;
 /// <summary>
 /// Forward, finite-capacity heuristic. Rules:
 /// <list type="number">
+/// <item><b>Locked jobs</b> (plan locked by the user) are fixed intervals like the running ones: never changed, they occupy capacity, successors wait for their end; a free predecessor ending after their start, or locked jobs beyond capacity, are reported as conflicts.</item>
 /// <item><b>Fixed jobs first.</b> Running jobs do not move: they occupy their machine from the real start to the end computed
 /// from the remaining minutes (from now, on the machine calendar, with efficiency). Machine <c>BusyIntervals</c> are fixed too.</item>
 /// <item><b>Processing order.</b> List scheduling: among the jobs whose predecessors are done, the next one is the best by
@@ -102,27 +103,27 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
         {
             // Edges only among jobs of the input; a fixed job never waits for anything.
             var preds = _jobs.ToDictionary(j => j.Key,
-                j => j.Value.IsFixed ? [] : j.Value.PredecessorIds.Where(p => p != j.Key && _jobs.ContainsKey(p)).Distinct().ToList());
+                j => IsFx(j.Value) ? [] : j.Value.PredecessorIds.Where(p => p != j.Key && _jobs.ContainsKey(p)).Distinct().ToList());
             var succs = _jobs.Keys.ToDictionary(k => k, _ => new List<int>());
             foreach (var (id, ps) in preds) foreach (var p in ps) succs[p].Add(id);
             var waiting = preds.ToDictionary(kv => kv.Key, kv => kv.Value.Count);
 
             var queue = new PriorityQueue<int, PlanningJob>(Comparer<PlanningJob>.Create(CompareKeys));
             foreach (var (id, n) in waiting)
-                if (n == 0 && !_jobs[id].IsFixed) queue.Enqueue(id, _jobs[id]);
+                if (n == 0 && !IsFx(_jobs[id])) queue.Enqueue(id, _jobs[id]);
 
             var done = new HashSet<int>();
             void Complete(int id)
             {
                 done.Add(id);
                 foreach (var s in succs[id])
-                    if (!_jobs[s].IsFixed && --waiting[s] == 0) queue.Enqueue(s, _jobs[s]);
+                    if (!IsFx(_jobs[s]) && --waiting[s] == 0) queue.Enqueue(s, _jobs[s]);
             }
 
             // 1. Fixed jobs occupy their machines before anything else.
-            foreach (var job in _jobs.Values.Where(j => j.IsFixed).OrderBy(j => j, Comparer<PlanningJob>.Create(CompareKeys)))
+            foreach (var job in _jobs.Values.Where(IsFx).OrderBy(j => j, Comparer<PlanningJob>.Create(CompareKeys)))
             {
-                PlaceFixed(job);
+                if (job.Locked) PlaceLocked(job); else PlaceFixed(job);
                 Complete(job.WorkOrderId);
             }
 
@@ -173,7 +174,62 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
                 }
             }
 
-            return new PlanningResult(_planned, _unplanned.OrderBy(u => u.WorkOrderId).ToList());
+            return new PlanningResult(_planned, _unplanned.OrderBy(u => u.WorkOrderId).ToList(), FindConflicts());
+        }
+
+        private static bool IsFx(PlanningJob j) => j.IsFixed || j.Locked;
+
+        private readonly Dictionary<int, (int? Machine, DateTime Start, DateTime End)> _fixedIntervals = [];
+
+        private void PlaceLocked(PlanningJob job)
+        {
+            var machine = job.AssignedEquipmentId is { } id && _equipment.TryGetValue(id, out var m) ? m : null;
+            var start = CeilMinute(job.LockedStart ?? _now);
+            var end = CeilMinute(job.LockedEnd ?? start);
+            if (end < start) end = start;
+            if (machine is not null && end > start) _busy[machine.Id].Add(new PlanningInterval(start, end));
+            _end[job.WorkOrderId] = end;
+            _fixedIntervals[job.WorkOrderId] = (machine?.Id, start, end);
+            _planned.Add(new PlannedJob(job.WorkOrderId, machine?.Id, start, end, true,
+                [new PlanningReason(PlanningReasonCode.Locked, "Fissato: non spostato")], true));
+        }
+
+        /// <summary>Conflicts of the locked jobs: a predecessor ending after their start, and locked/running jobs beyond capacity.</summary>
+        private List<PlanningConflict> FindConflicts()
+        {
+            var conflicts = new List<PlanningConflict>();
+            var locked = _jobs.Values.Where(j => j.Locked).OrderBy(j => j.WorkOrderId).ToList();
+            foreach (var l in locked)
+            {
+                var start = _fixedIntervals[l.WorkOrderId].Start;
+                foreach (var p in l.PredecessorIds.Where(p => p != l.WorkOrderId && _jobs.ContainsKey(p)).Distinct().OrderBy(p => p))
+                {
+                    if (!_end.TryGetValue(p, out var pe) || pe <= start) continue;
+                    conflicts.Add(new PlanningConflict(PlanningConflictCode.PredecessorAfterLockedStart, l.WorkOrderId, p, null,
+                        [l.WorkOrderId, p], start, pe, (int)Math.Ceiling((pe - start).TotalMinutes)));
+                }
+            }
+
+            // Capacity: only fixed intervals the engine knows by id (locked and running jobs).
+            var seen = new HashSet<string>();
+            foreach (var group in _planned.Where(p => p.IsFixed && p.EquipmentId is not null).GroupBy(p => p.EquipmentId!.Value).OrderBy(g => g.Key))
+            {
+                var capacity = Math.Max(1, _equipment[group.Key].Capacity);
+                var items = group.Where(p => p.End > p.Start).OrderBy(p => p.Start).ThenBy(p => p.WorkOrderId).ToList();
+                foreach (var cur in items)
+                {
+                    // Jobs active at the start of cur.
+                    var active = items.Where(p => p.Start <= cur.Start && p.End > cur.Start).OrderBy(p => p.WorkOrderId).ToList();
+                    if (active.Count <= capacity || !active.Any(a => _jobs[a.WorkOrderId].Locked)) continue;
+                    var key = group.Key + ":" + string.Join(",", active.Select(a => a.WorkOrderId));
+                    if (!seen.Add(key)) continue;
+                    var until = active.Min(a => a.End);
+                    var anchor = active.Where(a => _jobs[a.WorkOrderId].Locked).Min(a => a.WorkOrderId);
+                    conflicts.Add(new PlanningConflict(PlanningConflictCode.LockedOverCapacity, anchor, null, group.Key,
+                        active.Select(a => a.WorkOrderId).ToList(), cur.Start, until, (int)Math.Ceiling((until - cur.Start).TotalMinutes)));
+                }
+            }
+            return conflicts;
         }
 
         private string Label(int workOrderId)

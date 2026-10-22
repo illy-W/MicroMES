@@ -95,4 +95,29 @@ public class PlanLockApiTests(ApiFixture fixture) : IntegrationTest(fixture)
 
         (await Api.GetWorkOrdersAsync(orderId)).Ok.Should().OnlyContain(w => !w.IsPlanLocked && w.PlanLockedAt == null);
     }
+
+    [Fact]
+    public async Task ReplanAndRemovePlan_LockedWorkOrder_Success_IsKeptAndListed()
+    {
+        var wos = await OrderAsync();
+        var orderId = wos[0].ProductionOrderId;
+        await PlanAsync(orderId);
+        var first = (await Api.GetWorkOrderAsync(wos[0].Id)).Ok;
+        (await Api.PostAsync<WorkOrderDetailModel>($"/api/work-orders/{first.Id}/lock")).Status.Should().Be(HttpStatusCode.OK);
+
+        var preview = (await Api.PreviewPlanAsync(MicroMES.ApiFeatures.PlanningFeature.Models.PlanningScope.All)).Ok;
+        preview.NotMoved.Should().ContainSingle(n => n.WorkOrderId == first.Id && n.IsLocked && n.Message == "Fissato: non spostato");
+        preview.Items.Should().NotContain(i => i.WorkOrderId == first.Id);
+        preview.Summary.LockedCount.Should().Be(1);
+
+        var applied = (await Api.ApplyPlanAsync(MicroMES.ApiFeatures.PlanningFeature.Models.PlanningScope.All)).Ok;
+        applied.NotMoved.Should().ContainSingle();
+        var after = (await Api.GetWorkOrderAsync(first.Id)).Ok;
+        (after.PlannedStartAt, after.PlannedEndAt, after.AssignedEquipment?.Id).Should().Be((first.PlannedStartAt, first.PlannedEndAt, first.AssignedEquipment?.Id));
+
+        var removed = (await Api.RemovePlanAsync(orderId)).Ok;
+        removed.KeptLocked.Should().HaveCount(1);
+        removed.ClearedWorkOrders.Should().Be(1);
+        (await Api.GetWorkOrderAsync(first.Id)).Ok.PlannedStartAt.Should().Be(first.PlannedStartAt);
+    }
 }

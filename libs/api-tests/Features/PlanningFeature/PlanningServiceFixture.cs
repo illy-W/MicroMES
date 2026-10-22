@@ -587,4 +587,90 @@ public class PlanningServiceFixture : BaseFeatureFixture
         var t = (await Timeline(DayStart, DayStart.AddDays(1), order: late)).Data!;
         t.WorkOrders.Should().OnlyContain(w => w.IsLate && w.LateDays >= 1);
     }
+
+    // ---- locked work orders ---------------------------------------------------------------------
+
+    private void Lock(int id, DateTime start, DateTime end, int machine)
+        => Arrange(db =>
+        {
+            var w = db.WorkOrders.Single(x => x.Id == id);
+            w.PlannedStartAt = start; w.PlannedEndAt = end; w.PlannedAt = Monday8; w.AssignedEquipmentId = machine;
+            w.IsPlanLocked = true; w.PlanLockedAt = Monday8;
+        });
+
+    [Theory]
+    [InlineData(PlanningScope.Order)]
+    [InlineData(PlanningScope.Unplanned)]
+    [InlineData(PlanningScope.All)]
+    public async Task Apply_LockedWorkOrder_Success_IsNeverWrittenAndListedAsNotMoved(PlanningScope scope)
+    {
+        Lock(_wo2, Local(2026, 1, 5, 14), Local(2026, 1, 5, 15), _m1);
+        var before = Row(_wo2);
+
+        var p = (await Service<PlanningService>().ApplyAsync(Req(scope, scope == PlanningScope.Order ? _order : null))).Data!;
+
+        p.Items.Should().NotContain(i => i.WorkOrderId == _wo2);
+        var nm = p.NotMoved.Should().ContainSingle().Subject;
+        (nm.WorkOrderId, nm.IsLocked, nm.Message, nm.Equipment!.Code).Should().Be((_wo2, true, "Fissato: non spostato", "M1"));
+        p.Summary.LockedCount.Should().Be(1);
+        var after = Row(_wo2);
+        (after.PlannedStartAt, after.PlannedEndAt, after.AssignedEquipmentId, after.PlannedAt, after.UpdatedAt)
+            .Should().Be((before.PlannedStartAt, before.PlannedEndAt, before.AssignedEquipmentId, before.PlannedAt, before.UpdatedAt));
+    }
+
+    [Fact]
+    public async Task Preview_LockedWorkOrder_Success_SuccessorsFollowIt()
+    {
+        Lock(_wo1, Local(2026, 1, 5, 10), Local(2026, 1, 5, 12), _m1);
+        var p = (await Service<PlanningService>().PreviewAsync(Req(PlanningScope.All))).Data!;
+
+        p.Items.Single().ProposedStart.Should().BeOnOrAfter(Local(2026, 1, 5, 12));
+        p.NotMoved.Single().WorkOrderId.Should().Be(_wo1);
+        p.Conflicts.Should().BeEmpty();
+        p.Summary.ConflictCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Preview_LockedWithLatePredecessor_Success_ReportsTheConflictInItalian()
+    {
+        Arrange(db => db.WorkOrders.Single(x => x.Id == _wo1).SetupMinutes = 180);
+        Lock(_wo2, Local(2026, 1, 5, 10), Local(2026, 1, 5, 11), _m2);
+
+        var p = (await Service<PlanningService>().PreviewAsync(Req(PlanningScope.Order, _order))).Data!;
+
+        var c = p.Conflicts.Should().ContainSingle().Subject;
+        (c.WorkOrderId, c.RelatedWorkOrderId, c.Minutes).Should().Be((_wo2, _wo1, 60));
+        c.Message.Should().Be("Il lavoro OP-1/10 finisce il 05/01 11:00, dopo l'inizio fissato di OP-1/20 (05/01 10:00): 60 min di conflitto");
+        p.Summary.ConflictCount.Should().Be(1);
+        p.Summary.LockedCount.Should().Be(1);
+        Row(_wo2).PlannedStartAt.Should().Be(Local(2026, 1, 5, 10));
+    }
+
+    [Fact]
+    public async Task Apply_LockedWithLatePredecessor_Success_ReturnsTheSameConflicts()
+    {
+        Arrange(db => db.WorkOrders.Single(x => x.Id == _wo1).SetupMinutes = 180);
+        Lock(_wo2, Local(2026, 1, 5, 10), Local(2026, 1, 5, 11), _m2);
+        var preview = (await Service<PlanningService>().PreviewAsync(Req(PlanningScope.Order, _order))).Data!;
+        var applied = (await Service<PlanningService>().ApplyAsync(Req(PlanningScope.Order, _order))).Data!;
+
+        applied.Conflicts.Select(c => c.Message).Should().Equal(preview.Conflicts.Select(c => c.Message));
+        applied.Summary.ConflictCount.Should().Be(1);
+        Row(_wo1).PlannedStartAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task RemovePlan_LockedWorkOrder_Success_KeepsItAndListsIt()
+    {
+        await Service<PlanningService>().ApplyAsync(Req(PlanningScope.Order, _order));
+        Arrange(db => { var w = db.WorkOrders.Single(x => x.Id == _wo2); w.IsPlanLocked = true; w.PlanLockedAt = Monday8; });
+
+        var r = (await Service<PlanningService>().RemovePlanAsync(_order)).Data!;
+
+        r.ClearedWorkOrders.Should().Be(1);
+        r.KeptLocked.Should().Equal("OP-1/20");
+        r.KeptLockedWorkOrderIds.Should().Equal(_wo2);
+        Row(_wo1).PlannedStartAt.Should().BeNull();
+        Row(_wo2).PlannedStartAt.Should().NotBeNull();
+    }
 }

@@ -553,4 +553,90 @@ public class ForwardFiniteCapacityEngineTests
         }
         return (jobs, machines);
     }
+
+    // ---- locked jobs --------------------------------------------------------------------------
+
+    [Fact]
+    public void Locked_job_is_not_moved_and_the_others_are_planned_around_it()
+    {
+        var r = Plan([LockedJob(1, 1, N(2, 9), N(2, 11)), Job(2, 120, M1), Job(3, 60, M1)], [Machine(1)]);
+
+        r.Of(1).IsLocked.Should().BeTrue();
+        r.Of(1).IsFixed.Should().BeTrue();
+        (r.Of(1).Start, r.Of(1).End, r.Of(1).EquipmentId).Should().Be((N(2, 9), N(2, 11), 1));
+        r.Of(1).Reasons.Should().ContainSingle(x => x.Code == PlanningReasonCode.Locked && x.Message == "Fissato: non spostato");
+        // 120 min do not fit in 08:00-09:00: they go after the locked job.
+        r.Of(2).Start.Should().Be(N(2, 11));
+        r.Of(3).Start.Should().Be(N(2, 8)); // 60 min fit before the locked job
+        r.LockedCount.Should().Be(1);
+        r.ConflictCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Free_job_that_fits_before_the_locked_one_is_planned_there()
+    {
+        var r = Plan([LockedJob(1, 1, N(2, 10), N(2, 12)), Job(2, 60, M1)], [Machine(1)]);
+        r.Of(2).Start.Should().Be(N(2, 8));
+        r.Of(2).End.Should().Be(N(2, 9));
+    }
+
+    [Fact]
+    public void Successor_of_a_locked_job_starts_after_its_planned_end()
+    {
+        var r = Plan([LockedJob(1, 1, N(2, 9), N(2, 11)), Job(2, 60, [2], [1])], [Machine(1), Machine(2)]);
+        r.Of(2).Start.Should().Be(N(2, 11));
+        r.Of(2).Reasons.Should().Contain(x => x.Code == PlanningReasonCode.WaitsForPredecessor && x.RelatedWorkOrderId == 1);
+    }
+
+    [Fact]
+    public void Predecessor_that_cannot_finish_before_the_locked_start_is_a_conflict_and_the_locked_job_stays()
+    {
+        // The predecessor needs 180 min from 08:00 (ends 12:00 after the lunch break rules: 08-12 = 240 min, so 08:00-11:00).
+        var r = Plan([Job(1, 180, M1), LockedJob(2, 2, N(2, 10), N(2, 12), after: [1])], [Machine(1), Machine(2)]);
+
+        (r.Of(2).Start, r.Of(2).End).Should().Be((N(2, 10), N(2, 12)));
+        var c = r.ConflictList.Should().ContainSingle().Subject;
+        c.Code.Should().Be(PlanningConflictCode.PredecessorAfterLockedStart);
+        (c.WorkOrderId, c.RelatedWorkOrderId, c.Minutes).Should().Be((2, 1, 60));
+        r.ConflictCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Predecessor_finishing_in_time_is_not_a_conflict()
+    {
+        var r = Plan([Job(1, 60, M1), LockedJob(2, 2, N(2, 10), N(2, 12), after: [1])], [Machine(1), Machine(2)]);
+        r.ConflictList.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Capacity_two_machine_hosts_a_locked_job_and_one_free_job_at_the_same_time()
+    {
+        var r = Plan([LockedJob(1, 1, N(2, 8), N(2, 12)), Job(2, 120, M1), Job(3, 120, M1)], [Machine(1, capacity: 2)]);
+        r.Of(2).Start.Should().Be(N(2, 8));
+        r.Of(3).Start.Should().Be(N(2, 10)); // both slots of the capacity: locked + job 2, then job 3 when job 2 ends
+        r.ConflictList.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Locked_jobs_overlapping_beyond_capacity_are_reported_not_fixed()
+    {
+        var r = Plan([LockedJob(1, 1, N(2, 8), N(2, 11)), LockedJob(2, 1, N(2, 9), N(2, 12))], [Machine(1)]);
+
+        (r.Of(1).Start, r.Of(2).Start).Should().Be((N(2, 8), N(2, 9)));
+        var c = r.ConflictList.Should().ContainSingle().Subject;
+        c.Code.Should().Be(PlanningConflictCode.LockedOverCapacity);
+        c.EquipmentId.Should().Be(1);
+        c.WorkOrderIds.Should().Equal(1, 2);
+        c.Minutes.Should().Be(120);
+    }
+
+    [Fact]
+    public void Locked_plan_is_deterministic()
+    {
+        PlanningResult Run() => Plan([Job(1, 180, M1), LockedJob(2, 1, N(2, 10), N(2, 12), after: [1]), Job(3, 60, M1, [2])], [Machine(1)]);
+        var a = Run();
+        var b = Run();
+        a.Planned.Should().BeEquivalentTo(b.Planned, o => o.WithStrictOrdering());
+        a.ConflictList.Should().BeEquivalentTo(b.ConflictList, o => o.WithStrictOrdering());
+    }
 }

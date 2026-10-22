@@ -92,10 +92,11 @@ public class PlanningService(
         var run = await RunAsync(request);
         if (!run.IsSuccessful) return Forward<PlanningPreviewModel>(run);
         var (items, unplanned, summary, token) = Describe(run.Data!);
+        var (notMoved, conflicts) = DescribeLocked(run.Data!);
         return ProductionOrderResult<PlanningPreviewModel>.Ok(new PlanningPreviewModel
         {
             Scope = request.Scope, ProductionOrderId = request.Scope == PlanningScope.Order ? request.ProductionOrderId : null,
-            Items = items, Unplanned = unplanned, Summary = summary, Token = token, GeneratedAt = run.Data!.Now
+            Items = items, Unplanned = unplanned, NotMoved = notMoved, Conflicts = conflicts, Summary = summary, Token = token, GeneratedAt = run.Data!.Now
         });
     }
 
@@ -105,6 +106,7 @@ public class PlanningService(
         if (!run.IsSuccessful) return Forward<PlanningApplyModel>(run);
         var r = run.Data!;
         var (items, unplanned, summary, token) = Describe(r);
+        var (notMoved, conflicts) = DescribeLocked(r);
 
         try
         {
@@ -139,7 +141,7 @@ public class PlanningService(
         return ProductionOrderResult<PlanningApplyModel>.Ok(new PlanningApplyModel
         {
             Scope = request.Scope, ProductionOrderId = request.Scope == PlanningScope.Order ? request.ProductionOrderId : null,
-            Items = items, Unplanned = unplanned, Summary = summary, Token = token,
+            Items = items, Unplanned = unplanned, NotMoved = notMoved, Conflicts = conflicts, Summary = summary, Token = token,
             DiffersFromPreview = string.IsNullOrWhiteSpace(request.PreviewToken) ? null : request.PreviewToken != token,
             AppliedAt = r.Now
         });
@@ -153,9 +155,12 @@ public class PlanningService(
         if (problem is not null) return problem;
 
         var ids = data.Subtree(orderId).Select(o => o.Id).ToHashSet();
-        var targets = data.WorkOrders.Values
+        var withPlan = data.WorkOrders.Values
             .Where(w => ids.Contains(w.ProductionOrderId) && w.Status is not (WorkOrderStatus.Ended or WorkOrderStatus.Aborted)
                         && (w.PlannedStartAt is not null || w.PlannedEndAt is not null || w.PlannedAt is not null)).ToList();
+        // Locked work orders keep their plan: the answer lists them so the user can unlock them.
+        var kept = withPlan.Where(w => w.IsPlanLocked).OrderBy(w => w.Id).ToList();
+        var targets = withPlan.Where(w => !w.IsPlanLocked).ToList();
         var now = timeProvider.GetUtcNow().UtcDateTime;
         try
         {
@@ -175,7 +180,9 @@ public class PlanningService(
             try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
             return ProductionOrderResult<RemovePlanModel>.Failed(ProductionOrderFailure.None, $"Impossibile rimuovere il piano: {ex.Message}");
         }
-        return ProductionOrderResult<RemovePlanModel>.Ok(new RemovePlanModel { ProductionOrderId = orderId, ClearedWorkOrders = targets.Count });
+        return ProductionOrderResult<RemovePlanModel>.Ok(new RemovePlanModel { ProductionOrderId = orderId, ClearedWorkOrders = targets.Count,
+            KeptLocked = kept.Select(w => ProductionData.CodeOf(data.Orders[w.ProductionOrderId], w)).ToList(),
+            KeptLockedWorkOrderIds = kept.Select(w => w.Id).ToList() });
     }
 
     /// <summary>Alerts on the current plan; the unplannable ones come from a run of the engine on the work orders without a plan.</summary>
@@ -280,7 +287,41 @@ public class PlanningService(
             LateOrders = lateOrders, MaxLateDays = items.Count == 0 ? 0 : items.Max(i => i.LateDays),
             Unplanned = unplanned.Count, LastEnd = items.Count == 0 ? null : items.Max(i => i.ProposedEnd)
         };
+        var (nm, cf) = DescribeLocked(run);
+        summary.LockedCount = nm.Count;
+        summary.ConflictCount = cf.Count;
         return (items, unplanned, summary, TokenOf(items, unplanned));
+    }
+
+    private static (List<PlanningNotMovedModel>, List<PlanningConflictModel>) DescribeLocked(Run run)
+    {
+        var data = run.Data;
+        var lockedIds = run.Build.LockedWorkOrderIds ?? new HashSet<int>();
+        var notMoved = run.Result.Planned.Where(p => p.IsLocked && lockedIds.Contains(p.WorkOrderId)).Select(p =>
+        {
+            var wo = data.WorkOrders[p.WorkOrderId];
+            var order = data.Orders[wo.ProductionOrderId];
+            return new PlanningNotMovedModel
+            {
+                WorkOrderId = wo.Id, Code = ProductionData.CodeOf(order, wo), ProductionOrderId = order.Id, ProductionOrderCode = order.Code,
+                ProcessSegmentCode = wo.ProcessSegmentCode, ProcessSegmentName = wo.ProcessSegmentName,
+                Equipment = data.ToEquipmentModel(p.EquipmentId, wo.ProcessSegmentId), Start = p.Start, End = p.End, IsLocked = true,
+                Message = "Fissato: non spostato"
+            };
+        }).OrderBy(n => n.Start).ThenBy(n => n.ProductionOrderCode, StringComparer.Ordinal).ThenBy(n => n.WorkOrderId).ToList();
+
+        string Code(int id) => ProductionData.CodeOf(data.Orders[data.WorkOrders[id].ProductionOrderId], data.WorkOrders[id]);
+        var relevant = new HashSet<int>(lockedIds);
+        relevant.UnionWith(run.Build.ScopeWorkOrderIds);
+        var conflicts = run.Result.ConflictList.Where(c => c.WorkOrderIds.Any(relevant.Contains)).Select(c => new PlanningConflictModel
+        {
+            Code = c.Code, WorkOrderId = c.WorkOrderId, RelatedWorkOrderId = c.RelatedWorkOrderId, EquipmentId = c.EquipmentId,
+            WorkOrderIds = c.WorkOrderIds.ToList(), Start = c.Start, End = c.End, Minutes = c.Minutes,
+            Message = c.Code == PlanningConflictCode.PredecessorAfterLockedStart
+                ? $"Il lavoro {Code(c.RelatedWorkOrderId!.Value)} finisce il {PlanningDateFormat.Compact(run.Zone, c.End)}, dopo l'inizio fissato di {Code(c.WorkOrderId)} ({PlanningDateFormat.Compact(run.Zone, c.Start)}): {c.Minutes} min di conflitto"
+                : $"I lavori fissati {string.Join(", ", c.WorkOrderIds.Select(Code))} si sovrappongono oltre la capacità della macchina {(data.Equipment.TryGetValue(c.EquipmentId ?? 0, out var eq) ? eq.Code : "")} dal {PlanningDateFormat.Compact(run.Zone, c.Start)} al {PlanningDateFormat.Compact(run.Zone, c.End)}: {c.Minutes} min di conflitto"
+        }).ToList();
+        return (notMoved, conflicts);
     }
 
     private static string TokenOf(List<PlanningItemModel> items, List<PlanningUnplannedModel> unplanned)

@@ -32,6 +32,12 @@ internal static class PlanningTestKit
     public static PlanningJob Running(int id, decimal remainingMinutes, int machine, DateTime startedAt, string order = "R")
         => new(id, order.GetHashCode(), order, id * 10, 0, null, null, remainingMinutes, [], null, true, [machine], null, machine, true, startedAt);
 
+    /// <summary>Locked job: fixed interval [start, end) on the machine; <paramref name="after"/> are only checked for conflicts.</summary>
+    public static PlanningJob LockedJob(int id, int machine, DateTime start, DateTime end, int[]? after = null, string order = "L",
+        int? op = null, int? orderId = null)
+        => new(id, orderId ?? order.GetHashCode(), order, op ?? id * 10, 0, null, null, 0m, after ?? [], null, true, [machine], null, machine,
+            Locked: true, LockedStart: start, LockedEnd: end);
+
     public static PlanningInput Input(IEnumerable<PlanningJob> jobs, IEnumerable<PlanningEquipment> machines,
         DateTime? now = null, TimeSpan? horizon = null, IAvailabilitySource? defaultAvailability = null)
         => new(jobs.ToList(), machines.ToList(), defaultAvailability ?? Source(), Rome, now ?? Now, horizon);

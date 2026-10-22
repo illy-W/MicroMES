@@ -19,6 +19,10 @@ public static class PlanningDateFormat
         return $"{l.ToString("dd/MM", CultureInfo.InvariantCulture)} alle {l.ToString("HH:mm", CultureInfo.InvariantCulture)}";
     }
 
+    /// <summary>"dd/MM HH:mm" in the given zone.</summary>
+    public static string Compact(TimeZoneInfo zone, DateTime utc)
+        => TimeZoneInfo.ConvertTimeFromUtc(AsUtc(utc), zone).ToString("dd/MM HH:mm", CultureInfo.InvariantCulture);
+
     /// <summary>Replaces the token with the date of <paramref name="until"/>; without a date the message is returned as is.</summary>
     public static string Resolve(string message, DateTime? until, TimeZoneInfo zone)
         => until is { } u ? message.Replace(UntilToken, Short(zone, u), StringComparison.Ordinal) : message;
