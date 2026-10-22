@@ -24,7 +24,11 @@ public enum MoveConflictCode
     /// <summary>The machine is over capacity in the interval.</summary>
     MachineOverCapacity,
     /// <summary>The new end is after the requested end of the order.</summary>
-    Late
+    Late,
+    /// <summary>The chosen interval makes the use of a tooling exceed its quantity (other work orders named).</summary>
+    ToolingOverCapacity,
+    /// <summary>The machine is not compatible with a tooling the work order requires.</summary>
+    ToolingIncompatible
 }
 
 /// <summary>A consequence of the move shown to the user; it never blocks the apply.</summary>
@@ -58,6 +62,10 @@ public class MovePreviewModel
     public required DateTime NewEnd { get; set; }
     /// <summary>Working minutes between start and end: remaining standard minutes ÷ efficiency of the machine.</summary>
     public required decimal DurationMinutes { get; set; }
+    /// <summary>Setup minutes computed from the previous state of the machine (already inside the duration and the new end).</summary>
+    public decimal SetupMinutes { get; set; }
+    public List<string> SetupReasons { get; set; } = [];
+    public bool IsFullSetup { get; set; }
     /// <summary>Version of the work order the preview was computed on; send it back when applying.</summary>
     public required DateTime ExpectedUpdatedAt { get; set; }
     public required List<MoveConflictModel> Conflicts { get; set; }

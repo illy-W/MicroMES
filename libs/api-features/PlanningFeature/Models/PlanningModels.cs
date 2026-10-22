@@ -71,6 +71,14 @@ public class PlanningItemModel
     /// <summary>Whole days of delay (rounded up); 0 when not late.</summary>
     public required int LateDays { get; set; }
     public required List<PlanningReasonModel> Reasons { get; set; }
+    /// <summary>Setup minutes the proposed plan spends before the work (depends on the previous job on the machine).</summary>
+    public decimal SetupMinutes { get; set; }
+    /// <summary>Why the setup lasts that long (Italian, one entry per change; one "attrezzaggio completo" entry for the full setup).</summary>
+    public List<string> SetupReasons { get; set; } = [];
+    /// <summary>True when the proposed setup is the full setup of the step.</summary>
+    public bool IsFullSetup { get; set; }
+    /// <summary>Planned setup minutes persisted now; null when the work order has no plan.</summary>
+    public int? CurrentSetupMinutes { get; set; }
 }
 
 public class PlanningUnplannedModel
@@ -139,6 +147,10 @@ public class PlanningSummaryModel
     public required int LateOrders { get; set; }
     public required int MaxLateDays { get; set; }
     public required int Unplanned { get; set; }
+    /// <summary>Setup minutes of the planned work orders in the scope now: persisted setup, or the full setup of the step when not planned.</summary>
+    public decimal SetupMinutesBefore { get; set; }
+    /// <summary>Setup minutes of the same work orders in the proposed plan.</summary>
+    public decimal SetupMinutesAfter { get; set; }
     /// <summary>Latest proposed end; null when nothing was planned.</summary>
     public DateTime? LastEnd { get; set; }
 }

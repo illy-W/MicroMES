@@ -26,7 +26,7 @@ public class PlanLockService(
     private IWorkOrderRepository WorkOrders => unitOfWork.GetRepository<IWorkOrderRepository>();
 
     private sealed record Move(ProductionData Data, WorkOrder WorkOrder, Equipment? Machine, DateTime Start, DateTime End, decimal Minutes,
-        List<MoveConflictModel> Conflicts, DateTime Now);
+        List<MoveConflictModel> Conflicts, DateTime Now, SetupResult Setup);
 
     public async Task<ProductionOrderResult<MovePreviewModel>> PreviewAsync(int id, MoveWorkOrderRequest request)
     {
@@ -41,6 +41,7 @@ public class PlanLockService(
             CurrentEquipment = m.Data.ToEquipmentModel(wo.AssignedEquipmentId, wo.ProcessSegmentId),
             CurrentStart = wo.PlannedStartAt, CurrentEnd = wo.PlannedEndAt,
             NewStart = m.Start, NewEnd = m.End, DurationMinutes = Math.Round(m.Minutes, 2),
+            SetupMinutes = m.Setup.Minutes, SetupReasons = m.Setup.Reasons.ToList(), IsFullSetup = m.Setup.IsFull,
             ExpectedUpdatedAt = wo.UpdatedAt, Conflicts = m.Conflicts
         });
     }
@@ -58,6 +59,7 @@ public class PlanLockService(
             wo.PlannedStartAt = m.Start;
             wo.PlannedEndAt = m.End;
             wo.PlannedAt = m.Now;
+            PlanSetup.Write(wo, m.Setup.Minutes, m.Setup.Reasons, m.Setup.IsFull);
             wo.AssignedEquipmentId = m.Machine?.Id;
             wo.IsPlanLocked = true;
             wo.PlanLockedAt = m.Now;
@@ -128,27 +130,28 @@ public class PlanLockService(
             .Where(s => s.Status is not (WorkOrderStatus.Ended or WorkOrderStatus.Aborted))
             .Select(s => Ref(s, AsUtc(s.PlannedStartAt), AsUtc(s.PlannedEndAt))).ToList();
 
-        var occupants = new List<MoveJobRef>();
-        if (machine is not null)
+        // Everything planned or running, on any machine: the machine occupants and the users of the tooling come from here.
+        var all = new List<(MoveJobRef Ref, int? MachineId)>();
         {
             var openOrders = data.Orders.Values.Where(PlanningInputBuilder.IsPlannableOrder).Select(o => o.Id).ToHashSet();
             foreach (var other in data.WorkOrders.Values.Where(w => w.Id != wo.Id && openOrders.Contains(w.ProductionOrderId)))
             {
                 if (other.Status is WorkOrderStatus.Waiting or WorkOrderStatus.Ready or WorkOrderStatus.Interrupted)
                 {
-                    if (other.AssignedEquipmentId == machine.Id && other.PlannedStartAt is { } s && other.PlannedEndAt is { } e)
-                        occupants.Add(Ref(other, AsUtc(s), AsUtc(e)));
+                    if (other.PlannedStartAt is { } s && other.PlannedEndAt is { } e)
+                        all.Add((Ref(other, AsUtc(s), AsUtc(e)), other.AssignedEquipmentId));
                 }
                 else if (other.Status == WorkOrderStatus.Running)
                 {
                     var session = data.SessionsOf(other.Id).LastOrDefault(x => x.EndedAt is null);
-                    if ((session?.EquipmentId ?? other.AssignedEquipmentId) != machine.Id) continue;
-                    var left = WorkingTimeCalculator.ApplyEfficiency(ProductionEndEstimator.RemainingMinutes(data, other, now), machine.EfficiencyPercent);
-                    var runEnd = calc.AddWorkingMinutes(source, now, left);
-                    occupants.Add(Ref(other, AsUtc(session?.StartedAt ?? other.StartedAt ?? now), runEnd.IsSuccess ? runEnd.Value : now));
+                    var runMachine = session?.EquipmentId ?? other.AssignedEquipmentId;
+                    var left = WorkingTimeCalculator.ApplyEfficiency(ProductionEndEstimator.RemainingMinutes(data, other, now), directory.EfficiencyOf(runMachine));
+                    var runEnd = calc.AddWorkingMinutes(directory.ForEquipment(runMachine), now, left);
+                    all.Add((Ref(other, AsUtc(session?.StartedAt ?? other.StartedAt ?? now), runEnd.IsSuccess ? runEnd.Value : now), runMachine));
                 }
             }
         }
+        var occupants = machine is null ? [] : all.Where(x => x.MachineId == machine.Id).Select(x => x.Ref).ToList();
 
         // Setup depends on the sequence: the job before the new start on the machine (planned or running), else the executed history.
         var requirements = MachineStartingState.RequirementsOf(data, wo);
@@ -167,9 +170,19 @@ public class PlanLockService(
         if (timing.Error is not null) return ProductionOrderResult<Move>.Invalid(timing.Error);
         var end = timing.End!.Value;
 
+        var toolLinks = (catalog.ToolingLinks ?? []).GroupBy(l => l.ToolingId).ToDictionary(g => g.Key, g => g.Select(l => l.EquipmentId).ToHashSet());
+        var toolingUse = new List<MoveToolingUse>();
+        foreach (var t in requirements.Tooling.DistinctBy(t => t.ToolingId))
+        {
+            var resource = (catalog.Tooling ?? []).FirstOrDefault(r => r.Id == t.ToolingId);
+            var users = all.Where(x => data.ToolingLines.Any(l => l.WorkOrderId == x.Ref.Id && l.ToolingId == t.ToolingId)).Select(x => x.Ref).ToList();
+            var incompatible = machine is not null && toolLinks.TryGetValue(t.ToolingId, out var allowed) && allowed.Count > 0 && !allowed.Contains(machine.Id);
+            toolingUse.Add(new MoveToolingUse(t.ToolingId, t.Code, resource?.Quantity ?? 1, incompatible, users));
+        }
+
         var conflicts = ManualMoveCalculator.FindConflicts(calc.Zone, Ref(wo, start, end), start, end, predecessors, successors,
-            machine?.Id, machine?.Code, machine?.Capacity ?? 1, occupants, AsUtc(order.RequestedEnd));
-        return ProductionOrderResult<Move>.Ok(new Move(data, wo, machine, start, end, timing.WorkMinutes, conflicts, now));
+            machine?.Id, machine?.Code, machine?.Capacity ?? 1, occupants, AsUtc(order.RequestedEnd), toolingUse);
+        return ProductionOrderResult<Move>.Ok(new Move(data, wo, machine, start, end, timing.WorkMinutes, conflicts, now, setup));
     }
 
     private static DateTime AsUtc(DateTime t) => t.Kind == DateTimeKind.Utc ? t : DateTime.SpecifyKind(t, DateTimeKind.Utc);

@@ -66,6 +66,10 @@ public class TimelineWorkOrderModel
     /// </summary>
     public required int Lane { get; set; }
     public required int Priority { get; set; }
+    /// <summary>Planned setup (start of the bar) in minutes; null when unknown or not planned.</summary>
+    public int? PlannedSetupMinutes { get; set; }
+    public List<string> PlannedSetupReasons { get; set; } = [];
+    public bool IsFullSetup { get; set; }
     /// <summary>Toolings required (snapshot taken at release).</summary>
     public List<MicroMES.ApiFeatures.ProductionOrderFeature.Models.WorkOrderToolingModel> Tooling { get; set; } = [];
     /// <summary>Setup attribute values (snapshot taken at release).</summary>

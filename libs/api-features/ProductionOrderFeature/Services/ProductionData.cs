@@ -218,6 +218,9 @@ public class ProductionData(TimeProvider timeProvider)
             PlannedStartAt = wo.PlannedStartAt,
             PlannedEndAt = wo.PlannedEndAt,
             PlannedAt = wo.PlannedAt,
+            PlannedSetupMinutes = wo.PlannedSetupMinutes,
+            PlannedSetupReasons = wo.PlannedSetupReasons?.ToList() ?? [],
+            IsFullSetup = wo.PlannedSetupMinutes is not null && wo.PlannedSetupIsFull,
             PlanStatus = PlanStatusOf(wo),
             PlanStatusReason = PlanStatusReasonOf(wo),
             IsPlanLocked = wo.IsPlanLocked,
@@ -319,7 +322,7 @@ public class ProductionData(TimeProvider timeProvider)
             Notes = m.Notes, Status = m.Status,
             AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
             StartedAt = m.StartedAt, EndedAt = m.EndedAt, PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt,
-            PlannedAt = m.PlannedAt, PlanStatus = m.PlanStatus, PlanStatusReason = m.PlanStatusReason, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt, Predecessors = m.Predecessors, Successors = m.Successors,
+            PlannedAt = m.PlannedAt, PlannedSetupMinutes = m.PlannedSetupMinutes, PlannedSetupReasons = m.PlannedSetupReasons, IsFullSetup = m.IsFullSetup, PlanStatus = m.PlanStatus, PlanStatusReason = m.PlanStatusReason, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt, Predecessors = m.Predecessors, Successors = m.Successors,
             AllowedActions = m.AllowedActions,
             Tooling = ToolingOf(wo.Id), SetupValues = SetupValuesOf(wo.Id),
             Sessions = SessionsOf(wo.Id).Select(s => new WorkOrderSessionModel
@@ -483,7 +486,7 @@ public class ProductionData(TimeProvider timeProvider)
                     AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
                     PlannedQuantity = m.PlannedQuantity, GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity,
                     PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes,
-                    PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt, PlanStatus = m.PlanStatus, PlanStatusReason = m.PlanStatusReason, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt,
+                    PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt, PlannedSetupMinutes = m.PlannedSetupMinutes, PlannedSetupReasons = m.PlannedSetupReasons, IsFullSetup = m.IsFullSetup, PlanStatus = m.PlanStatus, PlanStatusReason = m.PlanStatusReason, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt,
                     AllowedActions = m.AllowedActions,
                     Tooling = ToolingOf(w.Id), SetupValues = SetupValuesOf(w.Id),
                     Materials = Lines.Where(l => l.WorkOrderId == w.Id).OrderBy(l => l.Id).Select(ToMaterialModel).ToList()

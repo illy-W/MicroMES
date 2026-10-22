@@ -114,6 +114,12 @@ public class WorkOrderModel
     public DateTime? PlannedStartAt { get; set; }
     public DateTime? PlannedEndAt { get; set; }
     public DateTime? PlannedAt { get; set; }
+    /// <summary>Setup minutes computed by the plan (depends on the previous job on the machine); null when not planned.</summary>
+    public int? PlannedSetupMinutes { get; set; }
+    /// <summary>Why the planned setup lasts that long (Italian, one entry per change).</summary>
+    public List<string> PlannedSetupReasons { get; set; } = [];
+    /// <summary>True when the planned setup is the full setup of the step.</summary>
+    public bool IsFullSetup { get; set; }
     /// <summary>Derived (never stored): Unplanned, Planned, Late (planned end after the requested end of the order), Stale (plan no longer coherent).</summary>
     public required PlanStatus PlanStatus { get; set; }
     /// <summary>Cause of a Stale plan (None otherwise). LockedPredecessorConflict / LockedMachineNotUsable: the work order is locked, so the lock (not the engine) is the cause.</summary>

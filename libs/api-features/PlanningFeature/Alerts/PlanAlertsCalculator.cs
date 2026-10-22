@@ -13,7 +13,10 @@ public sealed record AlertPredecessor(int Id, string Code, DateTime? End);
 public sealed record AlertWorkOrder(
     int Id, string Code, int OrderId, string OrderCode, DateTime? OrderRequestedEnd, WorkOrderStatus Status,
     DateTime? PlannedStart, DateTime? PlannedEnd, int? EquipmentId, string? EquipmentCode, bool MachineUsable,
-    IReadOnlyList<AlertPredecessor> Predecessors, bool IsLocked = false);
+    IReadOnlyList<AlertPredecessor> Predecessors, bool IsLocked = false, IReadOnlyList<int>? ToolingIds = null);
+
+/// <summary>A tooling as the alerts see it; no compatible machines listed = compatible with any machine.</summary>
+public sealed record AlertTooling(int Id, string Code, int Quantity, bool IsActive, IReadOnlyList<int> CompatibleEquipmentIds);
 
 public sealed record AlertMachine(int Id, string Code, int Capacity, IAvailabilitySource Availability);
 
@@ -44,7 +47,7 @@ public static class PlanAlertsCalculator
 
     public static List<PlanAlertModel> Calculate(
         IReadOnlyList<AlertWorkOrder> workOrders, IReadOnlyList<AlertMachine> machines,
-        IReadOnlyList<AlertUnplannable> unplannable, WorkingTimeCalculator calc, DateTime now)
+        IReadOnlyList<AlertUnplannable> unplannable, WorkingTimeCalculator calc, DateTime now, IReadOnlyList<AlertTooling>? tooling = null)
     {
         var alerts = new List<PlanAlertModel>();
         AddLate(alerts, workOrders, calc);
@@ -52,6 +55,7 @@ public static class PlanAlertsCalculator
         AddStaleAndMachine(alerts, workOrders, calc, now);
         AddOverload(alerts, workOrders, machines, calc);
         AddLocked(alerts, workOrders, machines, calc);
+        AddTooling(alerts, workOrders, tooling ?? [], calc);
 
         return alerts
             .OrderByDescending(a => a.Severity)
@@ -89,7 +93,9 @@ public static class PlanAlertsCalculator
         foreach (var u in unplannable)
             alerts.Add(new PlanAlertModel
             {
-                Type = PlanAlertType.Unplannable, Severity = PlanAlertSeverity.Critical,
+                Type = u.Reason is UnplannedReasonCode.ToolingInactive or UnplannedReasonCode.ToolingIncompatible
+                    ? PlanAlertType.UnplannableForTooling : PlanAlertType.Unplannable,
+                Severity = PlanAlertSeverity.Critical,
                 ProductionOrderId = u.OrderId, ProductionOrderCode = u.OrderCode, WorkOrderId = u.WorkOrderId, WorkOrderCode = u.Code,
                 CauseWorkOrderId = u.RelatedWorkOrderId,
                 Message = $"Il lavoro {u.Code} non si può pianificare. {u.Message}",
@@ -98,6 +104,8 @@ public static class PlanAlertsCalculator
                     UnplannedReasonCode.NoWorkingTime => "Aggiungi fasce di lavoro al calendario della macchina o rimuovi le chiusure.",
                     UnplannedReasonCode.HorizonExceeded => "Il piano copre 6 mesi: riduci i minuti del lavoro o rimuovi le chiusure del calendario.",
                     UnplannedReasonCode.NoCandidateMachine => "Attiva o abilita almeno una macchina per la fase del lavoro.",
+                    UnplannedReasonCode.ToolingInactive => "Riattiva l'attrezzatura o cambia il passo di ciclo.",
+                    UnplannedReasonCode.ToolingIncompatible => "Scegli un'altra attrezzatura o abilita una macchina compatibile con l'attrezzatura richiesta.",
                     UnplannedReasonCode.CyclicDependency => "Correggi le dipendenze: i lavori si aspettano a vicenda.",
                     _ => "Risolvi prima il lavoro che lo trattiene, poi ripianifica."
                 }
@@ -186,6 +194,79 @@ public static class PlanAlertsCalculator
                     Suggestion = "Sposta alcuni lavori su un'altra macchina abilitata e ripianifica."
                 });
             }
+        }
+    }
+
+    private static void AddTooling(List<PlanAlertModel> alerts, IReadOnlyList<AlertWorkOrder> workOrders,
+        IReadOnlyList<AlertTooling> tooling, WorkingTimeCalculator calc)
+    {
+        foreach (var t in tooling.OrderBy(t => t.Code, StringComparer.Ordinal).ThenBy(t => t.Id))
+        {
+            var users = workOrders.Where(w => w.ToolingIds is not null && w.ToolingIds.Contains(t.Id)).OrderBy(w => w.Id).ToList();
+            if (users.Count == 0) continue;
+
+            PlanAlertModel Base(AlertWorkOrder w, PlanAlertType type, PlanAlertSeverity severity, string message, string suggestion) => new()
+            {
+                Type = type, Severity = severity, ProductionOrderId = w.OrderId, ProductionOrderCode = w.OrderCode,
+                WorkOrderId = w.Id, WorkOrderCode = w.Code, EquipmentId = w.EquipmentId, EquipmentCode = w.EquipmentCode,
+                ToolingId = t.Id, ToolingCode = t.Code, WorkOrderIds = [w.Id], Date = w.PlannedStart, Message = message, Suggestion = suggestion
+            };
+
+            // Deactivated: one alert per tooling, listing the open work orders that require it.
+            if (!t.IsActive)
+            {
+                var first = users[0];
+                var a = Base(first, PlanAlertType.ToolingInactive, PlanAlertSeverity.Warning,
+                    $"L'attrezzatura {t.Code} è disattivata ma è richiesta da {users.Count} {(users.Count == 1 ? "lavoro aperto" : "lavori aperti")}: {string.Join(", ", users.Select(u => u.Code))}.",
+                    "Riattiva l'attrezzatura o cambia il passo di ciclo.");
+                a.WorkOrderIds = users.Select(u => u.Id).ToList();
+                a.EquipmentId = null; a.EquipmentCode = null; a.Date = null;
+                alerts.Add(a);
+            }
+
+            // Machine not compatible (assigned or locked).
+            if (t.CompatibleEquipmentIds.Count > 0)
+                foreach (var w in users.Where(w => w.EquipmentId is { } e && w.MachineUsable && !t.CompatibleEquipmentIds.Contains(e)))
+                    alerts.Add(Base(w, PlanAlertType.ToolingIncompatibleMachine, PlanAlertSeverity.Critical,
+                        $"Il lavoro {w.Code}{(w.IsLocked ? " (fissato)" : "")} è su {w.EquipmentCode}, che non è compatibile con l'attrezzatura {t.Code} richiesta.",
+                        $"Scegli una macchina compatibile con {t.Code}."));
+
+            // Overbooked: locked or running intervals using more units than the quantity at some instant.
+            var fixedUsers = users.Where(w => (w.IsLocked || w.Status == WorkOrderStatus.Running)
+                                              && w.PlannedStart is not null && w.PlannedEnd is not null && w.PlannedEnd > w.PlannedStart).ToList();
+            if (fixedUsers.Count <= Math.Max(1, t.Quantity)) continue;
+            var quantity = Math.Max(1, t.Quantity);
+            var points = fixedUsers.SelectMany(j => new[] { j.PlannedStart!.Value, j.PlannedEnd!.Value }).Distinct().OrderBy(x => x).ToList();
+            DateTime? runFrom = null;
+            var runTo = default(DateTime);
+            var involved = new Dictionary<int, AlertWorkOrder>();
+            void Flush()
+            {
+                if (runFrom is null) return;
+                var list = involved.Values.OrderBy(j => j.Id).ToList();
+                var a = Base(list[0], PlanAlertType.ToolingOverbooked, PlanAlertSeverity.Warning,
+                    $"L'attrezzatura {t.Code} (quantità {quantity}) è richiesta da {list.Count} lavori insieme ({string.Join(", ", list.Select(j => j.Code))}) dal {Local(calc, runFrom.Value)} al {Local(calc, runTo)}.",
+                    "Sposta uno dei due lavori o aumenta la quantità dell'attrezzatura.");
+                a.WorkOrderIds = list.Select(j => j.Id).ToList();
+                a.Date = runFrom;
+                alerts.Add(a);
+                runFrom = null;
+                involved = [];
+            }
+            for (var i = 0; i + 1 < points.Count; i++)
+            {
+                var from = points[i];
+                var to = points[i + 1];
+                var active = fixedUsers.Where(j => j.PlannedStart < to && j.PlannedEnd > from).ToList();
+                if (active.Count > quantity)
+                {
+                    runFrom ??= from;
+                    runTo = to;
+                    foreach (var j in active) involved[j.Id] = j;
+                }
+                else Flush();
+            }
+            Flush();
         }
     }
 

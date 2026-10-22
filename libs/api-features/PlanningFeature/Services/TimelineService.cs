@@ -44,7 +44,7 @@ public class TimelineService(
     private static DateTime? Utc(DateTime? t) => t is { } v ? Utc(v) : null;
 
     public async Task<ProductionOrderResult<TimelineModel>> GetAsync(
-        DateTime from, DateTime to, int? equipmentId = null, WorkOrderStatus? status = null, int? productionOrderId = null, bool? locked = null)
+        DateTime from, DateTime to, int? equipmentId = null, WorkOrderStatus? status = null, int? productionOrderId = null, bool? locked = null, int? toolingId = null)
     {
         from = Utc(from);
         to = Utc(to);
@@ -61,6 +61,8 @@ public class TimelineService(
             return ProductionOrderResult<TimelineModel>.NotFound("Macchina non trovata.");
         if (productionOrderId is { } pid && !data.Orders.ContainsKey(pid))
             return ProductionOrderResult<TimelineModel>.NotFound("Ordine di produzione non trovato.");
+        if (toolingId is { } tid && !(catalog.Tooling ?? []).Any(t => t.Id == tid))
+            return ProductionOrderResult<TimelineModel>.NotFound("Attrezzatura non trovata.");
         foreach (var m in catalog.Machines.Values) data.Equipment.TryAdd(m.Id, m);
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -85,7 +87,8 @@ public class TimelineService(
         var shown = bars.Where(b => (equipmentId is null || b.EquipmentId == equipmentId)
                                     && (status is null || b.Wo.Status == status)
                                     && (productionOrderId is null || b.Wo.ProductionOrderId == productionOrderId)
-                                    && (locked is not true || b.Wo.IsPlanLocked)).ToList();
+                                    && (locked is not true || b.Wo.IsPlanLocked)
+                                    && (toolingId is null || data.ToolingLines.Any(l => l.WorkOrderId == b.Wo.Id && l.ToolingId == toolingId))).ToList();
 
         var period = TimelineCalculator.PeriodFor(from, to);
         var nonWorking = new List<TimelineNonWorkingModel>();
@@ -146,6 +149,8 @@ public class TimelineService(
             Status = wo.Status, PlanStatus = data.PlanStatusOf(wo), PlanStatusReason = data.PlanStatusReasonOf(wo), IsPlanLocked = wo.IsPlanLocked, PlanLockedAt = Utc(wo.PlanLockedAt), IsLate = late,
             LateDays = late ? (int)Math.Ceiling((wo.PlannedEndAt!.Value - order.RequestedEnd!.Value).TotalDays) : 0,
             PredecessorIds = data.PredecessorIds(wo.Id).OrderBy(i => i).ToList(), Lane = lane, Priority = order.Priority,
+            PlannedSetupMinutes = wo.PlannedSetupMinutes, PlannedSetupReasons = wo.PlannedSetupReasons?.ToList() ?? [],
+            IsFullSetup = wo.PlannedSetupMinutes is not null && wo.PlannedSetupIsFull,
             Tooling = data.ToolingOf(wo.Id), SetupValues = data.SetupValuesOf(wo.Id)
         };
     }

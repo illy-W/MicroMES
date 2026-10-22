@@ -47,7 +47,7 @@ public class PlanningController(PlanningService service, TimelineService timelin
 
     /// <summary>
     /// Read-only timeline of the window [from, to) (UTC, max 62 days): machines, work orders with plan or real dates, non-working spans and load per day
-    /// (windows up to 14 days) or per week. Filters: machine, status, order, locked (only locked work orders).
+    /// (windows up to 14 days) or per week. Filters: machine, status, order, locked (only locked work orders), toolingId (only work orders requiring that tooling; 404 when unknown).
     /// </summary>
     [HttpGet("timeline", Name = "GetPlanningTimeline")]
     [ProducesResponseType<TimelineModel>(StatusCodes.Status200OK)]
@@ -56,8 +56,8 @@ public class PlanningController(PlanningService service, TimelineService timelin
     public async Task<IActionResult> GetTimeline(
         [FromQuery] DateTime from, [FromQuery] DateTime to,
         [FromQuery] int? equipmentId, [FromQuery] WorkOrderStatus? status, [FromQuery] int? productionOrderId,
-        [FromQuery] bool? locked)
-        => ToResponse(await timeline.GetAsync(from, to, equipmentId, status, productionOrderId, locked));
+        [FromQuery] bool? locked, [FromQuery] int? toolingId)
+        => ToResponse(await timeline.GetAsync(from, to, equipmentId, status, productionOrderId, locked, toolingId));
 
     private IActionResult ToResponse<T>(ProductionOrderResult<T> result)
     {

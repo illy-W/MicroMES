@@ -19,7 +19,15 @@ public enum PlanAlertType
     /// <summary>(Warning) The locked intervals on a machine exceed its capacity.</summary>
     LockedOverCapacity,
     /// <summary>(Warning) A locked work order ends after the requested end of its order.</summary>
-    LockedLate
+    LockedLate,
+    /// <summary>(Warning) Locked or running work orders use a tooling beyond its quantity at some instant.</summary>
+    ToolingOverbooked,
+    /// <summary>(Critical) A work order is assigned (or locked) on a machine not compatible with a tooling it requires.</summary>
+    ToolingIncompatibleMachine,
+    /// <summary>(Warning) Open work orders require a deactivated tooling (one alert per tooling).</summary>
+    ToolingInactive,
+    /// <summary>(Critical) An open work order cannot be planned because of tooling: inactive, or no compatible active machine.</summary>
+    UnplannableForTooling
 }
 
 public enum PlanAlertSeverity
@@ -38,6 +46,11 @@ public class PlanAlertModel
     public string? WorkOrderCode { get; set; }
     public int? EquipmentId { get; set; }
     public string? EquipmentCode { get; set; }
+    /// <summary>Tooling the alert is about (tooling alerts only).</summary>
+    public int? ToolingId { get; set; }
+    public string? ToolingCode { get; set; }
+    /// <summary>Work orders involved (tooling alerts: those using the tooling).</summary>
+    public List<int> WorkOrderIds { get; set; } = [];
     /// <summary>Work order that holds this one back (Unplannable behind an unplanned predecessor, StalePlan behind a late predecessor).</summary>
     public int? CauseWorkOrderId { get; set; }
     /// <summary>Date the alert refers to (UTC): planned end for Late, planned start for StalePlan, week start for MachineOverloaded.</summary>

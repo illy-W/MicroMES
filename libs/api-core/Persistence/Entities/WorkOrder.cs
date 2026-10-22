@@ -32,6 +32,12 @@ public class WorkOrder : IEntity<int>
     public DateTime? PlannedEndAt { get; set; }
     /// <summary>When the plan was written (UTC); null = not planned.</summary>
     public DateTime? PlannedAt { get; set; }
+    /// <summary>Setup minutes computed by the planning (sequence-dependent) or by the manual move; null = not planned or unknown. Cleared with the plan.</summary>
+    public int? PlannedSetupMinutes { get; set; }
+    /// <summary>Why the planned setup lasts <see cref="PlannedSetupMinutes"/> (Italian, one entry per change); null = none.</summary>
+    public List<string>? PlannedSetupReasons { get; set; }
+    /// <summary>True when the planned setup is the full setup of the step.</summary>
+    public bool PlannedSetupIsFull { get; set; }
     /// <summary>Manual lock of the plan: the engine never moves a locked work order. Cleared when the work order starts or its order is closed.</summary>
     public bool IsPlanLocked { get; set; }
     /// <summary>When the plan was locked (UTC); null when not locked.</summary>

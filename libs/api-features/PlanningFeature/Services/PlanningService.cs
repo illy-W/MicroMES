@@ -123,6 +123,7 @@ public class PlanningService(
                 wo.PlannedStartAt = item.ProposedStart;
                 wo.PlannedEndAt = item.ProposedEnd;
                 wo.PlannedAt = r.Now;
+                PlanSetup.Write(wo, item.SetupMinutes, item.SetupReasons, item.IsFullSetup);
                 if (item.AssignsEquipment) wo.AssignedEquipmentId = item.ProposedEquipment!.Id;
                 wo.UpdatedAt = r.Now;
                 Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile salvare il piano del lavoro.");
@@ -133,6 +134,7 @@ public class PlanningService(
                 wo.PlannedStartAt = null;
                 wo.PlannedEndAt = null;
                 wo.PlannedAt = null;
+                PlanSetup.Clear(wo);
                 wo.UpdatedAt = r.Now;
                 Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile rimuovere il piano del lavoro.");
             }
@@ -176,6 +178,7 @@ public class PlanningService(
                 wo.PlannedStartAt = null;
                 wo.PlannedEndAt = null;
                 wo.PlannedAt = null;
+                PlanSetup.Clear(wo);
                 wo.UpdatedAt = now;
                 Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile rimuovere il piano del lavoro.");
             }
@@ -214,8 +217,10 @@ public class PlanningService(
                 w.AssignedEquipmentId, eq?.Code, usable,
                 data.PredecessorIds(w.Id).Select(p => data.WorkOrders[p])
                     .Select(p => new AlertPredecessor(p.Id, Code(p), AsUtc(p.EndedAt ?? p.PlannedEndAt))).ToList(),
-                w.IsPlanLocked);
+                w.IsPlanLocked, data.ToolingLines.Where(l => l.WorkOrderId == w.Id).Select(l => l.ToolingId).Distinct().ToList());
         }).ToList();
+        var toolLinks = (catalog.ToolingLinks ?? []).GroupBy(l => l.ToolingId).ToDictionary(g => g.Key, g => g.Select(l => l.EquipmentId).Distinct().ToList());
+        var toolingAlerts = (catalog.Tooling ?? []).Select(t => new AlertTooling(t.Id, t.Code, t.Quantity, t.IsActive, toolLinks.GetValueOrDefault(t.Id) ?? [])).ToList();
 
         var machines = catalog.Machines.Values.Where(m => m.IsActive)
             .Select(m => new AlertMachine(m.Id, m.Code, Math.Max(1, m.Capacity), directory.ForEquipment(m.Id))).ToList();
@@ -225,7 +230,7 @@ public class PlanningService(
             return new AlertUnplannable(w.Id, Code(w), w.ProductionOrderId, data.Orders[w.ProductionOrderId].Code, u.Code, u.Message, u.RelatedWorkOrderId);
         }).ToList();
 
-        var alerts = PlanAlertsCalculator.Calculate(alertWos, machines, unplannable, directory.Calculator, r.Now);
+        var alerts = PlanAlertsCalculator.Calculate(alertWos, machines, unplannable, directory.Calculator, r.Now, toolingAlerts);
         return ProductionOrderResult<PlanAlertsModel>.Ok(new PlanAlertsModel
         {
             Alerts = alerts,
@@ -265,6 +270,8 @@ public class PlanningService(
                 CurrentStart = wo.PlannedStartAt, CurrentEnd = wo.PlannedEndAt, AssignsEquipment = assignsEquipment,
                 RequestedEnd = order.RequestedEnd, IsLate = late,
                 LateDays = late ? (int)Math.Ceiling((p.End - order.RequestedEnd!.Value).TotalDays) : 0,
+                SetupMinutes = p.SetupMinutes, SetupReasons = p.SetupReasonList.ToList(), IsFullSetup = p.IsFullSetup,
+                CurrentSetupMinutes = hasPlan ? wo.PlannedSetupMinutes : null,
                 Reasons = p.Reasons.Select(r => new PlanningReasonModel
                 {
                     Code = r.Code, Message = PlanningDateFormat.Resolve(r.Message, r.Until, run.Zone), Until = r.Until, RelatedWorkOrderId = r.RelatedWorkOrderId, RelatedEquipmentId = r.RelatedEquipmentId
@@ -291,6 +298,8 @@ public class PlanningService(
             Considered = scope.Count, Planned = items.Count,
             New = items.Count(i => i.Change == PlanChangeKind.New), Moved = items.Count(i => i.Change == PlanChangeKind.Moved),
             Unchanged = items.Count(i => i.Change == PlanChangeKind.Unchanged),
+            SetupMinutesBefore = items.Sum(i => i.CurrentSetupMinutes ?? data.WorkOrders[i.WorkOrderId].SetupMinutes),
+            SetupMinutesAfter = items.Sum(i => i.SetupMinutes),
             LateOrders = lateOrders, MaxLateDays = items.Count == 0 ? 0 : items.Max(i => i.LateDays),
             Unplanned = unplanned.Count, LastEnd = items.Count == 0 ? null : items.Max(i => i.ProposedEnd)
         };
@@ -337,5 +346,23 @@ public class PlanningService(
                        .Select(i => $"{i.WorkOrderId}|{i.ProposedEquipment?.Id}|{i.ProposedStart.Ticks}|{i.ProposedEnd.Ticks}"))
                    + "#" + string.Join(",", unplanned.Select(u => $"{u.WorkOrderId}:{u.Reason}"));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..16];
+    }
+}
+
+/// <summary>Writes/clears the planned setup on a work order (shared by apply, manual move and plan removal).</summary>
+public static class PlanSetup
+{
+    public static void Write(WorkOrder wo, decimal minutes, IReadOnlyList<string> reasons, bool isFull)
+    {
+        wo.PlannedSetupMinutes = (int)Math.Round(minutes, MidpointRounding.AwayFromZero);
+        wo.PlannedSetupReasons = reasons.Count == 0 ? null : reasons.ToList();
+        wo.PlannedSetupIsFull = isFull;
+    }
+
+    public static void Clear(WorkOrder wo)
+    {
+        wo.PlannedSetupMinutes = null;
+        wo.PlannedSetupReasons = null;
+        wo.PlannedSetupIsFull = false;
     }
 }

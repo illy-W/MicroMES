@@ -42,6 +42,9 @@ public class ProductionOrderOverviewWorkOrderModel
     public required decimal WorkedMinutes { get; set; }
     public DateTime? PlannedStartAt { get; set; }
     public DateTime? PlannedEndAt { get; set; }
+    public int? PlannedSetupMinutes { get; set; }
+    public List<string> PlannedSetupReasons { get; set; } = [];
+    public bool IsFullSetup { get; set; }
     public required PlanStatus PlanStatus { get; set; }
     public required PlanStatusCalculator.StaleCause PlanStatusReason { get; set; }
     public required bool IsPlanLocked { get; set; }

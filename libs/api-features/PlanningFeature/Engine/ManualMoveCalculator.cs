@@ -11,6 +11,9 @@ public sealed record MoveTiming(DateTime? End, decimal WorkMinutes, string? Erro
 /// <summary>A work order seen by the conflict check (planned or real interval).</summary>
 public sealed record MoveJobRef(int Id, string Code, DateTime? Start, DateTime? End);
 
+/// <summary>A tooling the moved job needs: quantity, the other jobs using it in the window and whether the chosen machine is not compatible with it.</summary>
+public sealed record MoveToolingUse(int Id, string Code, int Quantity, bool IncompatibleWithMachine, IReadOnlyList<MoveJobRef> Users);
+
 /// <summary>
 /// Pure rules of the manual move: validity of the start on the calendar, end computation (same <see cref="WorkingTimeCalculator"/>
 /// as the engine and the estimator) and conflicts of the result. The start is never shifted: an invalid one is an error with a suggestion.
@@ -51,7 +54,8 @@ public static class ManualMoveCalculator
     public static List<MoveConflictModel> FindConflicts(
         TimeZoneInfo zone, MoveJobRef self, DateTime start, DateTime end,
         IReadOnlyList<MoveJobRef> predecessors, IReadOnlyList<MoveJobRef> successors,
-        int? equipmentId, string? equipmentCode, int capacity, IReadOnlyList<MoveJobRef> occupants, DateTime? requestedEnd)
+        int? equipmentId, string? equipmentCode, int capacity, IReadOnlyList<MoveJobRef> occupants, DateTime? requestedEnd,
+        IReadOnlyList<MoveToolingUse>? tooling = null)
     {
         var result = new List<MoveConflictModel>();
 
@@ -77,6 +81,29 @@ public static class ManualMoveCalculator
 
         if (equipmentId is not null) result.AddRange(CapacityConflicts(zone, self, start, end, equipmentId.Value, equipmentCode, capacity, occupants));
 
+        foreach (var t in (tooling ?? []).OrderBy(t => t.Code, StringComparer.Ordinal).ThenBy(t => t.Id))
+        {
+            if (t.IncompatibleWithMachine && equipmentCode is not null)
+                result.Add(new MoveConflictModel
+                {
+                    Code = MoveConflictCode.ToolingIncompatible,
+                    Message = $"La macchina {equipmentCode} non è compatibile con l'attrezzatura {t.Code} richiesta da {self.Code}. Scegli una macchina compatibile con {t.Code}.",
+                    WorkOrderIds = [self.Id], WorkOrderCodes = [self.Code], EquipmentId = equipmentId
+                });
+            foreach (var run in Overlaps(start, end, Math.Max(1, t.Quantity), t.Users))
+            {
+                var minutes = (int)Math.Ceiling((run.To - run.From).TotalMinutes);
+                result.Add(new MoveConflictModel
+                {
+                    Code = MoveConflictCode.ToolingOverCapacity,
+                    Message = $"L'attrezzatura {t.Code} (quantità {Math.Max(1, t.Quantity)}) è richiesta anche da {string.Join(", ", run.Involved.Select(o => o.Code))} dal {PlanningDateFormat.Compact(zone, run.From)} al {PlanningDateFormat.Compact(zone, run.To)}: {minutes} min di conflitto. Sposta uno dei due lavori o aumenta la quantità dell'attrezzatura.",
+                    WorkOrderIds = new[] { self.Id }.Concat(run.Involved.Select(o => o.Id)).ToList(),
+                    WorkOrderCodes = new[] { self.Code }.Concat(run.Involved.Select(o => o.Code)).ToList(),
+                    Minutes = minutes, From = run.From, To = run.To
+                });
+            }
+        }
+
         if (requestedEnd is { } due && end > due)
         {
             var days = (int)Math.Ceiling((end - due).TotalDays);
@@ -90,10 +117,11 @@ public static class ManualMoveCalculator
         return result;
     }
 
-    private static List<MoveConflictModel> CapacityConflicts(TimeZoneInfo zone, MoveJobRef self, DateTime start, DateTime end,
-        int equipmentId, string? equipmentCode, int capacity, IReadOnlyList<MoveJobRef> occupants)
+    private sealed record OverlapRun(DateTime From, DateTime To, List<MoveJobRef> Involved);
+
+    /// <summary>Runs inside [start, end) where the occupants plus the moved job exceed <paramref name="capacity"/>.</summary>
+    private static List<OverlapRun> Overlaps(DateTime start, DateTime end, int capacity, IReadOnlyList<MoveJobRef> occupants)
     {
-        capacity = Math.Max(1, capacity);
         var overlapping = occupants.Where(o => o.Start is { } s && o.End is { } e && s < end && e > start).ToList();
         if (overlapping.Count == 0 || end <= start) return [];
 
@@ -105,7 +133,7 @@ public static class ManualMoveCalculator
         }
         var ordered = points.ToList();
 
-        var result = new List<MoveConflictModel>();
+        var result = new List<OverlapRun>();
         DateTime? runFrom = null;
         DateTime runTo = default;
         var involved = new Dictionary<int, MoveJobRef>();
@@ -113,16 +141,7 @@ public static class ManualMoveCalculator
         void Flush()
         {
             if (runFrom is null) return;
-            var list = involved.Values.OrderBy(o => o.Id).ToList();
-            var minutes = (int)Math.Ceiling((runTo - runFrom.Value).TotalMinutes);
-            result.Add(new MoveConflictModel
-            {
-                Code = MoveConflictCode.MachineOverCapacity,
-                Message = $"La macchina {equipmentCode} supera la capacità ({capacity}) dal {PlanningDateFormat.Compact(zone, runFrom.Value)} al {PlanningDateFormat.Compact(zone, runTo)} con {string.Join(", ", list.Select(o => o.Code))}: {minutes} min di conflitto",
-                WorkOrderIds = new[] { self.Id }.Concat(list.Select(o => o.Id)).ToList(),
-                WorkOrderCodes = new[] { self.Code }.Concat(list.Select(o => o.Code)).ToList(),
-                EquipmentId = equipmentId, Minutes = minutes, From = runFrom, To = runTo
-            });
+            result.Add(new OverlapRun(runFrom.Value, runTo, involved.Values.OrderBy(o => o.Id).ToList()));
             runFrom = null;
             involved = [];
         }
@@ -142,5 +161,23 @@ public static class ManualMoveCalculator
         }
         Flush();
         return result;
+    }
+
+    private static List<MoveConflictModel> CapacityConflicts(TimeZoneInfo zone, MoveJobRef self, DateTime start, DateTime end,
+        int equipmentId, string? equipmentCode, int capacity, IReadOnlyList<MoveJobRef> occupants)
+    {
+        capacity = Math.Max(1, capacity);
+        return Overlaps(start, end, capacity, occupants).Select(run =>
+        {
+            var minutes = (int)Math.Ceiling((run.To - run.From).TotalMinutes);
+            return new MoveConflictModel
+            {
+                Code = MoveConflictCode.MachineOverCapacity,
+                Message = $"La macchina {equipmentCode} supera la capacità ({capacity}) dal {PlanningDateFormat.Compact(zone, run.From)} al {PlanningDateFormat.Compact(zone, run.To)} con {string.Join(", ", run.Involved.Select(o => o.Code))}: {minutes} min di conflitto",
+                WorkOrderIds = new[] { self.Id }.Concat(run.Involved.Select(o => o.Id)).ToList(),
+                WorkOrderCodes = new[] { self.Code }.Concat(run.Involved.Select(o => o.Code)).ToList(),
+                EquipmentId = equipmentId, Minutes = minutes, From = run.From, To = run.To
+            };
+        }).ToList();
     }
 }
