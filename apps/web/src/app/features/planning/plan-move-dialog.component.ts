@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, OnDestroy, OnInit, output, signal, untracked } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideAlarmClock, lucideCircleAlert, lucideLoaderCircle, lucideTriangleAlert } from '@ng-icons/lucide';
+import { lucideAlarmClock, lucideCircleAlert, lucideLoaderCircle, lucideTriangleAlert, lucideWrench } from '@ng-icons/lucide';
 import type { EquipmentModel, MoveConflictModel, MovePreviewModel } from '@micromes/api-client/models';
 import { toast } from '@spartan-ng/brain/sonner';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -32,7 +32,7 @@ const DEBOUNCE_MS = 300;
 @Component({
   selector: 'app-plan-move-dialog',
   imports: [HlmDialogImports, HlmSelectImports, HlmButton, HlmInput, HlmLabel, HlmSkeleton, NgIcon],
-  providers: [provideIcons({ lucideAlarmClock, lucideCircleAlert, lucideLoaderCircle, lucideTriangleAlert })],
+  providers: [provideIcons({ lucideAlarmClock, lucideCircleAlert, lucideLoaderCircle, lucideTriangleAlert, lucideWrench })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-dialog state="open" (closed)="closed.emit()">
@@ -92,6 +92,18 @@ const DEBOUNCE_MS = 300;
                 <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                   <dt class="text-muted-foreground">Nuova fine</dt>
                   <dd class="font-medium tabular-nums">{{ fmt(p.newEnd) }}</dd>
+                  <dt class="text-muted-foreground">Attrezzaggio</dt>
+                  <dd>
+                    @if ((p.setupMinutes ?? 0) > 0) {
+                      <span class="font-medium tabular-nums">{{ p.setupMinutes }} min</span>
+                      @if (p.isFullSetup) { <span class="text-muted-foreground"> (completo)</span> }
+                      @if (p.setupReasons?.length) {
+                        <ul class="text-muted-foreground list-disc pl-4 text-xs">
+                          @for (r of p.setupReasons; track $index) { <li>{{ r }}</li> }
+                        </ul>
+                      }
+                    } @else { <span class="text-muted-foreground">nessuno</span> }
+                  </dd>
                   <dt class="text-muted-foreground">Durata</dt>
                   <dd>{{ duration(p.durationMinutes) }}</dd>
                 </dl>

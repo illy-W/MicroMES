@@ -42,5 +42,7 @@ describe('plan-lock', () => {
     const base = { message: 'm', workOrderIds: [1], workOrderCodes: ['A', 'B'] };
     expect(conflictLine({ ...base, code: 'SuccessorsStartBeforeEnd' }).text).toContain('A, B');
     expect(conflictLine({ ...base, code: 'Late', lateDays: 2 }).text).toContain('2 g');
+    expect(conflictLine({ ...base, code: 'ToolingOverCapacity', minutes: 30 })).toMatchObject({ icon: 'lucideWrench' });
+    expect(conflictLine({ ...base, code: 'ToolingIncompatible' }).text).toContain('non compatibile');
   });
 });

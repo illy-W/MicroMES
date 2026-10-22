@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideArrowRight, lucideCircleCheck, lucideClock, lucideLock, lucideMove, lucidePlus, lucideSearch, lucideTriangleAlert } from '@ng-icons/lucide';
+import { lucideArrowRight, lucideCircleCheck, lucideClock, lucideLock, lucideMove, lucidePlus, lucideMinus, lucideSearch, lucideTrendingDown, lucideTrendingUp, lucideTriangleAlert } from '@ng-icons/lucide';
 import type { PlanChangeKind, PlanningConflictModel, PlanningItemModel, PlanningPreviewModel, PlanningScope } from '@micromes/api-client/models';
 import { PlanningService } from '@micromes/api-client/services/planning';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -17,6 +17,7 @@ import { firstValueFrom } from 'rxjs';
 import { CalendarsStore } from '../calendars/calendars.store';
 import { toFailure } from '../materials/materials.service';
 import { formatEstimatedEnd } from '../production-orders/estimated-end.component';
+import { setupDelta } from './setup';
 
 const CHANGE: Record<PlanChangeKind, { label: string; icon: string }> = {
   New: { label: 'Nuovo', icon: 'lucidePlus' },
@@ -28,7 +29,7 @@ const CHANGE: Record<PlanChangeKind, { label: string; icon: string }> = {
 @Component({
   selector: 'app-plan-preview-dialog',
   imports: [HlmDialogImports, HlmButton, HlmBadge, HlmInput, HlmLabel, HlmSkeleton, HlmSwitch, HlmTableImports, HlmTooltipImports, NgIcon],
-  providers: [provideIcons({ lucideArrowRight, lucideCircleCheck, lucideClock, lucideLock, lucideMove, lucidePlus, lucideSearch, lucideTriangleAlert })],
+  providers: [provideIcons({ lucideArrowRight, lucideCircleCheck, lucideClock, lucideLock, lucideMinus, lucideMove, lucidePlus, lucideSearch, lucideTrendingDown, lucideTrendingUp, lucideTriangleAlert })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-dialog state="open" (closed)="closed.emit()">
@@ -67,6 +68,11 @@ const CHANGE: Record<PlanChangeKind, { label: string; icon: string }> = {
               @if ((p.summary.conflictCount ?? 0) > 0) {
                 · <span hlmBadge variant="outline" class="text-destructive gap-1 px-1.5" data-testid="conflict-chip"><ng-icon name="lucideTriangleAlert" size="12" aria-hidden="true" /> {{ p.summary.conflictCount }} conflitti</span>
               }
+              @if (setup(); as sd) {
+                · <span hlmBadge variant="outline" class="gap-1 px-1.5" [class.text-destructive]="sd.direction === 'up'" data-testid="setup-chip">
+                  <ng-icon [name]="sd.icon" size="12" aria-hidden="true" /> <span aria-hidden="true">{{ sd.text }}</span><span class="sr-only">{{ sd.sr }}</span>
+                </span>
+              }
               @if (p.summary.lastEnd) { · fine ultimo lavoro <strong class="tabular-nums">{{ fmt(p.summary.lastEnd) }}</strong> }
             </p>
 
@@ -95,6 +101,7 @@ const CHANGE: Record<PlanChangeKind, { label: string; icon: string }> = {
                         <th hlmTh>Inizio</th>
                         <th hlmTh>Fine</th>
                         <th hlmTh>Attuale</th>
+                        <th hlmTh>Attrezzaggio</th>
                         <th hlmTh>Esito</th>
                         <th hlmTh>Motivo dell'attesa</th>
                       </tr>
@@ -102,7 +109,7 @@ const CHANGE: Record<PlanChangeKind, { label: string; icon: string }> = {
                     <tbody hlmTBody>
                       @for (g of rows(); track g.orderId) {
                         <tr hlmTr>
-                          <th hlmTh colspan="8" scope="colgroup" class="bg-muted/50 text-left">Ordine {{ g.orderCode }}</th>
+                          <th hlmTh colspan="9" scope="colgroup" class="bg-muted/50 text-left">Ordine {{ g.orderCode }}</th>
                         </tr>
                         @for (i of g.items; track i.workOrderId) {
                           <tr hlmTr>
@@ -128,6 +135,22 @@ const CHANGE: Record<PlanChangeKind, { label: string; icon: string }> = {
                               @if (i.currentStart && i.currentEnd) {
                                 {{ i.currentEquipment?.code ?? 'senza macchina' }} · {{ fmt(i.currentStart) }} → {{ fmt(i.currentEnd) }}
                               } @else { — }
+                            </td>
+                            <td hlmTd class="max-w-64 text-sm">
+                              @if ((i.setupMinutes ?? 0) > 0) {
+                                <span class="inline-flex flex-wrap items-center gap-1">
+                                  <span class="font-medium tabular-nums">Attrezzaggio {{ i.setupMinutes }} min</span>
+                                  @if (i.isFullSetup) { <span hlmBadge variant="secondary" class="px-1.5">Completo</span> }
+                                </span>
+                                @if (i.setupReasons?.length) {
+                                  <details class="text-muted-foreground text-xs">
+                                    <summary class="cursor-pointer">Motivi ({{ i.setupReasons!.length }})</summary>
+                                    <ul class="list-disc pl-4">
+                                      @for (r of i.setupReasons; track $index) { <li>{{ r }}</li> }
+                                    </ul>
+                                  </details>
+                                }
+                              } @else { <span class="text-muted-foreground">—</span> }
                             </td>
                             <td hlmTd>
                               <span hlmBadge [variant]="i.change === 'Unchanged' ? 'outline' : 'secondary'" class="gap-1 px-1.5">
@@ -241,6 +264,11 @@ export class PlanPreviewDialogComponent implements OnInit {
   protected notMovedOpen(count: number): boolean {
     return this.notMovedToggle() ?? count <= 5;
   }
+
+  protected readonly setup = computed(() => {
+    const s = this.preview()?.summary;
+    return s ? setupDelta(s.setupMinutesBefore, s.setupMinutesAfter) : null;
+  });
 
   protected readonly title = computed(() =>
     this.scope() === 'All' ? 'Ripianifica tutto' : this.scope() === 'Order' ? 'Pianifica ordine' : 'Pianifica non pianificati',

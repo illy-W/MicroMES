@@ -23,6 +23,7 @@ import {
   lucideSearch,
   lucideTriangleAlert,
   lucideWorkflow,
+  lucideWrench,
 } from '@ng-icons/lucide';
 import { WorkOrderStatus } from '@micromes/api-client/models';
 import type { TimelineLoadModel, TimelineModel, TimelineNonWorkingModel, TimelineWorkOrderModel } from '@micromes/api-client/models';
@@ -45,6 +46,8 @@ import { type DepLink, PlanningWorkPanelComponent } from './planning-work-panel.
 import { isWorkVisible } from './timeline-visibility';
 import { chooseEmptyMessage } from './timeline-empty';
 import { PlanningStore } from './planning.store';
+import { SETUP_HATCH, setupLabel, setupSegmentWidth, toolingNames } from './setup';
+import { ToolingStore } from '../tooling/tooling.store';
 import { allowsDashedBorder, layoutBar, type LabelPlacement } from './bar-label';
 import { type Axis, buildAxis, centreTime, clampSpan, commonClosedRanges, type Range, scrollForCentre, visibleTimeRange } from './timeline-axis';
 import { adaptiveDayPph, dayAxisHours, shouldAutoScale } from './adaptive-scale';
@@ -100,6 +103,9 @@ interface BarTip {
   predecessors: number;
   /** Riga «Fissato (data)» se il lavoro è fissato. */
   locked: string | null;
+  /** Riga «attrezzaggio N min» e attrezzature richieste. */
+  setup: string | null;
+  tooling: string | null;
 }
 interface BarVm {
   w: TimelineWorkOrderModel;
@@ -116,6 +122,8 @@ interface BarVm {
   stale: boolean;
   /** Lavoro fissato (piano bloccato). */
   locked: boolean;
+  /** Larghezza (px) della parte di attrezzaggio a inizio barra, `null` se non va disegnata. */
+  setupW: number | null;
   /** Larghezza reale (durata vera): `width` è quella visiva (>= reale). */
   realW: number;
   placement: LabelPlacement;
@@ -186,7 +194,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
   providers: [
     provideIcons({
       lucideAlarmClock, lucideCalendarX, lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideCircleCheck, lucideCircleDot, lucideClock, lucideEyeOff,
-      lucideFoldHorizontal, lucideInfo, lucideLock, lucideMinus, lucideOctagonX, lucidePause, lucidePlay, lucidePlus, lucideRefreshCw, lucideSearch, lucideTriangleAlert, lucideWorkflow,
+      lucideFoldHorizontal, lucideInfo, lucideLock, lucideMinus, lucideOctagonX, lucidePause, lucidePlay, lucidePlus, lucideRefreshCw, lucideSearch, lucideTriangleAlert, lucideWorkflow, lucideWrench,
     }),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -251,6 +259,12 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                   <li class="inline-flex items-center gap-1.5"><span class="bg-card text-foreground border-foreground/60 flex size-4 items-center justify-center rounded-sm border" aria-hidden="true"><ng-icon name="lucideLock" size="11" /></span> Fissato (piano bloccato, il ripianifica non lo sposta)</li>
                 </ul>
               </section>
+              <section class="flex flex-col gap-1.5" aria-label="Attrezzaggio">
+                <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Attrezzaggio</p>
+                <ul class="flex flex-col gap-1.5">
+                  <li class="inline-flex items-center gap-1.5"><span class="border-foreground/40 relative inline-block h-4 w-9 shrink-0 overflow-hidden rounded-sm border" [style.--oc]="legendColor" aria-hidden="true"><span class="absolute inset-y-0 left-0 w-5 border-r border-foreground/40" [class]="setupHatch"></span></span> Attrezzaggio: tratteggio diagonale a inizio barra, largo quanto i minuti pianificati</li>
+                </ul>
+              </section>
               <section class="flex flex-col gap-1.5" aria-label="Tempo">
                 <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Calendario</p>
                 <ul class="flex flex-col gap-1.5">
@@ -295,6 +309,13 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           <hlm-select-content *hlmSelectPortal>
             <hlm-select-item value="all">Tutte le macchine</hlm-select-item>
             @for (m of machineOptions(); track m.id) { <hlm-select-item [value]="m.id">{{ m.label }}</hlm-select-item> }
+          </hlm-select-content>
+        </hlm-select>
+        <hlm-select [value]="toolingFilter()" [itemToString]="toolingLabel" (valueChange)="toolingFilter.set($event ?? 'all')">
+          <hlm-select-trigger size="sm" class="w-36 shrink-0" aria-label="Filtra per attrezzatura"><hlm-select-value /></hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-item value="all">Tutte le attrezzature</hlm-select-item>
+            @for (t of toolingOptions(); track t.id) { <hlm-select-item [value]="t.id">{{ t.label }}</hlm-select-item> }
           </hlm-select-content>
         </hlm-select>
         @if (filtersActive()) {
@@ -472,6 +493,8 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                               <span class="opacity-70">Stato</span><span>{{ b.tip.status }}</span>
                               <span class="opacity-70">Piano</span><span>{{ b.tip.plan }}</span>
                               <span class="opacity-70">Predecessori</span><span>{{ b.tip.predecessors }}</span>
+                              @if (b.tip.setup) { <span class="opacity-70">Attrezzaggio</span><span>{{ b.tip.setup }}</span> }
+                              @if (b.tip.tooling) { <span class="opacity-70">Attrezzature</span><span>{{ b.tip.tooling }}</span> }
                               @if (b.tip.locked) { <span class="opacity-70">Fissato</span><span>{{ b.tip.locked }}</span> }
                             </div>
                           </div>
@@ -511,6 +534,9 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                         >
                           <span class="pointer-events-none absolute inset-0 rounded-md" [class]="b.ext" aria-hidden="true"></span>
                           <span class="pointer-events-none absolute inset-y-0 left-0 rounded-md group-hover:brightness-95" [class]="b.cls" [style.width.px]="b.realW" aria-hidden="true"></span>
+                          @if (b.setupW; as sw) {
+                            <span class="pointer-events-none absolute inset-y-0 left-0 border-r border-foreground/40" [class]="setupHatch" [style.width.px]="sw" data-setup aria-hidden="true"></span>
+                          }
                           <span class="pointer-events-none absolute bottom-0 left-0 h-[3px] bg-(--oc)" [class.opacity-50]="b.w.status === 'Ended' || b.w.status === 'Aborted'" [style.width.px]="b.realW" aria-hidden="true"></span>
                           <span class="relative flex h-full min-w-0 flex-col justify-center overflow-hidden text-left text-xs leading-tight whitespace-nowrap" [class]="b.text" [style.padding-left.px]="b.padLeft" [style.padding-right.px]="b.padRight">
                             @if (b.placement === 'inside' || b.placement === 'truncated') {
@@ -605,6 +631,7 @@ export class PlanningTimelineComponent {
   private readonly orders = inject(WorkOrdersStore);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly toolingStore = inject(ToolingStore);
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   protected readonly LEFT = LEFT;
@@ -617,6 +644,7 @@ export class PlanningTimelineComponent {
   protected readonly statuses = (Object.keys(WORK_STATUS) as WorkOrderStatus[]).map((value) => ({ value, label: WORK_STATUS[value].label }));
   protected readonly legend = (Object.keys(WORK_STATUS) as WorkOrderStatus[]).map((s) => ({ icon: WORK_STATUS[s].icon, label: WORK_STATUS[s].label, ...STATUS_STYLE[s] }));
   protected readonly legendColor = 'var(--chart-1)';
+  protected readonly setupHatch = SETUP_HATCH;
 
   // --- stato (inizializzato dai query params) ---
   private readonly qp = this.route.snapshot.queryParamMap;
@@ -628,6 +656,7 @@ export class PlanningTimelineComponent {
   protected readonly orderFilter = signal(this.qp.get('order') ?? ALL);
   protected readonly statusFilter = signal(this.qp.get('status') ?? ALL);
   protected readonly machineFilter = signal(this.qp.get('machine') ?? ALL);
+  protected readonly toolingFilter = signal(this.qp.get('tooling') ?? ALL);
   protected readonly search = signal(this.qp.get('q') ?? '');
   protected readonly selectedId = signal<number | null>(null);
   /** Larghezza del contenitore: da 1100 px il pannello sta accanto alla timeline, sotto è un foglio laterale. */
@@ -827,11 +856,15 @@ export class PlanningTimelineComponent {
     [...this.knownOrders()].map(([id, code]) => ({ id: String(id), code })).sort((a, b) => a.code.localeCompare(b.code)),
   );
   protected readonly machineOptions = computed(() => (this.data()?.equipment ?? []).map((e) => ({ id: String(e.id), label: `${e.code} · ${e.name}` })));
+  protected readonly toolingOptions = computed(() =>
+    this.toolingStore.items().filter((t) => t.isActive || String(t.id) === this.toolingFilter()).map((t) => ({ id: String(t.id), label: `${t.code} · ${t.name}` })),
+  );
+  protected readonly toolingLabel = (v: string): string => (v === ALL ? 'Tutte le attrezzature' : (this.toolingOptions().find((t) => t.id === v)?.label ?? `Attrezzatura ${v}`));
   protected readonly machineLabels = computed<ReadonlyMap<number, string>>(() => new Map((this.data()?.equipment ?? []).map((e) => [e.id, `${e.code} · ${e.name}`])));
   protected readonly orderLabel = (v: string): string => (v === ALL ? 'Tutti gli ordini' : (this.knownOrders().get(Number(v)) ?? `Ordine ${v}`));
   protected readonly statusLabel = (v: string): string => (v === ALL ? 'Tutti gli stati' : workStatus(v).label);
   protected readonly machineLabel = (v: string): string => (v === ALL ? 'Tutte le macchine' : (this.machineLabels().get(Number(v)) ?? v));
-  protected readonly filtersActive = computed(() => this.orderFilter() !== ALL || this.statusFilter() !== ALL || this.machineFilter() !== ALL || this.lockedOnly() || !!this.search().trim());
+  protected readonly filtersActive = computed(() => this.orderFilter() !== ALL || this.statusFilter() !== ALL || this.machineFilter() !== ALL || this.toolingFilter() !== ALL || this.lockedOnly() || !!this.search().trim());
 
   // --- modello righe ---
   private readonly matches = (w: TimelineWorkOrderModel, q: string): boolean => !q || w.code.toLowerCase().includes(q) || w.productionOrderCode.toLowerCase().includes(q);
@@ -864,6 +897,7 @@ export class PlanningTimelineComponent {
     if (this.orderFilter() !== ALL) out.push(`Ordine: ${this.orderLabel(this.orderFilter())}`);
     if (this.statusFilter() !== ALL) out.push(`Stato: ${this.statusLabel(this.statusFilter())}`);
     if (this.machineFilter() !== ALL) out.push(`Macchina: ${this.machineLabel(this.machineFilter())}`);
+    if (this.toolingFilter() !== ALL) out.push(`Attrezzatura: ${this.toolingLabel(this.toolingFilter())}`);
     if (this.lockedOnly()) out.push('Solo fissati');
     return out;
   });
@@ -980,10 +1014,15 @@ export class PlanningTimelineComponent {
           const machine = r.key === NONE_ROW ? 'nessuna macchina' : (machineName.get(r.key) ?? r.code);
           const status = st.label;
           const plan = late ? `In ritardo${x.lateDays ? ` di ${x.lateDays} g` : ''}` : stale ? 'Piano obsoleto' : x.planStatus === 'Planned' ? 'Pianificato' : 'Non pianificato';
+          const planned = x.status !== 'Running' && x.status !== 'Ended';
+          const setupMin = planned ? (x.plannedSetupMinutes ?? 0) : 0;
+          const setupW = setupSegmentWidth({ startMs: rg.s, endMs: rg.e, setupMinutes: setupMin, barWidth: width, toX: px });
+          const setupText = setupLabel(setupMin, x.isFullSetup);
+          const toolText = toolingNames(x.tooling);
           const period = `${formatDateTime(rg.s, tz)} – ${formatDateTime(rg.e, tz)}`;
-          const aria = `${name}, ordine ${x.productionOrderCode}, lavoro ${x.code} su ${machine}, dal ${formatDateTime(rg.s, tz)} al ${formatDateTime(rg.e, tz)}, ${status.toLowerCase()}${late ? ', in ritardo' : ''}${stale ? ', piano obsoleto' : ''}${locked ? ', fissato' : ''}${overload ? ', sovraccarico' : ''}${x.predecessorIds.length === 1 ? `, dopo ${pool.get(x.predecessorIds[0])?.code ?? 'un altro lavoro'}` : x.predecessorIds.length > 1 ? `, dopo ${x.predecessorIds.length} lavori` : ''}`;
+          const aria = `${name}, ordine ${x.productionOrderCode}, lavoro ${x.code} su ${machine}, dal ${formatDateTime(rg.s, tz)} al ${formatDateTime(rg.e, tz)}, ${status.toLowerCase()}${late ? ', in ritardo' : ''}${stale ? ', piano obsoleto' : ''}${locked ? ', fissato' : ''}${overload ? ', sovraccarico' : ''}${setupText ? `, ${setupText}` : ''}${toolText ? `, attrezzature ${toolText}` : ''}${x.predecessorIds.length === 1 ? `, dopo ${pool.get(x.predecessorIds[0])?.code ?? 'un altro lavoro'}` : x.predecessorIds.length > 1 ? `, dopo ${x.predecessorIds.length} lavori` : ''}`;
           return {
-            w: x, left, width, realW: width, y: rowTop + rowPad + x.lane * LANE_H, height: BAR_H, lane: x.lane, rowKey: r.key, overload, dim, late, stale, locked,
+            w: x, left, width, setupW, realW: width, y: rowTop + rowPad + x.lane * LANE_H, height: BAR_H, lane: x.lane, rowKey: r.key, overload, dim, late, stale, locked,
             placement: 'inside', dot: late || overload ? 'bg-destructive' : stale ? 'bg-secondary ring-1 ring-border' : null, padLeft: 10, ext: '', text: '',
             statusIcon: st.icon, name, segCode: x.processSegmentCode || name, sub, subBar: sub, subRun, running, color: orderColor(hues.get(x.productionOrderId) ?? 0),
             padRight: 4, cls: '', aria,
@@ -991,6 +1030,8 @@ export class PlanningTimelineComponent {
               phase: name, workOrder: x.code, order: `${x.productionOrderCode} · ${x.materialName}`, machine, period,
               duration: formatDuration(rg.e - rg.s), status, plan, predecessors: x.predecessorIds.length,
               locked: locked ? `Fissato${x.planLockedAt ? ` (${formatDateTime(x.planLockedAt, tz)})` : ''}` : null,
+              setup: setupText ? setupText.charAt(0).toUpperCase() + setupText.slice(1) : null,
+              tooling: toolText || null,
             },
           };
         })
@@ -1252,6 +1293,7 @@ export class PlanningTimelineComponent {
     this.hostW.set(this.host.nativeElement.clientWidth);
     this.destroyRef.onDestroy(() => ro.disconnect());
 
+    if (!this.toolingStore.items().length) void this.toolingStore.load();
     void this.loadProbe();
     void this.resetAround(this.initialAt ?? Date.now());
 
@@ -1264,6 +1306,7 @@ export class PlanningTimelineComponent {
     effect(() => {
       this.orderFilter();
       this.statusFilter();
+      this.toolingFilter();
       this.lockedOnly();
       untracked(() => {
         if (this.first) {
@@ -1295,6 +1338,7 @@ export class PlanningTimelineComponent {
         order: this.orderFilter() === ALL ? null : this.orderFilter(),
         status: this.statusFilter() === ALL ? null : this.statusFilter(),
         machine: this.machineFilter() === ALL ? null : this.machineFilter(),
+        tooling: this.toolingFilter() === ALL ? null : this.toolingFilter(),
         q: this.search().trim() || null,
         deps: this.depsAll() ? 'all' : null,
         done: this.showDone() ? '1' : null,
@@ -1305,14 +1349,14 @@ export class PlanningTimelineComponent {
     });
   }
 
-  private filters(): { order: string; status: string; locked: boolean } {
-    return { order: this.orderFilter(), status: this.statusFilter(), locked: this.lockedOnly() };
+  private filters(): { order: string; status: string; tooling: string; locked: boolean } {
+    return { order: this.orderFilter(), status: this.statusFilter(), tooling: this.toolingFilter(), locked: this.lockedOnly() };
   }
 
   /** Richiesta di un intervallo (<= 28 giorni), con cache per [from,to] + filtri e coalescenza delle richieste identiche. */
   private fetchChunk(range: Range): Promise<TimelineModel> {
     const q = this.filters();
-    const key = `${range.start}|${range.end}|${q.order}|${q.status}|${q.locked ? 'L' : ''}`;
+    const key = `${range.start}|${range.end}|${q.order}|${q.status}|${q.tooling}|${q.locked ? 'L' : ''}`;
     const hit = this.cache.get(key);
     if (hit) return hit;
     const p = firstValueFrom(
@@ -1321,6 +1365,7 @@ export class PlanningTimelineComponent {
         to: new Date(range.end).toISOString(),
         ...(q.order !== ALL ? { productionOrderId: Number(q.order) } : {}),
         ...(q.status !== ALL ? { status: q.status as WorkOrderStatus } : {}),
+        ...(q.tooling !== ALL ? { toolingId: Number(q.tooling) } : {}),
         ...(q.locked ? { locked: true } : {}),
       }),
     );
@@ -1755,6 +1800,7 @@ export class PlanningTimelineComponent {
     this.orderFilter.set(ALL);
     this.statusFilter.set(ALL);
     this.machineFilter.set(ALL);
+    this.toolingFilter.set(ALL);
     this.search.set('');
     this.lockedOnly.set(false);
   }

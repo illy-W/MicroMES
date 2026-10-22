@@ -2,7 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideLock, lucideLockOpen, lucideMove, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideX } from '@ng-icons/lucide';
+import { lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideLock, lucideLockOpen, lucideMove, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideWrench, lucideX } from '@ng-icons/lucide';
 import type { TimelineWorkOrderModel, WorkOrderDetailModel, WorkOrderStatus } from '@micromes/api-client/models';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -59,7 +59,7 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
 @Component({
   selector: 'app-planning-work-panel',
   imports: [HlmBadge, HlmButton, HlmSkeleton, NgIcon, NgTemplateOutlet, PlanMoveDialogComponent, RouterLink, WorkOrderMachineDialogComponent],
-  providers: [provideIcons({ lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideLock, lucideLockOpen, lucideMove, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideX })],
+  providers: [provideIcons({ lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideLock, lucideLockOpen, lucideMove, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideWrench, lucideX })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block' },
   template: `
@@ -115,6 +115,48 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
           <dd>{{ d.plannedMinutes }} previsti · {{ d.workedMinutes }} lavorati</dd>
         }
       </dl>
+
+      @if (hasSetup()) {
+        <section class="flex flex-col gap-1.5" aria-label="Attrezzaggio">
+          <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Attrezzaggio</p>
+          <p class="flex flex-wrap items-center gap-2">
+            <span class="font-medium tabular-nums">{{ item().plannedSetupMinutes }} min</span>
+            @if (item().isFullSetup) { <span hlmBadge variant="secondary">Attrezzaggio completo</span> }
+          </p>
+          @if (item().plannedSetupReasons?.length) {
+            <ul class="text-muted-foreground flex list-disc flex-col gap-0.5 pl-4">
+              @for (r of item().plannedSetupReasons; track $index) { <li>{{ r }}</li> }
+            </ul>
+          }
+        </section>
+      }
+
+      @if (item().tooling?.length) {
+        <section class="flex flex-col gap-1.5" aria-label="Attrezzature richieste">
+          <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Attrezzature richieste</p>
+          <ul class="flex flex-wrap gap-1.5">
+            @for (t of item().tooling; track t.toolingId) {
+              <li>
+                <a hlmBadge variant="outline" class="hover:bg-muted gap-1" routerLink="/tooling" [attr.aria-label]="'Apri Attrezzature: ' + t.code + ' ' + t.name" [title]="t.name">
+                  <ng-icon name="lucideWrench" size="12" aria-hidden="true" /> {{ t.code }}
+                </a>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (item().setupValues?.length) {
+        <section class="flex flex-col gap-1.5" aria-label="Valori di cambio">
+          <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Valori di cambio</p>
+          <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+            @for (v of item().setupValues; track v.code) {
+              <dt class="text-muted-foreground">{{ v.name }}</dt>
+              <dd>{{ v.value }}</dd>
+            }
+          </dl>
+        </section>
+      }
 
       <section class="flex flex-col gap-1.5" aria-label="Dipendenze">
         <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Dipendenze</p>
@@ -240,6 +282,7 @@ export class PlanningWorkPanelComponent {
   protected readonly moving = signal(false);
   protected readonly acting = signal(false);
   protected readonly reasonText = computed(() => (this.item().isPlanLocked || this.item().planStatus === 'Stale' ? staleCauseLabel(this.item().planStatusReason) : null));
+  protected readonly hasSetup = computed(() => (this.item().plannedSetupMinutes ?? 0) > 0);
   protected readonly status = workStatus;
   protected readonly st = computed(() => workStatus(this.item().status));
   protected readonly planLabel = computed(() => PLAN_LABEL[this.item().planStatus] ?? this.item().planStatus);
@@ -283,7 +326,7 @@ export class PlanningWorkPanelComponent {
 
   protected readonly alerts = computed(() => {
     const w = this.item();
-    return this.planning.alerts().filter((a) => a.workOrderId === w.id || (a.workOrderId == null && a.productionOrderId === w.productionOrderId));
+    return this.planning.alerts().filter((a) => a.workOrderId === w.id || !!a.workOrderIds?.includes(w.id) || (a.workOrderId == null && a.productionOrderId === w.productionOrderId));
   });
 
   private seq = 0;

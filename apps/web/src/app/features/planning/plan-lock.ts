@@ -77,6 +77,10 @@ export function conflictLine(c: MoveConflictModel): ConflictLine {
       return { icon: 'lucideCircleAlert', text: `La macchina risulta sovraccarica${c.minutes ? ` (${c.minutes} min oltre la capacità)` : ''}` };
     case 'Late':
       return { icon: 'lucideAlarmClock', text: `Il lavoro sarà in ritardo${c.lateDays ? ` di ${c.lateDays} g` : ''}` };
+    case 'ToolingOverCapacity':
+      return { icon: 'lucideWrench', text: `Attrezzatura oltre la disponibilità${c.minutes ? ` (${c.minutes} min)` : ''}${c.message ? `: ${c.message}` : ''}` };
+    case 'ToolingIncompatible':
+      return { icon: 'lucideWrench', text: `Attrezzatura non compatibile con la macchina${c.message ? `: ${c.message}` : ''}` };
     default:
       return { icon: 'lucideTriangleAlert', text: c.message };
   }

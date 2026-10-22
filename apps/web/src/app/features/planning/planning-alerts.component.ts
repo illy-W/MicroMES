@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert } from '@ng-icons/lucide';
+import { lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert, lucideWrench } from '@ng-icons/lucide';
 import type { PlanAlertModel } from '@micromes/api-client/models';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -13,7 +13,7 @@ import { PlanningStore } from './planning.store';
 @Component({
   selector: 'app-planning-alerts',
   imports: [HlmButton, HlmBadge, HlmPopoverImports, HlmSkeleton, NgIcon, RouterLink],
-  providers: [provideIcons({ lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert })],
+  providers: [provideIcons({ lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert, lucideWrench })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-popover align="end" [state]="popState()" (stateChanged)="popState.set($event)">
@@ -57,8 +57,11 @@ import { PlanningStore } from './planning.store';
                       <p class="text-sm font-medium"><span class="sr-only">{{ g.key === 'Critical' ? 'Critica: ' : 'Avviso: ' }}</span>{{ a.message }}</p>
                       <p class="text-muted-foreground text-sm">{{ a.suggestion }}</p>
                       <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                        @if (a.workOrderId || a.productionOrderId) {
+                        @if (target(a) || a.productionOrderId) {
                           <button hlmBtn type="button" variant="link" size="sm" class="h-auto p-0" (click)="show(a)">Mostra nel piano</button>
+                        }
+                        @if (a.toolingId) {
+                          <a class="inline-flex items-center gap-1 underline underline-offset-2" routerLink="/tooling" [attr.aria-label]="'Apri Attrezzature: ' + (a.toolingCode ?? '')" (click)="popState.set('closed')"><ng-icon name="lucideWrench" size="12" aria-hidden="true" /> Attrezzatura {{ a.toolingCode }}</a>
                         }
                         @if (a.productionOrderId; as oid) {
                           <a class="underline underline-offset-2" [routerLink]="['/production-orders', oid]" (click)="popState.set('closed')">Ordine {{ a.productionOrderCode }}</a>
@@ -93,8 +96,12 @@ export class PlanningAlertsComponent {
     ];
   });
 
+  protected target(a: PlanAlertModel): number | null {
+    return a.workOrderId ?? a.workOrderIds?.[0] ?? null;
+  }
+
   protected show(a: PlanAlertModel): void {
     this.popState.set('closed');
-    this.store.showInPlan(a.workOrderId, a.productionOrderId);
+    this.store.showInPlan(this.target(a), a.productionOrderId);
   }
 }

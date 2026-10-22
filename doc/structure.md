@@ -126,6 +126,13 @@ See `AGENTS.md` for the project table and dependency direction.
 - `PlanLockService` + `ManualMoveCalculator` (pure): `move/preview` and `move` (start UTC + optional machine; end computed with the calendar; 422 for past or non-working start with the next working instant; conflicts `PredecessorEndsAfterStart`, `SuccessorsStartBeforeEnd`, `MachineOverCapacity`, `Late` never block; `expectedUpdatedAt` for 409). Alerts `LockedPredecessorConflict`, `LockedMachineUnavailable`, `LockedOverCapacity`, `LockedLate`; `planStatusReason` (`StaleCause`) with locked causes; filter `locked=true` on timeline and work orders.
 - Web: `features/planning` `plan-lock.ts` (company time zone conversion, labels), `plan-lock-actions.ts`, `plan-move-dialog.component.ts`; padlock on bars, legend and 'Solo fissati' filter (`locked=1`); order actions and badge in `features/production-orders`.
 
+### Tooling and setup (specs/tooling-setup)
+
+- `ToolingFeature` (`/api/tooling`, `/api/setup-attributes`, dev seeder `ToolingDevelopmentSeeder`: fills the new tables on an already seeded DB, no snapshot backfill for existing work orders). Routing steps carry `toolingIds` and `setupValues`; release copies them to `WorkOrderTooling`/`WorkOrderSetupValue` (422 if a required tooling is inactive).
+- `PlanningFeature/Engine/SetupCalculator` (pure, the only place with the setup formula) and `Services/MachineStartingState` (state from the latest Running/Ended job per machine). The engine checks tooling compatibility and `Quantity` (jobs incl. setup, fixed intervals too), computes each job's setup from the real predecessor on the machine (a gap is used only if the successor's setup does not grow), breaks ties by smaller setup. Property tests check formula consistency and tooling usage; bench scenarios 6-8.
+- Persisted `WorkOrder.PlannedSetupMinutes/Reasons/IsFull`; preview/apply/move/timeline expose `setup*` and `tooling[]`; `toolingId` filter on the timeline; alerts `ToolingOverbooked`, `ToolingIncompatibleMachine`, `ToolingInactive`, `UnplannableForTooling`; move conflicts `ToolingOverCapacity`, `ToolingIncompatible`.
+- Web: `features/tooling`, `features/setup-attributes`, routing step extras (`features/routing/routing-step-extras*`), `features/planning/setup.ts` (setup segment geometry on the compressed axis, summary delta).
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.
