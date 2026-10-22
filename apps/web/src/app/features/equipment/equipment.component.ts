@@ -8,6 +8,7 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleCheck, lucideCircleOff, lucideCog, lucidePlus, lucideSearch, lucideSearchX, lucideStar, lucideTriangleAlert } from '@ng-icons/lucide';
 import {
@@ -32,7 +33,6 @@ import { HlmSwitch } from '@spartan-ng/helm/switch';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { TablePaginatorComponent } from '../../shared/components/table-paginator.component';
 import { EquipmentRowActionsComponent } from './equipment-row-actions.component';
-import { EquipmentDetailComponent } from './equipment-detail.component';
 import { EquipmentFormDialogComponent } from './equipment-form-dialog.component';
 import { toFailure } from '../materials/materials.service';
 import { EquipmentStore } from './equipment.store';
@@ -69,17 +69,14 @@ const columns = columnHelper.columns([
     HlmSkeleton,
     HlmSwitch,
     NgIcon,
+    RouterLink,
     FlexRender,
     EquipmentFormDialogComponent,
-    EquipmentDetailComponent,
   ],
   providers: [provideIcons({ lucideCircleCheck, lucideCircleOff, lucideCog, lucidePlus, lucideSearch, lucideSearchX, lucideStar, lucideTriangleAlert })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col gap-4 p-4">
-      @if (detail(); as m) {
-        <app-equipment-detail [equipment]="m" (back)="detailId.set(null)" (edit)="openEdit($event)" />
-      } @else {
       <div class="flex items-start justify-between gap-4">
         <div class="flex flex-col gap-1">
           <h1 class="text-xl font-semibold">Macchine e postazioni</h1>
@@ -175,7 +172,8 @@ const columns = columnHelper.columns([
               </thead>
               <tbody hlmTBody>
                 @for (row of table.getRowModel().rows; track row.id) {
-                  <tr hlmTr [class.text-muted-foreground]="!row.original.isActive">
+                  <!-- La riga è una scorciatoia col mouse: da tastiera si usa il link del codice. -->
+                  <tr hlmTr class="cursor-pointer" [class.text-muted-foreground]="!row.original.isActive" (click)="rowClick($event, row.original)">
                     @for (cell of row.getVisibleCells(); track cell.id) {
                       <td hlmTd [class]="cellClass(cell.column.id)">
                         @switch (cell.column.id) {
@@ -216,10 +214,13 @@ const columns = columnHelper.columns([
                               }
                             </span>
                           }
+                          @case ('code') {
+                            <a class="underline underline-offset-2" [routerLink]="['/equipment', row.original.id]">{{ row.original.code }}</a>
+                          }
                           @case ('actions') {
                             <app-equipment-row-actions
                               [equipment]="row.original"
-                              (open)="detailId.set($event.id)"
+                              (open)="openPage($event)"
                               (edit)="openEdit($event)"
                               (deactivate)="askDeactivate($event)"
                             />
@@ -245,7 +246,6 @@ const columns = columnHelper.columns([
           </span>
           <div table-paginator [table]="table"></div>
         </div>
-      }
       }
     </div>
 
@@ -284,11 +284,10 @@ const columns = columnHelper.columns([
 })
 export class EquipmentComponent implements OnInit {
   protected readonly store = inject(EquipmentStore);
+  private readonly router = inject(Router);
 
   protected readonly search = signal('');
   protected readonly showInactive = signal(false);
-  protected readonly detailId = signal<number | null>(null);
-  protected readonly detail = computed(() => this.store.items().find((m) => m.id === this.detailId()) ?? null);
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<EquipmentModel | null>(null);
   protected readonly toDeactivate = signal<EquipmentModel | null>(null);
@@ -341,6 +340,15 @@ export class EquipmentComponent implements OnInit {
     if (m.efficiencyPercent !== 100) parts.push(`efficienza ${m.efficiencyPercent}%`);
     if (m.capacity > 1) parts.push(`capacità ${m.capacity}`);
     return parts.join(' · ');
+  }
+
+  protected rowClick(e: Event, m: EquipmentModel): void {
+    if ((e.target as HTMLElement).closest('a,button,input')) return;
+    this.openPage(m);
+  }
+
+  protected openPage(m: EquipmentModel): void {
+    void this.router.navigate(['/equipment', m.id]);
   }
 
   protected cellClass(id: string): string {

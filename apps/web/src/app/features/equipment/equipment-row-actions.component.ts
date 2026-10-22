@@ -24,7 +24,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
     <ng-template #menu>
       <hlm-dropdown-menu>
         <hlm-dropdown-menu-group>
-          <button hlmDropdownMenuItem (click)="open.emit(equipment())">Calendario ed eccezioni</button>
+          <button hlmDropdownMenuItem (click)="open.emit(equipment())">Apri pagina macchina</button>
           <button hlmDropdownMenuItem (click)="edit.emit(equipment())">Modifica</button>
         </hlm-dropdown-menu-group>
         @if (equipment().isActive) {

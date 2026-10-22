@@ -32,6 +32,10 @@ export const appRoutes: Route[] = [
         loadComponent: () => import('./features/equipment/equipment.component').then((m) => m.EquipmentComponent),
       },
       {
+        path: 'equipment/:id',
+        loadComponent: () => import('./features/equipment/equipment-page.component').then((m) => m.EquipmentPageComponent),
+      },
+      {
         path: 'tooling',
         loadComponent: () => import('./features/tooling/tooling.component').then((m) => m.ToolingComponent),
       },
