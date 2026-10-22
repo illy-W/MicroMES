@@ -14,6 +14,7 @@ public static class Registrar
         services.AddScoped<PlanningCatalogLoader>();
         services.AddScoped<PlanningService>();
         services.AddScoped<TimelineService>();
+        services.AddScoped<PlanLockService>();
         services.AddScoped<PlanningDevelopmentSeeder>();
         return services;
     }
