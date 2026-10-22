@@ -7,6 +7,7 @@ import {
   lucideCircleDot,
   lucideClock,
   lucideListChecks,
+  lucideLock,
   lucideOctagonX,
   lucidePause,
   lucidePlay,
@@ -45,6 +46,8 @@ import { formatMinutes } from '../routing/routing-metrics';
 import { CalendarsStore } from '../calendars/calendars.store';
 import { PlanStatusBadgeComponent } from '../planning/plan-status-badge.component';
 import { formatDateTime } from '../planning/timeline-time';
+import { runPlanLockAction } from '../planning/plan-lock-actions';
+import { PlanMoveDialogComponent, type MoveTarget } from '../planning/plan-move-dialog.component';
 import { WorkOrderAbortDialogComponent } from './work-order-abort-dialog.component';
 import { type CloseMode, WorkOrderCloseDialogComponent } from './work-order-close-dialog.component';
 import { machineUsage, usageText } from './work-order-machines';
@@ -102,6 +105,7 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
     WorkOrderAbortDialogComponent,
     WorkOrderSessionsDialogComponent,
     WorkOrderMachineDialogComponent,
+    PlanMoveDialogComponent,
   ],
   providers: [
     provideIcons({
@@ -109,6 +113,7 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
       lucideCircleDot,
       lucideClock,
       lucideListChecks,
+      lucideLock,
       lucideOctagonX,
       lucidePause,
       lucidePlay,
@@ -265,7 +270,12 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
                       <td hlmTd [class]="cellClass(cell.column.id)">
                         @switch (cell.column.id) {
                           @case ('code') {
-                            <span class="font-medium">{{ w.code }}</span>
+                            <span class="inline-flex items-center gap-1 font-medium">
+                              {{ w.code }}
+                              @if (w.isPlanLocked) {
+                                <ng-icon name="lucideLock" size="12" class="text-muted-foreground" aria-hidden="true" /><span class="sr-only">(fissato)</span>
+                              }
+                            </span>
                           }
                           @case ('phase') {
                             {{ w.processSegmentName }}
@@ -342,6 +352,9 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
                               (abortWork)="aborting.set($event)"
                               (sessions)="viewing.set($event)"
                               [hasMachines]="hasMachines(w)"
+                              (lockPlan)="planAction(w, 'lock')"
+                              (unlockPlan)="planAction(w, 'unlock')"
+                              (movePlan)="moving.set($event)"
                               (assignMachine)="machineDialog.set({ work: $event, mode: 'Assign' })"
                             />
                           }
@@ -371,6 +384,9 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
     }
     @if (machineDialog(); as d) {
       <app-work-order-machine-dialog [work]="d.work" [mode]="d.mode" (done)="afterCommand(); machineDialog.set(null)" (closed)="machineDialog.set(null)" />
+    }
+    @if (moving(); as w) {
+      <app-plan-move-dialog [work]="moveTarget(w)" (done)="afterCommand(); moving.set(null)" (closed)="moving.set(null)" />
     }
     @if (aborting(); as w) {
       <app-work-order-abort-dialog [work]="w" (done)="afterCommand(); aborting.set(null)" (closed)="aborting.set(null)" />
@@ -418,6 +434,7 @@ export class WorkOrdersComponent implements OnInit {
   protected readonly orderFilter = signal<string>(ALL);
   protected readonly closing = signal<{ work: WorkOrderModel; mode: CloseMode } | null>(null);
   protected readonly machineFilter = signal<string>(ALL);
+  protected readonly moving = signal<WorkOrderModel | null>(null);
   protected readonly machineDialog = signal<{ work: WorkOrderModel; mode: MachineMode } | null>(null);
   protected readonly aborting = signal<WorkOrderModel | null>(null);
   protected readonly viewing = signal<WorkOrderModel | null>(null);
@@ -588,6 +605,14 @@ export class WorkOrdersComponent implements OnInit {
       toast.error(toFailure(e).message);
       void this.store.load();
     }
+  }
+
+  protected moveTarget(w: WorkOrderModel): MoveTarget {
+    return { id: w.id, code: w.code, processSegmentId: w.processSegmentId, plannedStartAt: w.plannedStartAt, equipmentId: (w.assignedEquipment ?? w.currentEquipment)?.id ?? null };
+  }
+
+  protected async planAction(w: WorkOrderModel, kind: 'lock' | 'unlock'): Promise<void> {
+    if (await runPlanLockAction(this.store, kind, w.id)) this.afterCommand();
   }
 
   /** La riga è già aggiornata dalla risposta; si ricarica per riallineare successori e stato dell'ordine. */

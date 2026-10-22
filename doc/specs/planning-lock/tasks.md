@@ -23,9 +23,9 @@
 
 ## Frontend
 
-- [ ] 2.1 [Frontend] Pannello del lavoro (timeline e Ordini di lavoro): azioni «Fissa», «Sposta…», «Sblocca» secondo `allowedActions`, con conferme e messaggi 409/422 specifici. _Satisfies: REQ-5_
-- [ ] 2.2 [Frontend] Dialogo «Sposta…»: data e ora nel fuso aziendale, scelta macchina tra quelle abilitate, anteprima in tempo reale di fine e conflitti, errori inline vicino al campo, «Applica e fissa»; accessibile e da tastiera. _Satisfies: REQ-2, REQ-5_
-- [ ] 2.3 [Frontend] Timeline: icona lucchetto sulle barre (anche strette), tooltip e nome accessibile con «fissato», voce «Fissato» in legenda, filtro «Solo fissati». _Satisfies: REQ-5_
+- [x] 2.1 [Frontend] Pannello del lavoro (timeline e Ordini di lavoro): azioni «Fissa», «Sposta…», «Sblocca» secondo `allowedActions`, con conferme e messaggi 409/422 specifici. _Satisfies: REQ-5_
+- [x] 2.2 [Frontend] Dialogo «Sposta…»: data e ora nel fuso aziendale, scelta macchina tra quelle abilitate, anteprima in tempo reale di fine e conflitti, errori inline vicino al campo, «Applica e fissa»; accessibile e da tastiera. _Satisfies: REQ-2, REQ-5_
+- [x] 2.3 [Frontend] Timeline: icona lucchetto sulle barre (anche strette), tooltip e nome accessibile con «fissato», voce «Fissato» in legenda, filtro «Solo fissati». _Satisfies: REQ-5_
 - [ ] 2.4 [Frontend] Anteprima di pianificazione: sezione «Non spostati (fissati)» con i conflitti e riepilogo; messaggio dopo «Rimuovi piano» con i lavori fissati rimasti. _Satisfies: REQ-3, REQ-5_
 - [ ] 2.5 [Frontend] Segnalazioni: nuovi tipi nel popover, nel dettaglio ordine e nella lista lavori; azioni «Fissa tutti» / «Sblocca tutti» sull'ordine con conferma; filtro «Solo fissati» nella lista lavori. _Satisfies: REQ-4, REQ-5_
 

@@ -2,7 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideX } from '@ng-icons/lucide';
+import { lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideLock, lucideLockOpen, lucideMove, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideX } from '@ng-icons/lucide';
 import type { TimelineWorkOrderModel, WorkOrderDetailModel, WorkOrderStatus } from '@micromes/api-client/models';
 import { HlmBadge } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -11,6 +11,9 @@ import { toFailure } from '../materials/materials.service';
 import { workStatus } from '../production-orders/production-order-labels';
 import { WorkOrderMachineDialogComponent } from '../work-orders/work-order-machine-dialog.component';
 import { WorkOrdersStore } from '../work-orders/work-orders.store';
+import { runPlanLockAction } from './plan-lock-actions';
+import { staleCauseLabel } from './plan-lock';
+import { PlanMoveDialogComponent, type MoveTarget } from './plan-move-dialog.component';
 import { PlanningStore } from './planning.store';
 import { formatDateTime } from './timeline-time';
 
@@ -55,8 +58,8 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
 /** Pannello laterale con il dettaglio di un lavoro selezionato in timeline. */
 @Component({
   selector: 'app-planning-work-panel',
-  imports: [HlmBadge, HlmButton, HlmSkeleton, NgIcon, NgTemplateOutlet, RouterLink, WorkOrderMachineDialogComponent],
-  providers: [provideIcons({ lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideX })],
+  imports: [HlmBadge, HlmButton, HlmSkeleton, NgIcon, NgTemplateOutlet, PlanMoveDialogComponent, RouterLink, WorkOrderMachineDialogComponent],
+  providers: [provideIcons({ lucideAlarmClock, lucideCircleAlert, lucideClock, lucideCircleCheck, lucideCircleDot, lucideLock, lucideLockOpen, lucideMove, lucideOctagonX, lucidePause, lucidePlay, lucideTriangleAlert, lucideX })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block' },
   template: `
@@ -76,10 +79,19 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
           <ng-icon [name]="st().icon" size="14" aria-hidden="true" /> {{ st().label }}
         </span>
         <span hlmBadge variant="outline">{{ planLabel() }}</span>
+        @if (item().isPlanLocked) {
+          <span hlmBadge variant="secondary"><ng-icon name="lucideLock" size="12" aria-hidden="true" /> Fissato{{ item().planLockedAt ? ' il ' + fmt(item().planLockedAt) : '' }}</span>
+        }
         @if (item().isLate) {
           <span hlmBadge variant="destructive"><ng-icon name="lucideAlarmClock" size="12" aria-hidden="true" /> in ritardo{{ item().lateDays > 0 ? ' di ' + item().lateDays + ' g' : '' }}</span>
         }
       </div>
+
+      @if (reasonText(); as r) {
+        <p class="text-muted-foreground flex items-start gap-2" role="status">
+          <ng-icon name="lucideTriangleAlert" size="14" class="mt-0.5 shrink-0" aria-hidden="true" /> <span>{{ r }}</span>
+        </p>
+      }
 
       <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <dt class="text-muted-foreground">Ordine</dt>
@@ -168,6 +180,15 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
         @if (canAssign()) {
           <button hlmBtn type="button" size="sm" (click)="assigning.set(true)">Assegna macchina</button>
         }
+        @if (can('Lock')) {
+          <button hlmBtn type="button" size="sm" variant="outline" [disabled]="acting()" (click)="act('lock')"><ng-icon name="lucideLock" aria-hidden="true" /> Fissa</button>
+        }
+        @if (can('Move') && detail()) {
+          <button hlmBtn type="button" size="sm" variant="outline" (click)="moving.set(true)"><ng-icon name="lucideMove" aria-hidden="true" /> Sposta…</button>
+        }
+        @if (can('Unlock')) {
+          <button hlmBtn type="button" size="sm" variant="outline" [disabled]="acting()" (click)="act('unlock')"><ng-icon name="lucideLockOpen" aria-hidden="true" /> Sblocca</button>
+        }
         <a hlmBtn variant="outline" size="sm" [routerLink]="['/production-orders', item().productionOrderId]">Apri ordine</a>
         <a hlmBtn variant="outline" size="sm" routerLink="/work-orders" [queryParams]="{ order: item().productionOrderId }">Apri in Ordini di lavoro</a>
       </div>
@@ -192,6 +213,9 @@ const ASSIGNABLE = ['Waiting', 'Ready', 'Interrupted'];
       }
     </ng-template>
 
+    @if (moving() && detail(); as d) {
+      <app-plan-move-dialog [work]="moveTarget(d)" (done)="moving.set(false); onAssigned()" (closed)="moving.set(false)" />
+    }
     @if (assigning() && detail(); as d) {
       <app-work-order-machine-dialog [work]="d" mode="Assign" (done)="assigning.set(false); onAssigned()" (closed)="assigning.set(false)" />
     }
@@ -213,6 +237,9 @@ export class PlanningWorkPanelComponent {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly assigning = signal(false);
+  protected readonly moving = signal(false);
+  protected readonly acting = signal(false);
+  protected readonly reasonText = computed(() => (this.item().isPlanLocked || this.item().planStatus === 'Stale' ? staleCauseLabel(this.item().planStatusReason) : null));
   protected readonly status = workStatus;
   protected readonly st = computed(() => workStatus(this.item().status));
   protected readonly planLabel = computed(() => PLAN_LABEL[this.item().planStatus] ?? this.item().planStatus);
@@ -295,6 +322,24 @@ export class PlanningWorkPanelComponent {
     return kind === 'pred'
       ? `Finisce ${formatDateTime(l.fromMs, this.timeZone())} → questo inizia ${formatDateTime(l.toMs, this.timeZone())}`
       : `Questo finisce ${formatDateTime(l.fromMs, this.timeZone())} → inizia ${formatDateTime(l.toMs, this.timeZone())}`;
+  }
+
+  protected can(action: string): boolean {
+    return !!this.detail()?.allowedActions.includes(action);
+  }
+
+  protected moveTarget(d: WorkOrderDetailModel): MoveTarget {
+    const w = this.item();
+    return { id: w.id, code: w.code, processSegmentId: d.processSegmentId, plannedStartAt: w.plannedStartAt, equipmentId: w.equipmentId };
+  }
+
+  protected async act(kind: 'lock' | 'unlock'): Promise<void> {
+    this.acting.set(true);
+    try {
+      if (await runPlanLockAction(this.orders, kind, this.item().id)) this.onAssigned();
+    } finally {
+      this.acting.set(false);
+    }
   }
 
   protected fmt(v?: string | null): string {

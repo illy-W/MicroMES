@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
-import type { AbortRequest, OpenSessionRequest, CloseSessionRequest, CorrectSessionRequest, WorkOrderDetailModel, WorkOrderModel } from '@micromes/api-client/models';
+import type { AbortRequest, MoveApplyModel, MovePreviewModel, MoveWorkOrderRequest, OpenSessionRequest, CloseSessionRequest, CorrectSessionRequest, WorkOrderDetailModel, WorkOrderModel } from '@micromes/api-client/models';
 import { WorkOrdersService } from '@micromes/api-client/services/work-orders';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, type Observable } from 'rxjs';
 import { toFailure } from '../materials/materials.service';
 
 /** Store a signals degli ordini di lavoro: elenco completo (i filtri sono client-side) e comandi. */
@@ -55,6 +55,26 @@ export class WorkOrdersStore {
 
   async abort(id: number, req: AbortRequest): Promise<WorkOrderDetailModel> {
     return this.apply(await firstValueFrom(this.api.abortWorkOrder(id, req)));
+  }
+
+  /** Fissa il piano del lavoro. */
+  async lockPlan(id: number): Promise<WorkOrderDetailModel> {
+    return this.apply(await firstValueFrom(this.api.lockWorkOrderPlan(id)));
+  }
+
+  async unlockPlan(id: number): Promise<WorkOrderDetailModel> {
+    return this.apply(await firstValueFrom(this.api.unlockWorkOrderPlan(id)));
+  }
+
+  /** Observable: l'annullamento (unsubscribe) interrompe la richiesta in volo. */
+  previewMove(id: number, req: MoveWorkOrderRequest): Observable<MovePreviewModel> {
+    return this.api.previewMoveWorkOrder(id, req);
+  }
+
+  async move(id: number, req: MoveWorkOrderRequest): Promise<MoveApplyModel> {
+    const r = await firstValueFrom(this.api.moveWorkOrder(id, req));
+    this.apply(r.workOrder);
+    return r;
   }
 
   getDetail(id: number): Promise<WorkOrderDetailModel> {

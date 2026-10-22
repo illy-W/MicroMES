@@ -13,6 +13,7 @@ import {
   lucideEyeOff,
   lucideFoldHorizontal,
   lucideInfo,
+  lucideLock,
   lucideMinus,
   lucideOctagonX,
   lucidePause,
@@ -96,6 +97,8 @@ interface BarTip {
   status: string;
   plan: string;
   predecessors: number;
+  /** Riga «Fissato (data)» se il lavoro è fissato. */
+  locked: string | null;
 }
 interface BarVm {
   w: TimelineWorkOrderModel;
@@ -110,6 +113,8 @@ interface BarVm {
   dim: boolean;
   late: boolean;
   stale: boolean;
+  /** Lavoro fissato (piano bloccato). */
+  locked: boolean;
   /** Larghezza reale (durata vera): `width` è quella visiva (>= reale). */
   realW: number;
   placement: LabelPlacement;
@@ -180,7 +185,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
   providers: [
     provideIcons({
       lucideAlarmClock, lucideCalendarX, lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideCircleCheck, lucideCircleDot, lucideClock, lucideEyeOff,
-      lucideFoldHorizontal, lucideInfo, lucideMinus, lucideOctagonX, lucidePause, lucidePlay, lucidePlus, lucideRefreshCw, lucideSearch, lucideTriangleAlert, lucideWorkflow,
+      lucideFoldHorizontal, lucideInfo, lucideLock, lucideMinus, lucideOctagonX, lucidePause, lucidePlay, lucidePlus, lucideRefreshCw, lucideSearch, lucideTriangleAlert, lucideWorkflow,
     }),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -209,6 +214,9 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           </button>
           <button hlmBtn type="button" size="icon-sm" [variant]="showDone() ? 'secondary' : 'outline'" aria-label="Mostra fasi terminate" [hlmTooltip]="showDone() ? 'Nascondi fasi terminate' : 'Mostra fasi terminate'" [attr.aria-pressed]="showDone()" (click)="showDone.set(!showDone())">
             <ng-icon [name]="showDone() ? 'lucideCircleCheck' : 'lucideEyeOff'" aria-hidden="true" />
+          </button>
+          <button hlmBtn type="button" size="icon-sm" [variant]="lockedOnly() ? 'secondary' : 'outline'" aria-label="Solo fissati" [hlmTooltip]="lockedOnly() ? 'Mostra tutti i lavori' : 'Mostra solo i lavori fissati'" [attr.aria-pressed]="lockedOnly()" (click)="lockedOnly.set(!lockedOnly())">
+            <ng-icon name="lucideLock" aria-hidden="true" />
           </button>
           <button hlmBtn type="button" size="icon-sm" [variant]="depsAll() ? 'secondary' : 'outline'" aria-label="Mostra tutte le dipendenze" hlmTooltip="Mostra tutte le dipendenze (altrimenti solo quelle del lavoro selezionato o sotto il mouse)" [attr.aria-pressed]="depsAll()" (click)="depsAll.set(!depsAll())">
             <ng-icon name="lucideWorkflow" aria-hidden="true" />
@@ -239,6 +247,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                   <li class="inline-flex items-center gap-1.5"><span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" aria-hidden="true"><ng-icon name="lucideAlarmClock" size="11" /></span> In ritardo (pallino rosso)</li>
                   <li class="inline-flex items-center gap-1.5"><span class="bg-secondary text-secondary-foreground ring-border flex size-4 items-center justify-center rounded-full ring-1" aria-hidden="true"><ng-icon name="lucideTriangleAlert" size="11" /></span> Piano obsoleto</li>
                   <li class="inline-flex items-center gap-1.5"><span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" aria-hidden="true"><ng-icon name="lucideCircleAlert" size="11" /></span> Sovraccarico della macchina</li>
+                  <li class="inline-flex items-center gap-1.5"><span class="bg-card text-foreground border-foreground/60 flex size-4 items-center justify-center rounded-sm border" aria-hidden="true"><ng-icon name="lucideLock" size="11" /></span> Fissato (piano bloccato, il ripianifica non lo sposta)</li>
                 </ul>
               </section>
               <section class="flex flex-col gap-1.5" aria-label="Tempo">
@@ -454,12 +463,15 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                               <span class="opacity-70">Stato</span><span>{{ b.tip.status }}</span>
                               <span class="opacity-70">Piano</span><span>{{ b.tip.plan }}</span>
                               <span class="opacity-70">Predecessori</span><span>{{ b.tip.predecessors }}</span>
+                              @if (b.tip.locked) { <span class="opacity-70">Fissato</span><span>{{ b.tip.locked }}</span> }
                             </div>
                           </div>
                         </ng-template>
                         <div
                           role="button"
                           class="group absolute z-[1] cursor-pointer overflow-hidden rounded-md transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          [class.border]="b.locked"
+                          [class.border-foreground/60]="b.locked"
                           [class.opacity-25]="dimmed(b)"
                           [class.ring-2]="selectedId() === b.w.id"
                           [class.ring-1]="chainRing(b)"
@@ -495,6 +507,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                             @if (b.placement === 'inside' || b.placement === 'truncated') {
                               <span class="flex min-w-0 items-center gap-1">
                                 <ng-icon [name]="b.statusIcon" size="14" class="shrink-0" aria-hidden="true" />
+                                @if (b.locked) { <ng-icon name="lucideLock" size="12" class="shrink-0" aria-hidden="true" /> }
                                 <span class="truncate font-medium">{{ b.name }}</span>
                               </span>
                               @if (b.placement === 'inside') { <span class="truncate text-[11px]">{{ b.subBar }}</span> }
@@ -510,6 +523,9 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                             </span>
                           } @else if (b.dot && b.placement !== 'inside') {
                             <span class="absolute top-0.5 right-0.5 size-2 rounded-full" [class]="b.dot" aria-hidden="true"></span>
+                          }
+                          @if (b.locked && b.placement !== 'inside' && b.placement !== 'truncated') {
+                            <span class="bg-card text-foreground pointer-events-none absolute right-0 bottom-0 flex size-3.5 items-center justify-center rounded-tl-sm" aria-hidden="true"><ng-icon name="lucideLock" size="10" /></span>
                           }
                         </div>
                       }
@@ -623,6 +639,8 @@ export class PlanningTimelineComponent {
   protected readonly depsAll = signal(this.qp.get('deps') === 'all');
   /** Mostra le fasi terminate (URL `done=1`); di default sono nascoste. */
   protected readonly showDone = signal(this.qp.get('done') === '1');
+  /** Solo lavori fissati (URL `locked=1`): filtro lato server. */
+  protected readonly lockedOnly = signal(this.qp.get('locked') === '1');
   /** Terminate visibili anche con il filtro di stato esplicito "Terminato". */
   private readonly showEnded = computed(() => this.showDone() || this.statusFilter() === 'Ended');
   /** Lavori terminati che restano visibili perché selezionati o col focus (valore solo se terminati: evita ricalcoli inutili). */
@@ -804,7 +822,7 @@ export class PlanningTimelineComponent {
   protected readonly orderLabel = (v: string): string => (v === ALL ? 'Tutti gli ordini' : (this.knownOrders().get(Number(v)) ?? `Ordine ${v}`));
   protected readonly statusLabel = (v: string): string => (v === ALL ? 'Tutti gli stati' : workStatus(v).label);
   protected readonly machineLabel = (v: string): string => (v === ALL ? 'Tutte le macchine' : (this.machineLabels().get(Number(v)) ?? v));
-  protected readonly filtersActive = computed(() => this.orderFilter() !== ALL || this.statusFilter() !== ALL || this.machineFilter() !== ALL || !!this.search().trim());
+  protected readonly filtersActive = computed(() => this.orderFilter() !== ALL || this.statusFilter() !== ALL || this.machineFilter() !== ALL || this.lockedOnly() || !!this.search().trim());
 
   // --- modello righe ---
   private readonly matches = (w: TimelineWorkOrderModel, q: string): boolean => !q || w.code.toLowerCase().includes(q) || w.productionOrderCode.toLowerCase().includes(q);
@@ -925,6 +943,7 @@ export class PlanningTimelineComponent {
           const overload = r.key !== NONE_ROW && x.lane >= r.capacity;
           const late = x.isLate;
           const stale = x.planStatus === 'Stale';
+          const locked = x.isPlanLocked;
           const dim = !!q && !this.matches(x, q);
           const op = operationNumber(x.code);
           const name = x.processSegmentName || x.processSegmentCode;
@@ -935,15 +954,16 @@ export class PlanningTimelineComponent {
           const status = st.label;
           const plan = late ? `In ritardo${x.lateDays ? ` di ${x.lateDays} g` : ''}` : stale ? 'Piano obsoleto' : x.planStatus === 'Planned' ? 'Pianificato' : 'Non pianificato';
           const period = `${formatDateTime(rg.s, tz)} – ${formatDateTime(rg.e, tz)}`;
-          const aria = `${name}, ordine ${x.productionOrderCode}, lavoro ${x.code} su ${machine}, dal ${formatDateTime(rg.s, tz)} al ${formatDateTime(rg.e, tz)}, ${status.toLowerCase()}${late ? ', in ritardo' : ''}${stale ? ', piano obsoleto' : ''}${overload ? ', sovraccarico' : ''}${x.predecessorIds.length === 1 ? `, dopo ${pool.get(x.predecessorIds[0])?.code ?? 'un altro lavoro'}` : x.predecessorIds.length > 1 ? `, dopo ${x.predecessorIds.length} lavori` : ''}`;
+          const aria = `${name}, ordine ${x.productionOrderCode}, lavoro ${x.code} su ${machine}, dal ${formatDateTime(rg.s, tz)} al ${formatDateTime(rg.e, tz)}, ${status.toLowerCase()}${late ? ', in ritardo' : ''}${stale ? ', piano obsoleto' : ''}${locked ? ', fissato' : ''}${overload ? ', sovraccarico' : ''}${x.predecessorIds.length === 1 ? `, dopo ${pool.get(x.predecessorIds[0])?.code ?? 'un altro lavoro'}` : x.predecessorIds.length > 1 ? `, dopo ${x.predecessorIds.length} lavori` : ''}`;
           return {
-            w: x, left, width, realW: width, y: rowTop + rowPad + x.lane * LANE_H, height: BAR_H, lane: x.lane, rowKey: r.key, overload, dim, late, stale,
+            w: x, left, width, realW: width, y: rowTop + rowPad + x.lane * LANE_H, height: BAR_H, lane: x.lane, rowKey: r.key, overload, dim, late, stale, locked,
             placement: 'inside', dot: late || overload ? 'bg-destructive' : stale ? 'bg-secondary ring-1 ring-border' : null, padLeft: 10, ext: '', text: '',
             statusIcon: st.icon, name, segCode: x.processSegmentCode || name, sub, subBar: sub, subRun, running, color: orderColor(hues.get(x.productionOrderId) ?? 0),
             padRight: 4, cls: '', aria,
             tip: {
               phase: name, workOrder: x.code, order: `${x.productionOrderCode} · ${x.materialName}`, machine, period,
               duration: formatDuration(rg.e - rg.s), status, plan, predecessors: x.predecessorIds.length,
+              locked: locked ? `Fissato${x.planLockedAt ? ` (${formatDateTime(x.planLockedAt, tz)})` : ''}` : null,
             },
           };
         })
@@ -1217,6 +1237,7 @@ export class PlanningTimelineComponent {
     effect(() => {
       this.orderFilter();
       this.statusFilter();
+      this.lockedOnly();
       untracked(() => {
         if (this.first) {
           this.first = false;
@@ -1250,20 +1271,21 @@ export class PlanningTimelineComponent {
         q: this.search().trim() || null,
         deps: this.depsAll() ? 'all' : null,
         done: this.showDone() ? '1' : null,
+        locked: this.lockedOnly() ? '1' : null,
         wo: this.selectedId(),
       };
       untracked(() => void this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge', replaceUrl: true }));
     });
   }
 
-  private filters(): { order: string; status: string } {
-    return { order: this.orderFilter(), status: this.statusFilter() };
+  private filters(): { order: string; status: string; locked: boolean } {
+    return { order: this.orderFilter(), status: this.statusFilter(), locked: this.lockedOnly() };
   }
 
   /** Richiesta di un intervallo (<= 28 giorni), con cache per [from,to] + filtri e coalescenza delle richieste identiche. */
   private fetchChunk(range: Range): Promise<TimelineModel> {
     const q = this.filters();
-    const key = `${range.start}|${range.end}|${q.order}|${q.status}`;
+    const key = `${range.start}|${range.end}|${q.order}|${q.status}|${q.locked ? 'L' : ''}`;
     const hit = this.cache.get(key);
     if (hit) return hit;
     const p = firstValueFrom(
@@ -1272,6 +1294,7 @@ export class PlanningTimelineComponent {
         to: new Date(range.end).toISOString(),
         ...(q.order !== ALL ? { productionOrderId: Number(q.order) } : {}),
         ...(q.status !== ALL ? { status: q.status as WorkOrderStatus } : {}),
+        ...(q.locked ? { locked: true } : {}),
       }),
     );
     this.cache.set(key, p);

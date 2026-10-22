@@ -46,6 +46,15 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
               }
             </button>
           }
+          @if (can('Lock')) {
+            <button hlmDropdownMenuItem (click)="lockPlan.emit(work())">Fissa</button>
+          }
+          @if (can('Move')) {
+            <button hlmDropdownMenuItem (click)="movePlan.emit(work())">Sposta…</button>
+          }
+          @if (can('Unlock')) {
+            <button hlmDropdownMenuItem (click)="unlockPlan.emit(work())">Sblocca</button>
+          }
           <button hlmDropdownMenuItem (click)="sessions.emit(work())">Registrazioni</button>
           <button hlmDropdownMenuItem (click)="openOrder()">Apri ordine</button>
         </hlm-dropdown-menu-group>
@@ -69,6 +78,9 @@ export class WorkOrderRowActionsComponent {
   readonly abortWork = output<WorkOrderModel>();
   readonly sessions = output<WorkOrderModel>();
   readonly assignMachine = output<WorkOrderModel>();
+  readonly lockPlan = output<WorkOrderModel>();
+  readonly unlockPlan = output<WorkOrderModel>();
+  readonly movePlan = output<WorkOrderModel>();
   /** La fase del lavoro ha macchine attive collegate: altrimenti «Assegna macchina» è disabilitata. */
   readonly hasMachines = input(true);
 

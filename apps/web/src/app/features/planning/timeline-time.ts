@@ -124,3 +124,9 @@ export function formatRangeTitle(a: number, b: number, tz: string): string {
   if (monYear(a).slice(-4) === monYear(last).slice(-4)) return `${formatWeekday(a, tz)} ${mon(a)} – ${formatWeekday(last, tz)} ${monYear(last)}`;
   return `${formatWeekday(a, tz)} ${monYear(a)} – ${formatWeekday(last, tz)} ${monYear(last)}`;
 }
+
+/** Ora `HH:mm` nel fuso. */
+export function timeKey(ms: number, tz: string): string {
+  const { h, m } = hms(ms, tz);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
