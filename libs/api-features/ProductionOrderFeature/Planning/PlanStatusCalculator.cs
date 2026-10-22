@@ -24,7 +24,8 @@ public sealed record WorkPlanFacts(
     DateTime? OrderRequestedEnd,
     IReadOnlyCollection<DateTime> PredecessorEnds,
     bool MachineUsable,
-    DateTime Now);
+    DateTime Now,
+    bool IsLocked = false);
 
 /// <summary>
 /// Pure plan status. Rules, in order:
@@ -46,15 +47,20 @@ public static class PlanStatusCalculator
         None,
         PredecessorEndsAfterStart,
         MachineNotUsable,
-        RunningPastPlannedEnd
+        RunningPastPlannedEnd,
+        /// <summary>Locked work order whose predecessor ends after its (fixed) start: the lock is the cause, not the engine.</summary>
+        LockedPredecessorConflict,
+        /// <summary>Locked work order on a machine that is inactive or no longer enabled for the phase.</summary>
+        LockedMachineNotUsable
     }
 
     public static StaleCause CauseOf(WorkPlanFacts f)
     {
         if (f.PlannedStartAt is not { } start || f.PlannedEndAt is not { } end) return StaleCause.None;
         if (f.Status is WorkOrderStatus.Ended or WorkOrderStatus.Aborted) return StaleCause.None;
-        if (f.PredecessorEnds.Any(p => p > start)) return StaleCause.PredecessorEndsAfterStart;
-        if (!f.MachineUsable) return StaleCause.MachineNotUsable;
+        if (f.PredecessorEnds.Any(p => p > start))
+            return f.IsLocked ? StaleCause.LockedPredecessorConflict : StaleCause.PredecessorEndsAfterStart;
+        if (!f.MachineUsable) return f.IsLocked ? StaleCause.LockedMachineNotUsable : StaleCause.MachineNotUsable;
         return f.Status == WorkOrderStatus.Running && f.Now > end ? StaleCause.RunningPastPlannedEnd : StaleCause.None;
     }
 

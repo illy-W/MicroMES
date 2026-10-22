@@ -101,16 +101,21 @@ public class ProductionData(TimeProvider timeProvider)
     // ---- plan --------------------------------------------------------------------------------------
 
     /// <summary>Plan status of a work order from the data in memory (see <see cref="PlanStatusCalculator"/>).</summary>
-    public PlanStatus PlanStatusOf(WorkOrder wo)
+    public PlanStatus PlanStatusOf(WorkOrder wo) => PlanStatusCalculator.Of(PlanFactsOf(wo));
+
+    /// <summary>Why the plan of the work order is Stale (None when it is not); distinct causes for locked work orders.</summary>
+    public PlanStatusCalculator.StaleCause PlanStatusReasonOf(WorkOrder wo) => PlanStatusCalculator.CauseOf(PlanFactsOf(wo));
+
+    private WorkPlanFacts PlanFactsOf(WorkOrder wo)
     {
         var order = Orders[wo.ProductionOrderId];
         var predecessorEnds = PredecessorIds(wo.Id).Select(id => WorkOrders[id])
             .Select(p => p.EndedAt ?? p.PlannedEndAt).Where(d => d is not null).Select(d => d!.Value).ToList();
         var machineUsable = wo.AssignedEquipmentId is not { } eid
             || (Equipment.TryGetValue(eid, out var e) && e.IsActive && EquipmentLinks.Contains((eid, wo.ProcessSegmentId)));
-        return PlanStatusCalculator.Of(new WorkPlanFacts(
+        return new WorkPlanFacts(
             wo.Status, wo.PlannedStartAt, wo.PlannedEndAt, order.RequestedEnd, predecessorEnds, machineUsable,
-            timeProvider.GetUtcNow().UtcDateTime));
+            timeProvider.GetUtcNow().UtcDateTime, wo.IsPlanLocked);
     }
 
     /// <summary>Aggregated plan (min start, max end, status) of the open work orders of the order and its descendants.</summary>
@@ -156,8 +161,9 @@ public class ProductionData(TimeProvider timeProvider)
             PlanStatus = plan.Status,
             ProducedQuantity = produced,
             ProgressPercent = Progress(produced, o.Quantity),
+            LockedWorkOrdersCount = OpenWorkOrdersOf(o.Id, true).Count(w => w.IsPlanLocked),
             // Child orders follow the state of their parent: no direct commands.
-            AllowedActions = o.ParentOrderId is null ? MachineOf(o).AllowedActions.ToList() : [],
+            AllowedActions = o.ParentOrderId is null ? MachineOf(o).AllowedActions.Concat(BulkPlanActionsOf(o)).ToList() : [],
             CreatedAt = o.CreatedAt,
             UpdatedAt = o.UpdatedAt
         };
@@ -203,6 +209,7 @@ public class ProductionData(TimeProvider timeProvider)
             PlannedEndAt = wo.PlannedEndAt,
             PlannedAt = wo.PlannedAt,
             PlanStatus = PlanStatusOf(wo),
+            PlanStatusReason = PlanStatusReasonOf(wo),
             IsPlanLocked = wo.IsPlanLocked,
             PlanLockedAt = wo.PlanLockedAt,
             Predecessors = PredecessorIds(wo.Id).Select(ToLink).OrderBy(l => l.Code, StringComparer.Ordinal).ToList(),
@@ -241,6 +248,37 @@ public class ProductionData(TimeProvider timeProvider)
         if (wo.IsPlanLocked) yield return "Unlock";
     }
 
+    /// <summary>Work orders not Ended/Aborted of the order (and of its descendants when asked).</summary>
+    public List<WorkOrder> OpenWorkOrdersOf(int orderId, bool includeChildren)
+    {
+        var ids = (includeChildren ? Subtree(orderId) : [Orders[orderId]]).Select(o => o.Id).ToHashSet();
+        return WorkOrders.Values.Where(w => ids.Contains(w.ProductionOrderId)
+            && w.Status is not (WorkOrderStatus.Ended or WorkOrderStatus.Aborted)).OrderBy(w => w.Id).ToList();
+    }
+
+    /// <summary>Why "lock all" cannot lock the work order (Italian), or null when it can. Status/order rules, plan and machine.</summary>
+    public string? LockSkipReason(WorkOrder wo)
+    {
+        var order = Orders[wo.ProductionOrderId];
+        if (wo.Status is not (WorkOrderStatus.Waiting or WorkOrderStatus.Ready or WorkOrderStatus.Interrupted))
+            return $"Il lavoro è in stato '{WorkOrderMachineState.StatusLabel(wo.Status)}': si fissa solo un lavoro In attesa, Pronto o Interrotto.";
+        if (order.Status is not (ProductionOrderStatus.Released or ProductionOrderStatus.InProgress))
+            return $"L'ordine {order.Code} non è in corso (stato {ProductionOrderMachineState.StatusLabel(order.Status)}).";
+        if (wo.PlannedStartAt is null || wo.PlannedEndAt is null)
+            return "Il lavoro non è pianificato: pianificalo oppure scegli un orario con Sposta.";
+        if (!IsPlanLockable(wo))
+            return "Il lavoro non ha una macchina assegnata: assegnala oppure scegli macchina e orario con Sposta.";
+        return null;
+    }
+
+    /// <summary>Bulk plan commands of an order: LockAll when some open work order (own) can be locked, UnlockAll when some is locked.</summary>
+    public IEnumerable<string> BulkPlanActionsOf(ProductionOrder order)
+    {
+        var open = OpenWorkOrdersOf(order.Id, false);
+        if (open.Any(w => !w.IsPlanLocked && LockSkipReason(w) is null)) yield return "LockAll";
+        if (open.Any(w => w.IsPlanLocked)) yield return "UnlockAll";
+    }
+
     public WorkOrderEquipmentModel? ToEquipmentModel(int? equipmentId, int processSegmentId)
         => equipmentId is { } id && Equipment.TryGetValue(id, out var e)
             ? new WorkOrderEquipmentModel
@@ -271,7 +309,7 @@ public class ProductionData(TimeProvider timeProvider)
             Notes = m.Notes, Status = m.Status,
             AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
             StartedAt = m.StartedAt, EndedAt = m.EndedAt, PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt,
-            PlannedAt = m.PlannedAt, PlanStatus = m.PlanStatus, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt, Predecessors = m.Predecessors, Successors = m.Successors,
+            PlannedAt = m.PlannedAt, PlanStatus = m.PlanStatus, PlanStatusReason = m.PlanStatusReason, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt, Predecessors = m.Predecessors, Successors = m.Successors,
             AllowedActions = m.AllowedActions,
             Sessions = SessionsOf(wo.Id).Select(s => new WorkOrderSessionModel
             {
@@ -339,6 +377,7 @@ public class ProductionData(TimeProvider timeProvider)
             ParentOrderCode = header.ParentOrderCode, ReleasedAt = header.ReleasedAt, StartedAt = header.StartedAt,
             EndedAt = header.EndedAt, PlannedStart = header.PlannedStart, PlannedEnd = header.PlannedEnd,
             PlanStatus = header.PlanStatus, ProducedQuantity = header.ProducedQuantity, ProgressPercent = header.ProgressPercent,
+            LockedWorkOrdersCount = header.LockedWorkOrdersCount,
             AllowedActions = header.AllowedActions, CreatedAt = header.CreatedAt, UpdatedAt = header.UpdatedAt,
             WorkOrders = own.Select(ToWorkOrderModel).ToList(),
             Dependencies = Dependencies
@@ -433,7 +472,7 @@ public class ProductionData(TimeProvider timeProvider)
                     AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
                     PlannedQuantity = m.PlannedQuantity, GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity,
                     PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes,
-                    PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt, PlanStatus = m.PlanStatus, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt,
+                    PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt, PlanStatus = m.PlanStatus, PlanStatusReason = m.PlanStatusReason, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt,
                     AllowedActions = m.AllowedActions,
                     Materials = Lines.Where(l => l.WorkOrderId == w.Id).OrderBy(l => l.Id).Select(ToMaterialModel).ToList()
                 };

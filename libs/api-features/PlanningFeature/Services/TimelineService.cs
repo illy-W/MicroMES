@@ -44,7 +44,7 @@ public class TimelineService(
     private static DateTime? Utc(DateTime? t) => t is { } v ? Utc(v) : null;
 
     public async Task<ProductionOrderResult<TimelineModel>> GetAsync(
-        DateTime from, DateTime to, int? equipmentId = null, WorkOrderStatus? status = null, int? productionOrderId = null)
+        DateTime from, DateTime to, int? equipmentId = null, WorkOrderStatus? status = null, int? productionOrderId = null, bool? locked = null)
     {
         from = Utc(from);
         to = Utc(to);
@@ -84,7 +84,8 @@ public class TimelineService(
 
         var shown = bars.Where(b => (equipmentId is null || b.EquipmentId == equipmentId)
                                     && (status is null || b.Wo.Status == status)
-                                    && (productionOrderId is null || b.Wo.ProductionOrderId == productionOrderId)).ToList();
+                                    && (productionOrderId is null || b.Wo.ProductionOrderId == productionOrderId)
+                                    && (locked is not true || b.Wo.IsPlanLocked)).ToList();
 
         var period = TimelineCalculator.PeriodFor(from, to);
         var nonWorking = new List<TimelineNonWorkingModel>();
@@ -142,7 +143,7 @@ public class TimelineService(
             EquipmentId = b.EquipmentId, PlannedStartAt = Utc(wo.PlannedStartAt), PlannedEndAt = Utc(wo.PlannedEndAt),
             ActualStartAt = wo.Status is WorkOrderStatus.Running or WorkOrderStatus.Ended or WorkOrderStatus.Aborted ? Utc(started) : null,
             ActualEndAt = wo.Status is WorkOrderStatus.Ended or WorkOrderStatus.Aborted ? Utc(wo.EndedAt ?? sessions.LastOrDefault()?.EndedAt) : null,
-            Status = wo.Status, PlanStatus = data.PlanStatusOf(wo), IsPlanLocked = wo.IsPlanLocked, PlanLockedAt = Utc(wo.PlanLockedAt), IsLate = late,
+            Status = wo.Status, PlanStatus = data.PlanStatusOf(wo), PlanStatusReason = data.PlanStatusReasonOf(wo), IsPlanLocked = wo.IsPlanLocked, PlanLockedAt = Utc(wo.PlanLockedAt), IsLate = late,
             LateDays = late ? (int)Math.Ceiling((wo.PlannedEndAt!.Value - order.RequestedEnd!.Value).TotalDays) : 0,
             PredecessorIds = data.PredecessorIds(wo.Id).OrderBy(i => i).ToList(), Lane = lane, Priority = order.Priority
         };

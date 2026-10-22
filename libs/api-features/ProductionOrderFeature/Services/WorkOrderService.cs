@@ -23,7 +23,7 @@ public class WorkOrderService(
 
     public async Task<ProductionOrderResult<List<WorkOrderModel>>> GetAllAsync(
         WorkOrderStatus? status, int? productionOrderId, string? search, int? equipmentId = null,
-        string? sort = null, PlanStatus? planStatus = null)
+        string? sort = null, PlanStatus? planStatus = null, bool? locked = null)
     {
         if (!string.IsNullOrWhiteSpace(sort) && !sort.Equals("plannedStart", StringComparison.OrdinalIgnoreCase) && !sort.Equals("code", StringComparison.OrdinalIgnoreCase))
             return ProductionOrderResult<List<WorkOrderModel>>.Invalid($"Ordinamento '{sort}' non valido: usa 'code' (predefinito) o 'plannedStart'.");
@@ -36,6 +36,7 @@ public class WorkOrderService(
                         && (equipmentId is null || w.AssignedEquipmentId == equipmentId))
             .Select(data.ToWorkOrderModel)
             .Where(m => planStatus is null || m.PlanStatus == planStatus)
+            .Where(m => locked is not true || m.IsPlanLocked)
             .Where(m => string.IsNullOrEmpty(term)
                         || Contains(m.Code, term) || Contains(m.ProcessSegmentCode, term) || Contains(m.ProcessSegmentName, term)
                         || Contains(m.MaterialCode, term) || Contains(m.MaterialName, term));

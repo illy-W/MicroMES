@@ -47,7 +47,7 @@ public class PlanningController(PlanningService service, TimelineService timelin
 
     /// <summary>
     /// Read-only timeline of the window [from, to) (UTC, max 62 days): machines, work orders with plan or real dates, non-working spans and load per day
-    /// (windows up to 14 days) or per week. Filters: machine, status, order.
+    /// (windows up to 14 days) or per week. Filters: machine, status, order, locked (only locked work orders).
     /// </summary>
     [HttpGet("timeline", Name = "GetPlanningTimeline")]
     [ProducesResponseType<TimelineModel>(StatusCodes.Status200OK)]
@@ -55,8 +55,9 @@ public class PlanningController(PlanningService service, TimelineService timelin
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> GetTimeline(
         [FromQuery] DateTime from, [FromQuery] DateTime to,
-        [FromQuery] int? equipmentId, [FromQuery] WorkOrderStatus? status, [FromQuery] int? productionOrderId)
-        => ToResponse(await timeline.GetAsync(from, to, equipmentId, status, productionOrderId));
+        [FromQuery] int? equipmentId, [FromQuery] WorkOrderStatus? status, [FromQuery] int? productionOrderId,
+        [FromQuery] bool? locked)
+        => ToResponse(await timeline.GetAsync(from, to, equipmentId, status, productionOrderId, locked));
 
     private IActionResult ToResponse<T>(ProductionOrderResult<T> result)
     {

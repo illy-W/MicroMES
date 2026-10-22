@@ -43,6 +43,7 @@ public class ProductionOrderOverviewWorkOrderModel
     public DateTime? PlannedStartAt { get; set; }
     public DateTime? PlannedEndAt { get; set; }
     public required PlanStatus PlanStatus { get; set; }
+    public required PlanStatusCalculator.StaleCause PlanStatusReason { get; set; }
     public required bool IsPlanLocked { get; set; }
     public DateTime? PlanLockedAt { get; set; }
     /// <summary>Commands the UI may offer now: Start, Pause, Resume, Stop, Abort.</summary>

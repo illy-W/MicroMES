@@ -50,6 +50,8 @@ public class TimelineWorkOrderModel
     public DateTime? ActualEndAt { get; set; }
     public required WorkOrderStatus Status { get; set; }
     public required PlanStatus PlanStatus { get; set; }
+    /// <summary>Cause of a Stale plan (None otherwise); distinct values for locked work orders.</summary>
+    public required PlanStatusCalculator.StaleCause PlanStatusReason { get; set; }
     /// <summary>Manual lock of the plan and when it was set (UTC).</summary>
     public required bool IsPlanLocked { get; set; }
     public DateTime? PlanLockedAt { get; set; }

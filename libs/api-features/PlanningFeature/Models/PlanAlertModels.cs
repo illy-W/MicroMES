@@ -11,7 +11,15 @@ public enum PlanAlertType
     /// <summary>The planned load of a machine in a week exceeds 100% of its working capacity.</summary>
     MachineOverloaded,
     /// <summary>An open work order is assigned to a machine that was deactivated or is no longer enabled for the phase.</summary>
-    InactiveOrDisabledMachine
+    InactiveOrDisabledMachine,
+    /// <summary>(Critical) A locked work order starts before the (planned or real) end of a predecessor.</summary>
+    LockedPredecessorConflict,
+    /// <summary>(Critical) A locked work order is on a machine that is deactivated, no longer enabled for the phase, or closed at the locked interval.</summary>
+    LockedMachineUnavailable,
+    /// <summary>(Warning) The locked intervals on a machine exceed its capacity.</summary>
+    LockedOverCapacity,
+    /// <summary>(Warning) A locked work order ends after the requested end of its order.</summary>
+    LockedLate
 }
 
 public enum PlanAlertSeverity

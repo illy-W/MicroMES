@@ -63,4 +63,31 @@ public class WorkOrderPlanLockFixture
     [InlineData(ProductionOrderStatus.Cancelled)]
     public void Actions_OrderClosed_Success_NoPlanCommands(ProductionOrderStatus order)
         => _data.ToWorkOrderModel(Wo(order: order)).AllowedActions.Should().NotContain(["Lock", "Move"]);
+
+    [Fact]
+    public void BulkActions_LockableWorkOrder_Success_LockAllOnly()
+    {
+        Wo();
+        var m = _data.ToOrderModel(_data.Orders[1]);
+        m.AllowedActions.Should().Contain("LockAll").And.NotContain("UnlockAll");
+        m.LockedWorkOrdersCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void BulkActions_LockedWorkOrder_Success_UnlockAllAndCount()
+    {
+        Wo(locked: true);
+        var m = _data.ToOrderModel(_data.Orders[1]);
+        m.AllowedActions.Should().Contain("UnlockAll").And.NotContain("LockAll");
+        m.LockedWorkOrdersCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void LockSkipReason_NotPlannedOrNoMachine_Success_ItalianReason()
+    {
+        _data.LockSkipReason(Wo(planned: false)).Should().Contain("non è pianificato");
+        _data.LockSkipReason(Wo(equipment: null)).Should().Contain("macchina");
+        _data.LockSkipReason(Wo()).Should().BeNull();
+        _data.LockSkipReason(Wo(WorkOrderStatus.Running)).Should().Contain("In esecuzione");
+    }
 }

@@ -33,10 +33,31 @@ public class ProductionOrderModel
     public required decimal ProducedQuantity { get; set; }
     /// <summary>Produced / quantity as a percentage, capped to 100.</summary>
     public required decimal ProgressPercent { get; set; }
-    /// <summary>Commands the UI may offer now: Release, Cancel, Abort.</summary>
+    /// <summary>Open work orders with a locked plan, in the order and its descendants.</summary>
+    public required int LockedWorkOrdersCount { get; set; }
+    /// <summary>Commands the UI may offer now: Release, Cancel, Abort, plus the bulk plan commands LockAll (some open work order is lockable) and UnlockAll (some is locked).</summary>
     public required List<string> AllowedActions { get; set; }
     public required DateTime CreatedAt { get; set; }
     public required DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>Work order skipped by "lock all", with the reason (Italian).</summary>
+public class LockSkippedWorkOrderModel
+{
+    public required int WorkOrderId { get; set; }
+    public required string Code { get; set; }
+    public required string Reason { get; set; }
+}
+
+public class LockAllResultModel
+{
+    public required int Locked { get; set; }
+    public required List<LockSkippedWorkOrderModel> Skipped { get; set; }
+}
+
+public class UnlockAllResultModel
+{
+    public required int Unlocked { get; set; }
 }
 
 public class ProductionOrderSummaryModel

@@ -116,6 +116,8 @@ public class WorkOrderModel
     public DateTime? PlannedAt { get; set; }
     /// <summary>Derived (never stored): Unplanned, Planned, Late (planned end after the requested end of the order), Stale (plan no longer coherent).</summary>
     public required PlanStatus PlanStatus { get; set; }
+    /// <summary>Cause of a Stale plan (None otherwise). LockedPredecessorConflict / LockedMachineNotUsable: the work order is locked, so the lock (not the engine) is the cause.</summary>
+    public required PlanStatusCalculator.StaleCause PlanStatusReason { get; set; }
     /// <summary>Manual lock of the plan (the planning engine never moves it) and when it was set (UTC).</summary>
     public required bool IsPlanLocked { get; set; }
     public DateTime? PlanLockedAt { get; set; }

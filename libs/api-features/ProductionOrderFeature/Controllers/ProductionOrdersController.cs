@@ -73,6 +73,22 @@ public class ProductionOrdersController(ProductionOrderService service, Producti
     public async Task<IActionResult> AbortProductionOrder(int id, [FromBody] AbortRequest? request)
         => ToResponse(await service.AbortAsync(id, request?.Notes), r => Ok(r.Data));
 
+    /// <summary>Locks the plan of every lockable open work order of the order (and of its child orders when <c>includeChildren</c>); returns the count and the skipped ones with the reason. 409 when the order is not Released/InProgress.</summary>
+    [HttpPost("{id:int}/lock-all", Name = "LockAllProductionOrderWorkOrders")]
+    [ProducesResponseType<LockAllResultModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> LockAllWorkOrders(int id, [FromQuery] bool includeChildren = false)
+        => ToResponse(await service.LockAllAsync(id, includeChildren), r => Ok(r.Data));
+
+    /// <summary>Removes the lock from every locked open work order of the order (and of its child orders when <c>includeChildren</c>). 409 when the order is not Released/InProgress.</summary>
+    [HttpPost("{id:int}/unlock-all", Name = "UnlockAllProductionOrderWorkOrders")]
+    [ProducesResponseType<UnlockAllResultModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UnlockAllWorkOrders(int id, [FromQuery] bool includeChildren = false)
+        => ToResponse(await service.UnlockAllAsync(id, includeChildren), r => Ok(r.Data));
+
     private IActionResult ToResponse<T>(ProductionOrderResult<T> result, Func<ProductionOrderResult<T>, IActionResult> success)
     {
         if (result.IsSuccessful) return success(result);

@@ -22,8 +22,9 @@ public class WorkOrdersController(WorkOrderService service) : ControllerBase
         [FromQuery] string? search,
         [FromQuery] int? equipmentId,
         [FromQuery] string? sort,
-        [FromQuery] PlanStatus? planStatus)
-        => ToResponse(await service.GetAllAsync(status, productionOrderId, search, equipmentId, sort, planStatus));
+        [FromQuery] PlanStatus? planStatus,
+        [FromQuery] bool? locked)
+        => ToResponse(await service.GetAllAsync(status, productionOrderId, search, equipmentId, sort, planStatus, locked));
 
     [HttpGet("{id:int}", Name = "GetWorkOrder")]
     [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]

@@ -17,6 +17,10 @@ public class PlanAlertsCalculatorTests
         WorkOrderStatus status = WorkOrderStatus.Waiting, int? machine = 1, bool usable = true, params AlertPredecessor[] preds)
         => new(id, $"OP-{order}/{id}", order, $"OP-{order}", due, status, start, end, machine, machine is null ? null : $"M{machine}", usable, preds);
 
+    private static AlertWorkOrder Locked(int id, DateTime start, DateTime end, int order = 1, DateTime? due = null, int? machine = 1,
+        bool usable = true, params AlertPredecessor[] preds)
+        => Wo(id, start, end, order, due, WorkOrderStatus.Ready, machine, usable, preds) with { IsLocked = true };
+
     private static AlertMachine M(int id = 1, int capacity = 1) => new(id, $"M{id}", capacity, Source());
 
     private static List<PlanAlertModel> Run(IEnumerable<AlertWorkOrder> wos, IEnumerable<AlertMachine>? machines = null,
@@ -182,4 +186,73 @@ public class PlanAlertsCalculatorTests
 
     private static List<PlanAlertModel> WorkOrder_Set() => Run([
         Wo(1, N(2, 8), N(5, 10), 1, due: N(3, 17)), Wo(2, N(3, 8), N(3, 10), 2, usable: false), Wo(3, N(2, 8), N(2, 9), 3)]);
+
+    // ---- Locked work orders -------------------------------------------------------------------
+
+    [Fact]
+    public void Locked_predecessor_conflict_is_critical_names_predecessor_and_minutes_and_replaces_stale()
+    {
+        var alerts = Run([Locked(2, N(2, 10), N(2, 12), preds: new AlertPredecessor(1, "OP-1/1", N(2, 11)))]);
+        var a = alerts.Single();
+        a.Type.Should().Be(PlanAlertType.LockedPredecessorConflict);
+        a.Severity.Should().Be(PlanAlertSeverity.Critical);
+        a.CauseWorkOrderId.Should().Be(1);
+        a.Message.Should().Contain("OP-1/1").And.Contain("OP-1/2").And.Contain("60 min");
+        a.Suggestion.Should().Be("Sblocca il lavoro o anticipa il predecessore.");
+    }
+
+    [Fact]
+    public void Locked_on_inactive_machine_is_critical_and_not_reported_as_generic_machine_alert()
+    {
+        var a = Run([Locked(1, N(2, 8), N(2, 10), usable: false)]).Single();
+        a.Type.Should().Be(PlanAlertType.LockedMachineUnavailable);
+        a.Severity.Should().Be(PlanAlertSeverity.Critical);
+        a.Message.Should().Contain("M1").And.Contain("disattivata");
+        a.Suggestion.Should().Be("Assegna un'altra macchina o sblocca il lavoro.");
+    }
+
+    [Fact]
+    public void Locked_start_on_closed_time_of_the_machine_calendar_names_the_reason()
+    {
+        // Saturday 7: no shifts on the weekend.
+        var a = Run([Locked(1, N(7, 10), N(7, 12))]).Single();
+        a.Type.Should().Be(PlanAlertType.LockedMachineUnavailable);
+        a.Message.Should().Contain("M1").And.Contain("giorno senza turni");
+    }
+
+    [Fact]
+    public void Locked_jobs_beyond_capacity_name_the_other_jobs_as_warning()
+    {
+        var alerts = Run([Locked(1, N(2, 8), N(2, 11)), Locked(2, N(2, 9), N(2, 12), order: 2)]);
+        var a = alerts.Single(x => x.Type == PlanAlertType.LockedOverCapacity);
+        a.Severity.Should().Be(PlanAlertSeverity.Warning);
+        a.Message.Should().Contain("OP-1/1").And.Contain("OP-2/2");
+        a.Suggestion.Should().Be("Sposta uno dei lavori fissati o aumenta la capacità.");
+        Run([Locked(1, N(2, 8), N(2, 11)), Locked(2, N(2, 9), N(2, 12), order: 2)], [M(capacity: 2)])
+            .Should().NotContain(x => x.Type == PlanAlertType.LockedOverCapacity);
+    }
+
+    [Fact]
+    public void Locked_job_ending_after_the_requested_end_is_a_warning_with_days()
+    {
+        var a = Run([Locked(1, N(2, 8), N(4, 12), due: N(3, 17))]).Single(x => x.Type == PlanAlertType.LockedLate);
+        a.Severity.Should().Be(PlanAlertSeverity.Warning);
+        a.LateDays.Should().Be(1);
+        a.Suggestion.Should().Be("Anticipa l'inizio o sposta la fine richiesta.");
+    }
+
+    [Fact]
+    public void Healthy_locked_job_has_no_alerts()
+        => Run([Locked(1, N(2, 8), N(2, 10), due: N(6, 17))]).Should().BeEmpty();
+
+    [Fact]
+    public void Plan_status_reason_is_distinct_for_locked_work_orders()
+    {
+        var facts = new MicroMES.ApiFeatures.ProductionOrderFeature.Planning.WorkPlanFacts(WorkOrderStatus.Ready, N(2, 10), N(2, 12), null,
+            [N(2, 11)], true, N(2, 0), IsLocked: true);
+        MicroMES.ApiFeatures.ProductionOrderFeature.Planning.PlanStatusCalculator.CauseOf(facts)
+            .Should().Be(MicroMES.ApiFeatures.ProductionOrderFeature.Planning.PlanStatusCalculator.StaleCause.LockedPredecessorConflict);
+        MicroMES.ApiFeatures.ProductionOrderFeature.Planning.PlanStatusCalculator.CauseOf(facts with { IsLocked = false })
+            .Should().Be(MicroMES.ApiFeatures.ProductionOrderFeature.Planning.PlanStatusCalculator.StaleCause.PredecessorEndsAfterStart);
+    }
 }

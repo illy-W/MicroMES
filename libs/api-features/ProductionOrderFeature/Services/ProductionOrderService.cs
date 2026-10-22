@@ -402,6 +402,83 @@ public class ProductionOrderService(
         return ProductionOrderResult<ProductionOrderDetailModel>.Ok(data.ToOrderDetail(order));
     }
 
+    // ---- bulk plan lock -----------------------------------------------------------------------------
+
+    /// <summary>
+    /// Locks the current plan of every open work order of the order (and of its descendants when asked) that can be locked
+    /// (planned, machine assigned when the phase has machines, status and order allowed); the others are skipped with a reason.
+    /// All or nothing (one transaction). 409 when the order itself is not Released/InProgress.
+    /// </summary>
+    public async Task<ProductionOrderResult<LockAllResultModel>> LockAllAsync(int id, bool includeChildren)
+    {
+        var data = await loader.LoadFamilyAsync(id);
+        if (data is null) return ProductionOrderResult<LockAllResultModel>.NotFound(NotFoundMessage);
+        if (BulkDenial(data.Orders[id], "si fissano") is { } denial) return ProductionOrderResult<LockAllResultModel>.Conflict(denial);
+
+        var skipped = new List<LockSkippedWorkOrderModel>();
+        var toLock = new List<WorkOrder>();
+        foreach (var wo in data.OpenWorkOrdersOf(id, includeChildren).Where(w => !w.IsPlanLocked))
+        {
+            if (data.LockSkipReason(wo) is { } reason)
+                skipped.Add(new LockSkippedWorkOrderModel { WorkOrderId = wo.Id, Code = ProductionData.CodeOf(data.Orders[wo.ProductionOrderId], wo), Reason = reason });
+            else toLock.Add(wo);
+        }
+
+        try
+        {
+            unitOfWork.BeginTransaction();
+            var now = Now();
+            foreach (var wo in toLock)
+            {
+                wo.IsPlanLocked = true;
+                wo.PlanLockedAt = now;
+                wo.UpdatedAt = now;
+                Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile aggiornare un ordine di lavoro.");
+            }
+            unitOfWork.Commit();
+        }
+        catch (Exception ex)
+        {
+            try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
+            return ProductionOrderResult<LockAllResultModel>.Failed(ProductionOrderFailure.None, $"Impossibile fissare i lavori: {ex.Message}");
+        }
+        return ProductionOrderResult<LockAllResultModel>.Ok(new LockAllResultModel { Locked = toLock.Count, Skipped = skipped });
+    }
+
+    /// <summary>Removes the lock from every locked open work order of the order (and of its descendants when asked); nothing else changes.</summary>
+    public async Task<ProductionOrderResult<UnlockAllResultModel>> UnlockAllAsync(int id, bool includeChildren)
+    {
+        var data = await loader.LoadFamilyAsync(id);
+        if (data is null) return ProductionOrderResult<UnlockAllResultModel>.NotFound(NotFoundMessage);
+        if (BulkDenial(data.Orders[id], "si sbloccano") is { } denial) return ProductionOrderResult<UnlockAllResultModel>.Conflict(denial);
+
+        var locked = data.OpenWorkOrdersOf(id, includeChildren).Where(w => w.IsPlanLocked).ToList();
+        try
+        {
+            unitOfWork.BeginTransaction();
+            var now = Now();
+            foreach (var wo in locked)
+            {
+                wo.IsPlanLocked = false;
+                wo.PlanLockedAt = null;
+                wo.UpdatedAt = now;
+                Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile aggiornare un ordine di lavoro.");
+            }
+            unitOfWork.Commit();
+        }
+        catch (Exception ex)
+        {
+            try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
+            return ProductionOrderResult<UnlockAllResultModel>.Failed(ProductionOrderFailure.None, $"Impossibile sbloccare i lavori: {ex.Message}");
+        }
+        return ProductionOrderResult<UnlockAllResultModel>.Ok(new UnlockAllResultModel { Unlocked = locked.Count });
+    }
+
+    private static string? BulkDenial(ProductionOrder order, string verb)
+        => order.Status is ProductionOrderStatus.Released or ProductionOrderStatus.InProgress
+            ? null
+            : $"L'ordine {order.Code} è in stato '{ProductionOrderMachineState.StatusLabel(order.Status)}': i lavori {verb} solo per un ordine Rilasciato o In corso.";
+
     // ---- helpers ------------------------------------------------------------------------------------
 
     /// <summary>Child orders follow the state of their parent: they take no direct command.</summary>

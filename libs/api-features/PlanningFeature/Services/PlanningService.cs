@@ -207,7 +207,8 @@ public class PlanningService(
                 data.Orders[w.ProductionOrderId].RequestedEnd, w.Status, AsUtc(w.PlannedStartAt), AsUtc(w.PlannedEndAt),
                 w.AssignedEquipmentId, eq?.Code, usable,
                 data.PredecessorIds(w.Id).Select(p => data.WorkOrders[p])
-                    .Select(p => new AlertPredecessor(p.Id, Code(p), AsUtc(p.EndedAt ?? p.PlannedEndAt))).ToList());
+                    .Select(p => new AlertPredecessor(p.Id, Code(p), AsUtc(p.EndedAt ?? p.PlannedEndAt))).ToList(),
+                w.IsPlanLocked);
         }).ToList();
 
         var machines = catalog.Machines.Values.Where(m => m.IsActive)

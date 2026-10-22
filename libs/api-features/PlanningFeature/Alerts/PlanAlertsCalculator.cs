@@ -13,7 +13,7 @@ public sealed record AlertPredecessor(int Id, string Code, DateTime? End);
 public sealed record AlertWorkOrder(
     int Id, string Code, int OrderId, string OrderCode, DateTime? OrderRequestedEnd, WorkOrderStatus Status,
     DateTime? PlannedStart, DateTime? PlannedEnd, int? EquipmentId, string? EquipmentCode, bool MachineUsable,
-    IReadOnlyList<AlertPredecessor> Predecessors);
+    IReadOnlyList<AlertPredecessor> Predecessors, bool IsLocked = false);
 
 public sealed record AlertMachine(int Id, string Code, int Capacity, IAvailabilitySource Availability);
 
@@ -31,6 +31,10 @@ public sealed record AlertUnplannable(int WorkOrderId, string Code, int OrderId,
 /// <item><b>MachineOverloaded</b> (warning): for each local week (Monday to Sunday) the working minutes the planned jobs spend on the
 /// machine, summed, exceed 100% of capacity × working minutes of the machine in that week. Jobs are non-preemptive intervals, so with the
 /// engine's own plan this happens only when manual assignments or stale plans overlap.</item>
+/// <item><b>Locked work orders</b> (the lock is never corrected silently, so the cause is named instead of the generic alerts):
+/// LockedPredecessorConflict (critical, replaces StalePlan: minutes of overlap with the latest predecessor), LockedMachineUnavailable (critical,
+/// replaces InactiveOrDisabledMachine; also when the locked start is on closed time of the machine calendar), LockedOverCapacity (warning: locked
+/// intervals exceed the capacity, the other jobs are named), LockedLate (warning: the locked job ends after the requested end of its order).</item>
 /// </list>
 /// Order: critical first, then by date (undated last), then type and ids.
 /// </summary>
@@ -47,6 +51,7 @@ public static class PlanAlertsCalculator
         AddUnplannable(alerts, unplannable);
         AddStaleAndMachine(alerts, workOrders, calc, now);
         AddOverload(alerts, workOrders, machines, calc);
+        AddLocked(alerts, workOrders, machines, calc);
 
         return alerts
             .OrderByDescending(a => a.Severity)
@@ -103,6 +108,7 @@ public static class PlanAlertsCalculator
     {
         foreach (var w in workOrders.OrderBy(w => w.Id))
         {
+            if (w.IsLocked) continue; // reported by AddLocked, with the lock as the named cause
             if (w.Status is WorkOrderStatus.Waiting or WorkOrderStatus.Ready or WorkOrderStatus.Interrupted
                 && w.EquipmentId is not null && !w.MachineUsable)
             {
@@ -180,6 +186,104 @@ public static class PlanAlertsCalculator
                     Suggestion = "Sposta alcuni lavori su un'altra macchina abilitata e ripianifica."
                 });
             }
+        }
+    }
+
+    private static void AddLocked(List<PlanAlertModel> alerts, IReadOnlyList<AlertWorkOrder> workOrders,
+        IReadOnlyList<AlertMachine> machines, WorkingTimeCalculator calc)
+    {
+        var locked = workOrders.Where(w => w.IsLocked && w.PlannedStart is not null && w.PlannedEnd is not null
+                                           && w.Status is WorkOrderStatus.Waiting or WorkOrderStatus.Ready or WorkOrderStatus.Interrupted)
+            .OrderBy(w => w.Id).ToList();
+
+        PlanAlertModel Base(AlertWorkOrder w, PlanAlertType type, PlanAlertSeverity severity, string message, string suggestion) => new()
+        {
+            Type = type, Severity = severity, ProductionOrderId = w.OrderId, ProductionOrderCode = w.OrderCode,
+            WorkOrderId = w.Id, WorkOrderCode = w.Code, EquipmentId = w.EquipmentId, EquipmentCode = w.EquipmentCode,
+            Date = w.PlannedStart, Message = message, Suggestion = suggestion
+        };
+
+        foreach (var w in locked)
+        {
+            // Predecessor ends after the fixed start: the latest one is named.
+            var holder = w.Predecessors.Where(p => p.End is { } e && e > w.PlannedStart!.Value)
+                .OrderByDescending(p => p.End).ThenBy(p => p.Id).FirstOrDefault();
+            if (holder is not null)
+            {
+                var minutes = (int)Math.Ceiling((holder.End!.Value - w.PlannedStart!.Value).TotalMinutes);
+                var a = Base(w, PlanAlertType.LockedPredecessorConflict, PlanAlertSeverity.Critical,
+                    $"Il lavoro fissato {w.Code} inizia il {Local(calc, w.PlannedStart.Value)}, {minutes} min prima della fine del predecessore {holder.Code} ({Local(calc, holder.End.Value)}).",
+                    "Sblocca il lavoro o anticipa il predecessore.");
+                a.CauseWorkOrderId = holder.Id;
+                alerts.Add(a);
+            }
+
+            // Machine: deactivated / not enabled, or closed at the locked start (calendar changed after the lock).
+            if (w.EquipmentId is not null)
+            {
+                string? reason = null;
+                var label = w.EquipmentCode ?? "La macchina";
+                if (!w.MachineUsable) reason = $"{label} è disattivata o non è più abilitata per la fase";
+                else if (machines.FirstOrDefault(m => m.Id == w.EquipmentId) is { } m)
+                {
+                    var start = w.PlannedStart!.Value;
+                    var next = calc.NextWorkingInstant(m.Availability, start);
+                    if (next.IsSuccess && next.Value != start) reason = ManualMoveCalculator.Reason(calc, m.Availability, label, start);
+                }
+                if (reason is not null)
+                    alerts.Add(Base(w, PlanAlertType.LockedMachineUnavailable, PlanAlertSeverity.Critical,
+                        $"Il lavoro fissato {w.Code} non si può eseguire su {label}: {reason}.", "Assegna un'altra macchina o sblocca il lavoro."));
+            }
+
+            if (w.OrderRequestedEnd is { } due && w.PlannedEnd!.Value > due)
+            {
+                var days = (int)Math.Ceiling((w.PlannedEnd.Value - due).TotalDays);
+                var a = Base(w, PlanAlertType.LockedLate, PlanAlertSeverity.Warning,
+                    $"Il lavoro fissato {w.Code} finisce il {Local(calc, w.PlannedEnd.Value)}, {days} {(days == 1 ? "giorno" : "giorni")} dopo la fine richiesta dell'ordine {w.OrderCode} ({Local(calc, due)}).",
+                    "Anticipa l'inizio o sposta la fine richiesta.");
+                a.LateDays = days;
+                alerts.Add(a);
+            }
+        }
+
+        // Capacity: runs where the locked intervals of a machine overlap beyond its capacity.
+        foreach (var m in machines.OrderBy(m => m.Id))
+        {
+            var jobs = locked.Where(w => w.EquipmentId == m.Id && w.PlannedEnd > w.PlannedStart).ToList();
+            if (jobs.Count < 2) continue;
+            var capacity = Math.Max(1, m.Capacity);
+            var points = jobs.SelectMany(j => new[] { j.PlannedStart!.Value, j.PlannedEnd!.Value }).Distinct().OrderBy(t => t).ToList();
+            DateTime? runFrom = null;
+            var runTo = default(DateTime);
+            var involved = new Dictionary<int, AlertWorkOrder>();
+            void Flush()
+            {
+                if (runFrom is null) return;
+                var list = involved.Values.OrderBy(j => j.Id).ToList();
+                var first = list[0];
+                var a = Base(first, PlanAlertType.LockedOverCapacity, PlanAlertSeverity.Warning,
+                    $"{m.Code} ha {list.Count} lavori fissati sovrapposti ({string.Join(", ", list.Select(j => j.Code))}) dal {Local(calc, runFrom.Value)} al {Local(calc, runTo)}: la capacità è {capacity}.",
+                    "Sposta uno dei lavori fissati o aumenta la capacità.");
+                a.Date = runFrom;
+                a.EquipmentId = m.Id; a.EquipmentCode = m.Code;
+                alerts.Add(a);
+                runFrom = null;
+                involved = [];
+            }
+            for (var i = 0; i + 1 < points.Count; i++)
+            {
+                var from = points[i];
+                var to = points[i + 1];
+                var active = jobs.Where(j => j.PlannedStart < to && j.PlannedEnd > from).ToList();
+                if (active.Count > capacity)
+                {
+                    runFrom ??= from;
+                    runTo = to;
+                    foreach (var j in active) involved[j.Id] = j;
+                }
+                else Flush();
+            }
+            Flush();
         }
     }
 }
