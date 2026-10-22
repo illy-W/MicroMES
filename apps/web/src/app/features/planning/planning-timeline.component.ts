@@ -43,11 +43,11 @@ import { WorkOrdersStore } from '../work-orders/work-orders.store';
 import { type DepLink, PlanningWorkPanelComponent } from './planning-work-panel.component';
 import { isWorkVisible } from './timeline-visibility';
 import { PlanningStore } from './planning.store';
-import { CHIP_EXTRA_CODE, CHIP_EXTRA_FULL, estimateTextWidth, fitLeftChip, LABEL_INSIDE_MIN, placeLabel } from './bar-label';
+import { allowsDashedBorder, layoutBar, type LabelPlacement } from './bar-label';
 import { type Axis, buildAxis, centreTime, clampSpan, commonClosedRanges, type Range, scrollForCentre, visibleTimeRange } from './timeline-axis';
 import { adaptiveDayPph, dayAxisHours, shouldAutoScale } from './adaptive-scale';
 import { capRange, formatAt, initialRange, loadedUnion, parseAt, planCover, planExtension, resolveLanes } from './timeline-nav';
-import { detailLevel, operationNumber, orderColor, STATUS_STYLE } from './timeline-style';
+import { operationNumber, orderColor, STATUS_STYLE } from './timeline-style';
 import { dayKey, daysBetween, dayStart, formatDateTime, formatDay, formatDuration, formatRangeTitle, formatWeekday, HOUR, hourLabel, startOfDay } from './timeline-time';
 
 type Zoom = 'day' | 'week' | 'month';
@@ -72,7 +72,7 @@ const MARK_PAD = 16;
 const SEP_W = 12;
 const DAY_H = 24;
 const HOUR_H = 20;
-const MIN_W = 28;
+const MIN_W = 4;
 const ALL = 'all';
 /** Larghezza minima del contenitore per il pannello affiancato. */
 const WIDE_MIN = 1100;
@@ -110,16 +110,21 @@ interface BarVm {
   dim: boolean;
   late: boolean;
   stale: boolean;
-  level: 0 | 1 | 2 | 3;
-  /** Testo dentro la barra (false se l'etichetta è fuori). */
-  inside: boolean;
-  chip: ChipVm | null;
+  /** Larghezza reale (durata vera): `width` è quella visiva (>= reale). */
+  realW: number;
+  placement: LabelPlacement;
+  /** Angolo: pallino sulle barre strette al posto delle icone. */
+  dot: string | null;
+  padLeft: number;
+  ext: string;
+  text: string;
   statusIcon: string;
   name: string;
   segCode: string;
   sub: string;
   /** Seconda riga dentro la barra: per i lavori in corso aggiunge "In corso" se la larghezza lo consente. */
   subBar: string;
+  subRun: string;
   running: boolean;
   color: string;
   padRight: number;
@@ -131,17 +136,6 @@ interface BarVm {
 interface Chunk { range: Range; model: TimelineModel }
 interface BandVm { left: number; width: number; reason: string; cls: string }
 interface LoadMarkVm { left: number; width: number; pct: number; title: string }
-/** Etichetta fuori barra (stile Gantt): chip a destra/sinistra della barra o solo codice fase. */
-interface ChipVm {
-  left: number;
-  end: boolean;
-  text: string;
-  sub: string | null;
-  /** Larghezza stimata dello chip completo e del solo codice (per il clamp sotto la colonna sticky). */
-  fullW: number;
-  codeW: number;
-  code: string;
-}
 interface RowVm {
   key: number;
   code: string;
@@ -190,6 +184,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
     }),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(keydown.escape)': 'closePanel()' },
   template: `
     <section class="bg-card text-card-foreground flex min-h-0 min-w-0 flex-1 flex-col gap-2 rounded-xl border p-2" aria-label="Timeline di pianificazione">
       <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -226,11 +221,16 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                 <ul class="grid grid-cols-2 gap-x-3 gap-y-1.5">
                   @for (s of legend; track s.label) {
                     <li class="inline-flex items-center gap-1.5">
-                      <span class="relative inline-block h-3.5 w-6 shrink-0 rounded-sm" [class]="s.box + ' ' + s.strip" style="--oc: var(--muted-foreground)" aria-hidden="true"></span>
+                      <span class="relative inline-block h-4 w-9 shrink-0 overflow-hidden rounded-sm" [style.--oc]="legendColor" aria-hidden="true">
+                        <span class="absolute inset-0" [class]="s.ext"></span>
+                        <span class="absolute inset-y-0 left-0 w-6 rounded-sm" [class]="s.real + ' ' + s.strip"></span>
+                        <span class="absolute bottom-0 left-0 h-[3px] w-6 bg-(--oc)"></span>
+                      </span>
                       <ng-icon [name]="s.icon" size="12" aria-hidden="true" /> {{ s.label }}
                     </li>
                   }
                 </ul>
+                <p class="text-muted-foreground text-xs">La traccia sul bordo inferiore è la durata reale; l'area più chiara oltre la traccia serve solo a leggere l'etichetta.</p>
                 <p class="text-muted-foreground text-xs">Le fasi terminate sono nascoste di default: usa il pulsante con l'occhio per mostrarle.</p>
               </section>
               <section class="flex flex-col gap-1.5" aria-label="Segnali">
@@ -261,7 +261,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           </hlm-popover>
         </div>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <div class="relative shrink-0">
           <ng-icon name="lucideSearch" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2" aria-hidden="true" />
           <input hlmInput type="search" class="h-8 w-36 pl-8" placeholder="Cerca lavoro" aria-label="Cerca per codice lavoro o ordine" [value]="search()" (input)="search.set($any($event.target).value)" />
@@ -294,8 +294,8 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           <span class="text-muted-foreground shrink-0 text-xs whitespace-nowrap" role="status">{{ matchCount() }} trovati</span>
         }
         @if (legendOrders().length) {
-          <div class="bg-border hidden h-5 w-px shrink-0 sm:block" aria-hidden="true"></div>
-          <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-0.5 py-1 whitespace-nowrap" role="group" aria-label="Ordini: clic per evidenziare">
+          <div class="bg-border hidden h-5 w-px shrink-0 min-[1200px]:block" aria-hidden="true"></div>
+          <div class="flex min-w-0 basis-full items-center gap-1 overflow-x-auto min-[1200px]:flex-1 min-[1200px]:basis-0 px-0.5 py-1 whitespace-nowrap" role="group" aria-label="Ordini: clic per evidenziare">
             @for (o of legendOrders(); track o.id) {
               <button
                 type="button"
@@ -380,7 +380,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
               aria-label="Timeline delle macchine"
               class="relative min-h-0 flex-1 overflow-auto rounded-md border [overflow-anchor:none]"
               [class.opacity-70]="loading()"
-              (scroll)="onScroll()"
+              (scroll)="onScrollEvent()"
             >
               <div class="relative overflow-x-clip" [style.width.px]="LEFT + totalPx()" [style.min-width.px]="LEFT + totalPx()">
                 <div class="bg-card sticky top-0 z-20 flex border-b">
@@ -459,20 +459,24 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                         </ng-template>
                         <div
                           role="button"
-                          class="group absolute z-[1] flex cursor-pointer rounded-md transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          [class.flex-row-reverse]="b.chip?.end"
-                          [class.-translate-x-full]="b.chip?.end"
+                          class="group absolute z-[1] cursor-pointer overflow-hidden rounded-md transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                           [class.opacity-25]="dimmed(b)"
                           [class.ring-2]="selectedId() === b.w.id"
                           [class.ring-1]="chainRing(b)"
                           [class.ring-primary]="selectedId() === b.w.id || chainRing(b)"
                           [class.opacity-35]="chainDim(b)"
-                          [style.left.px]="b.chip?.end ? b.left + b.width : b.left"
+                          [class.outline]="b.overload"
+                          [class.outline-1]="b.overload"
+                          [class.-outline-offset-1]="b.overload"
+                          [class.outline-destructive]="b.overload"
+                          [style.--oc]="b.color"
+                          [style.left.px]="b.left"
+                          [style.width.px]="b.width"
                           [style.top.px]="b.y - r.top"
                           [style.height.px]="b.height"
                           [attr.data-bar]="b.w.id"
                           [attr.aria-label]="b.aria"
-                          [attr.aria-pressed]="selectedId() === b.w.id"
+                          [attr.aria-current]="selectedId() === b.w.id ? 'true' : null"
                           [attr.tabindex]="b.w.id === tabStop() ? 0 : -1"
                           [hlmTooltip]="tip"
                           position="top"
@@ -484,32 +488,28 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                           (mouseleave)="hoverOrder.set(null); hoverId.set(null)"
                           (keydown)="onKey($event, b)"
                         >
-                          <div [class]="b.cls" [style.width.px]="b.width" [style.padding-right.px]="b.padRight" [style.--oc]="b.color">
-                            @if (b.level >= 1 && b.inside) {
+                          <span class="pointer-events-none absolute inset-0 rounded-md" [class]="b.ext" aria-hidden="true"></span>
+                          <span class="pointer-events-none absolute inset-y-0 left-0 rounded-md group-hover:brightness-95" [class]="b.cls" [style.width.px]="b.realW" aria-hidden="true"></span>
+                          <span class="pointer-events-none absolute bottom-0 left-0 h-[3px] bg-(--oc)" [class.opacity-50]="b.w.status === 'Ended' || b.w.status === 'Aborted'" [style.width.px]="b.realW" aria-hidden="true"></span>
+                          <span class="relative flex h-full min-w-0 flex-col justify-center overflow-hidden text-left text-xs leading-tight whitespace-nowrap" [class]="b.text" [style.padding-left.px]="b.padLeft" [style.padding-right.px]="b.padRight">
+                            @if (b.placement === 'inside' || b.placement === 'truncated') {
                               <span class="flex min-w-0 items-center gap-1">
-                                @if (b.level >= 3) { <ng-icon [name]="b.statusIcon" size="14" class="shrink-0" aria-hidden="true" /> }
-                                <span class="truncate" [class.font-medium]="b.level >= 2">{{ b.level === 1 ? b.segCode : b.name }}</span>
+                                <ng-icon [name]="b.statusIcon" size="14" class="shrink-0" aria-hidden="true" />
+                                <span class="truncate font-medium">{{ b.name }}</span>
                               </span>
-                              @if (b.level >= 3) { <span class="truncate text-[11px]" [class.opacity-75]="!b.running" [class.opacity-90]="b.running">{{ b.subBar }}</span> }
+                              @if (b.placement === 'inside') { <span class="truncate text-[11px]">{{ b.subBar }}</span> }
+                            } @else if (b.placement === 'code') {
+                              <span class="truncate text-[11px] font-medium">{{ b.segCode }}</span>
                             }
-                            @if (b.late || b.stale || b.overload) {
-                              <span class="absolute top-0.5 right-0.5 flex gap-0.5" [class.flex-col]="b.width < 56">
-                                @if (b.late) { <span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" title="In ritardo"><ng-icon name="lucideAlarmClock" size="11" aria-hidden="true" /></span> }
-                                @if (b.stale) { <span class="bg-secondary text-secondary-foreground ring-border flex size-4 items-center justify-center rounded-full ring-1" title="Piano obsoleto"><ng-icon name="lucideTriangleAlert" size="11" aria-hidden="true" /></span> }
-                                @if (b.overload) { <span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" title="Sovraccarico"><ng-icon name="lucideCircleAlert" size="11" aria-hidden="true" /></span> }
-                              </span>
-                            }
-                          </div>
-                          @if (b.chip; as ch0) {
-                            @if (chipView(ch0); as ch) {
-                              <span class="flex items-center gap-1 border-(color:--oc) px-1.5 py-0.5 text-xs leading-tight whitespace-nowrap ring-1" [class]="(ch0.end ? 'rounded-l-md border-r-[3px] ' : 'rounded-r-md border-l-[3px] ') + (b.running ? 'bg-running text-running-foreground ring-running' : 'bg-background ring-border group-hover:bg-muted')" [style.--oc]="b.color" aria-hidden="true">
-                                @if (ch.sub) { <ng-icon [name]="b.statusIcon" size="12" class="shrink-0" /> }
-                                <span class="flex flex-col" [class.text-right]="ch0.end">
-                                  <span [class.font-medium]="ch.sub">{{ ch.text }}</span>
-                                  @if (ch.sub) { <span class="text-[11px]" [class]="b.running ? 'text-running-foreground/90' : 'text-muted-foreground'">{{ ch.sub }}</span> }
-                                </span>
-                              </span>
-                            }
+                          </span>
+                          @if (b.placement === 'inside' && (b.late || b.stale || b.overload)) {
+                            <span class="absolute top-0.5 right-0.5 flex gap-0.5">
+                              @if (b.late) { <span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" title="In ritardo"><ng-icon name="lucideAlarmClock" size="11" aria-hidden="true" /></span> }
+                              @if (b.stale) { <span class="bg-secondary text-secondary-foreground ring-border flex size-4 items-center justify-center rounded-full ring-1" title="Piano obsoleto"><ng-icon name="lucideTriangleAlert" size="11" aria-hidden="true" /></span> }
+                              @if (b.overload) { <span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" title="Sovraccarico"><ng-icon name="lucideCircleAlert" size="11" aria-hidden="true" /></span> }
+                            </span>
+                          } @else if (b.dot && b.placement !== 'inside') {
+                            <span class="absolute top-0.5 right-0.5 size-2 rounded-full" [class]="b.dot" aria-hidden="true"></span>
                           }
                         </div>
                       }
@@ -591,6 +591,7 @@ export class PlanningTimelineComponent {
   protected readonly zooms = ZOOMS;
   protected readonly statuses = (Object.keys(WORK_STATUS) as WorkOrderStatus[]).map((value) => ({ value, label: WORK_STATUS[value].label }));
   protected readonly legend = (Object.keys(WORK_STATUS) as WorkOrderStatus[]).map((s) => ({ icon: WORK_STATUS[s].icon, label: WORK_STATUS[s].label, ...STATUS_STYLE[s] }));
+  protected readonly legendColor = 'var(--chart-1)';
 
   // --- stato (inizializzato dai query params) ---
   private readonly qp = this.route.snapshot.queryParamMap;
@@ -925,25 +926,21 @@ export class PlanningTimelineComponent {
           const late = x.isLate;
           const stale = x.planStatus === 'Stale';
           const dim = !!q && !this.matches(x, q);
-          const level = detailLevel(width);
           const op = operationNumber(x.code);
           const name = x.processSegmentName || x.processSegmentCode;
           const sub = `${x.productionOrderCode}${op ? ` · Op. ${op}` : ''}`;
           const running = x.status === 'Running';
           const subRun = `${sub} · In corso`;
-          const subBar = running && estimateTextWidth(subRun, 6, 0) <= width - 10 - (width >= 56 && (late || stale || overload) ? ((late ? 1 : 0) + (stale ? 1 : 0) + (overload ? 1 : 0)) * 18 + 4 : 4) ? subRun : sub;
           const machine = r.key === NONE_ROW ? 'nessuna macchina' : (machineName.get(r.key) ?? r.code);
           const status = st.label;
           const plan = late ? `In ritardo${x.lateDays ? ` di ${x.lateDays} g` : ''}` : stale ? 'Piano obsoleto' : x.planStatus === 'Planned' ? 'Pianificato' : 'Non pianificato';
           const period = `${formatDateTime(rg.s, tz)} – ${formatDateTime(rg.e, tz)}`;
-          const markers = (late ? 1 : 0) + (stale ? 1 : 0) + (overload ? 1 : 0);
           const aria = `${name}, ordine ${x.productionOrderCode}, lavoro ${x.code} su ${machine}, dal ${formatDateTime(rg.s, tz)} al ${formatDateTime(rg.e, tz)}, ${status.toLowerCase()}${late ? ', in ritardo' : ''}${stale ? ', piano obsoleto' : ''}${overload ? ', sovraccarico' : ''}${x.predecessorIds.length === 1 ? `, dopo ${pool.get(x.predecessorIds[0])?.code ?? 'un altro lavoro'}` : x.predecessorIds.length > 1 ? `, dopo ${x.predecessorIds.length} lavori` : ''}`;
-          const style = STATUS_STYLE[x.status];
-          const cls = `relative flex h-full shrink-0 flex-col justify-center overflow-hidden rounded-md pl-2.5 text-left text-xs leading-tight whitespace-nowrap before:rounded-l-md group-hover:brightness-95 ${style.box} ${style.strip}${overload ? ' outline outline-1 -outline-offset-1 outline-destructive' : ''}`;
           return {
-            w: x, left, width, y: rowTop + rowPad + x.lane * LANE_H, height: BAR_H, lane: x.lane, rowKey: r.key, overload, dim, late, stale, level, inside: true, chip: null,
-            statusIcon: st.icon, name, segCode: x.processSegmentCode || name, sub, subBar, running, color: orderColor(hues.get(x.productionOrderId) ?? 0),
-            padRight: width >= 56 && markers ? markers * 18 + 4 : 4, cls, aria,
+            w: x, left, width, realW: width, y: rowTop + rowPad + x.lane * LANE_H, height: BAR_H, lane: x.lane, rowKey: r.key, overload, dim, late, stale,
+            placement: 'inside', dot: late || overload ? 'bg-destructive' : stale ? 'bg-secondary ring-1 ring-border' : null, padLeft: 10, ext: '', text: '',
+            statusIcon: st.icon, name, segCode: x.processSegmentCode || name, sub, subBar: sub, subRun, running, color: orderColor(hues.get(x.productionOrderId) ?? 0),
+            padRight: 4, cls: '', aria,
             tip: {
               phase: name, workOrder: x.code, order: `${x.productionOrderCode} · ${x.materialName}`, machine, period,
               duration: formatDuration(rg.e - rg.s), status, plan, predecessors: x.predecessorIds.length,
@@ -953,7 +950,7 @@ export class PlanningTimelineComponent {
         .filter((b) => b.width > 0 || b.w.id === this.focusId())
         .sort((a, b) => a.left - b.left);
       const bands = r.key === NONE_ROW ? [] : nw.filter((n) => n.equipmentId == null || n.equipmentId === r.key).flatMap((n) => this.band(n, ax, w));
-      this.placeChips(bars, ax.width);
+      this.sizeBars(bars, ax.width);
       const cap = rl.reduce((a, l) => a + l.capacityMinutes, 0);
       const busy = rl.reduce((a, l) => a + l.busyMinutes, 0);
       const summary = r.key === NONE_ROW || !cap ? null : Math.round((busy / cap) * 100);
@@ -964,7 +961,7 @@ export class PlanningTimelineComponent {
   /** Rettangoli di tutte le barre (non limitate al viewport) per id lavoro: base per l'overlay delle dipendenze (blocco 2b). */
   readonly barGeometry = computed<ReadonlyMap<number, BarRect>>(() => {
     const m = new Map<number, BarRect>();
-    for (const r of this.allRows()) for (const b of r.bars) m.set(b.w.id, { x: b.left, y: b.y, w: b.width, h: b.height, rowKey: b.rowKey });
+    for (const r of this.allRows()) for (const b of r.bars) m.set(b.w.id, { x: b.left, y: b.y, w: b.realW, h: b.height, rowKey: b.rowKey });
     return m;
   });
 
@@ -1080,27 +1077,26 @@ export class PlanningTimelineComponent {
     };
   });
 
-  /** Etichette fuori barra (Gantt) per le barre strette: mai sopra altre barre o etichette della stessa corsia. */
-  private placeChips(bars: BarVm[], maxRight: number): void {
+  /** Larghezza visiva (min ~72 px, mai sopra la barra seguente della corsia), testo e stile dipendenti dalla larghezza. */
+  private sizeBars(bars: BarVm[], maxRight: number): void {
     const lanes = new Map<number, BarVm[]>();
     for (const b of bars) lanes.set(b.lane, [...(lanes.get(b.lane) ?? []), b]);
     for (const list of lanes.values()) {
-      let used = 0;
       list.forEach((b, i) => {
         const next = list[i + 1];
-        const labelW = Math.max(estimateTextWidth(b.name, 6.8), estimateTextWidth(b.sub, 6)) + CHIP_EXTRA_FULL;
-        const codeW = estimateTextWidth(b.segCode, 6.8) + CHIP_EXTRA_CODE;
-        const res = placeLabel({
-          left: b.left, width: b.width, prevEnd: used, nextStart: next ? next.left : Infinity, labelW,
-          codeW, maxRight, insideMin: LABEL_INSIDE_MIN,
-        });
-        used = Math.max(used, b.left + b.width);
-        if (res.placement === 'inside' || res.placement === 'none' || !res.side) return;
-        const w = res.placement === 'code' ? codeW : labelW;
-        const chip: ChipVm = { left: res.side === 'right' ? b.left + b.width : b.left, end: res.side === 'left', text: res.placement === 'code' ? b.segCode : b.name, sub: res.placement === 'code' ? null : b.sub, fullW: labelW, codeW, code: b.segCode };
-        b.chip = chip;
-        b.inside = false;
-        if (res.side === 'right') used = Math.max(used, chip.left + w);
+        const lay = layoutBar({ left: b.left, realW: b.realW, nextStart: next ? next.left : Infinity, maxRight });
+        const style = STATUS_STYLE[b.w.status];
+        b.width = lay.visualWidth;
+        b.placement = lay.placement;
+        const markers = (b.late ? 1 : 0) + (b.stale ? 1 : 0) + (b.overload ? 1 : 0);
+        const roomy = lay.placement === 'inside';
+        b.padRight = roomy && markers ? markers * 18 + 4 : lay.placement === 'truncated' && b.dot ? 12 : 4;
+        b.padLeft = lay.placement === 'code' || lay.placement === 'none' ? 6 : 10;
+        const extra = b.running && roomy ? b.subRun : b.sub;
+        b.subBar = b.running && roomy && b.subRun.length * 6 <= b.width - 10 - b.padRight ? extra : b.sub;
+        b.cls = `${allowsDashedBorder(b.width) ? style.real : style.narrow} ${style.strip}`;
+        b.ext = style.ext;
+        b.text = style.text;
       });
     }
   }
@@ -1158,10 +1154,15 @@ export class PlanningTimelineComponent {
     }));
   });
 
+  /** Unico tab stop tra le barre RENDERIZZATE: prima il focus, poi la selezione, poi la prima visibile. */
   protected readonly tabStop = computed(() => {
+    const rendered = this.rows().flatMap((r) => r.bars);
+    const has = (id: number | null) => id != null && rendered.some((b) => b.w.id === id);
     const f = this.focusId();
-    if (f != null && this.allRows().some((r) => r.bars.some((b) => b.w.id === f))) return f;
-    return this.allRows().find((r) => r.bars.length)?.bars[0].w.id ?? null;
+    if (has(f)) return f;
+    const sel = this.selectedId();
+    if (has(sel)) return sel;
+    return rendered[0]?.w.id ?? null;
   });
 
   protected readonly selected = computed(() => {
@@ -1191,6 +1192,7 @@ export class PlanningTimelineComponent {
       clearTimeout(this.visTimer);
       clearTimeout(this.atTimer);
       clearTimeout(this.rescaleTimer);
+      if (this.scrollRaf) cancelAnimationFrame(this.scrollRaf);
     });
 
     const ro = new ResizeObserver(([e]) => {
@@ -1573,21 +1575,19 @@ export class PlanningTimelineComponent {
   }
 
   // --- scroll, viewport e posizione ---
-  /** Scorrimento orizzontale corrente: serve a non lasciare etichette a sinistra sotto la colonna macchina sticky. */
-  private readonly scrollX = signal(0);
-
-  /** Chip effettivamente mostrabile: a sinistra non finisce sotto la colonna macchina sticky (scende a solo codice o sparisce). */
-  protected chipView(ch: ChipVm): { text: string; sub: string | null } | null {
-    if (!ch.end) return { text: ch.text, sub: ch.sub };
-    const fit = fitLeftChip(ch.left, ch.sub ? ch.fullW : ch.codeW, ch.codeW, this.scrollX());
-    if (fit === 'full') return { text: ch.text, sub: ch.sub };
-    return fit === 'code' ? { text: ch.code, sub: null } : null;
+  private scrollRaf = 0;
+  /** Evento di scroll: raggruppa gli aggiornamenti in un solo frame. */
+  protected onScrollEvent(): void {
+    if (this.scrollRaf) return;
+    this.scrollRaf = requestAnimationFrame(() => {
+      this.scrollRaf = 0;
+      this.onScroll();
+    });
   }
 
   protected onScroll(): void {
     const el = this.scroller()?.nativeElement;
     if (!el || this.anchoring) return;
-    this.scrollX.set(el.scrollLeft);
     const viewW = el.clientWidth - LEFT;
     const bucket = 300;
     const margin = Math.max(600, viewW);
@@ -1714,6 +1714,15 @@ export class PlanningTimelineComponent {
 
   // --- tastiera ---
   protected onKey(ev: KeyboardEvent, b: BarVm): void {
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      this.select(b.w);
+      return;
+    }
+    if (ev.key === 'Escape') {
+      this.closePanel(b.w.id);
+      return;
+    }
     const rows = this.allRows().filter((r) => r.bars.length);
     const ri = rows.findIndex((r) => r.key === b.rowKey);
     if (ri < 0) return;
@@ -1729,6 +1738,15 @@ export class PlanningTimelineComponent {
     }
     ev.preventDefault();
     if (target) this.focusBar(target);
+  }
+
+  /** Escape: chiude il pannello di dettaglio (affiancato o foglio) e riporta il focus sulla barra. */
+  protected closePanel(focusBarId?: number): void {
+    const id = this.selectedId();
+    if (id == null) return;
+    this.selectedId.set(null);
+    const target = focusBarId ?? id;
+    setTimeout(() => this.scroller()?.nativeElement.querySelector<HTMLElement>(`[data-bar="${target}"]`)?.focus(), 30);
   }
 
   private focusBar(b: BarVm): void {

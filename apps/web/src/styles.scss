@@ -39,12 +39,12 @@
   --sidebar-ring: oklch(0.708 0 0);
   /* Identità ordini (timeline): 8 tonalità distinguibili, leggibili su bianco. Testo sempre su tinta chiara con --foreground. */
   --chart-1: oklch(0.55 0.19 255);
-  --chart-2: oklch(0.66 0.17 55);
+  --chart-2: oklch(0.58 0.16 55);
   --chart-3: oklch(0.52 0.13 30);
   --chart-4: oklch(0.56 0.2 330);
   --chart-5: oklch(0.6 0.12 205);
   --chart-6: oklch(0.52 0.2 290);
-  --chart-7: oklch(0.72 0.15 95);
+  --chart-7: oklch(0.58 0.12 95);
   --chart-8: oklch(0.6 0.17 355);
   /* Stato "in esecuzione" (timeline): il verde è riservato a questo stato, nessuna tonalità --chart-n è verde. Contrasto testo/sfondo > 6:1. */
   --running: oklch(0.48 0.12 150);
@@ -182,6 +182,17 @@ table {
   --ngd-edge-handle-stroke-drag: var(--primary);
   --ngd-minimap-bg-primary-default: var(--card);
   --ngd-minimap-stroke-primary-default: var(--border);
+}
+
+/* Timeline: tinte dell'ordine (--oc) su --card. Classi letterali: Tailwind non genera classi interpolate. */
+.tl-tint-7 {
+  background-color: color-mix(in oklch, var(--oc) 7%, var(--card));
+}
+.tl-tint-10 {
+  background-color: color-mix(in oklch, var(--oc) 10%, var(--card));
+}
+.tl-tint-16 {
+  background-color: color-mix(in oklch, var(--oc) 16%, var(--card));
 }
 
 /* Timeline: riflesso diagonale chiaro sulle fasi in esecuzione (verde pieno; statico con prefers-reduced-motion). */

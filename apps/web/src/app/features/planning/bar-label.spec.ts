@@ -1,63 +1,47 @@
 import { describe, expect, it } from 'vitest';
-import { barHitRect, fitLeftChip, placeLabel } from './bar-label';
+import { allowsDashedBorder, layoutBar, placementFor, visualWidth } from './bar-label';
 
-const base = { left: 200, width: 40, prevEnd: 0, nextStart: Infinity, labelW: 120, codeW: 40, maxRight: 2000 };
+const base = { left: 200, realW: 10, nextStart: Infinity, maxRight: 5000 };
 
-describe('placeLabel', () => {
-  it('keeps the label inside wide bars', () => {
-    expect(placeLabel({ ...base, width: 160 }).placement).toBe('inside');
+describe('visualWidth', () => {
+  it('extends short bars to the minimum when there is room', () => {
+    expect(visualWidth(base)).toBe(72);
   });
-  it('puts the label on the right when there is room', () => {
-    expect(placeLabel(base)).toEqual({ placement: 'right', side: 'right' });
+  it('keeps long bars at their real width', () => {
+    expect(visualWidth({ ...base, realW: 300 })).toBe(300);
   });
-  it('goes left when the next bar is too close', () => {
-    expect(placeLabel({ ...base, nextStart: 260 })).toEqual({ placement: 'left', side: 'left' });
+  it('shrinks to the room left before the next bar', () => {
+    expect(visualWidth({ ...base, nextStart: 250 })).toBe(48);
   });
-  it('falls back to the phase code on the right, then on the left', () => {
-    expect(placeLabel({ ...base, nextStart: 300, prevEnd: 150 })).toEqual({ placement: 'code', side: 'right' });
-    expect(placeLabel({ ...base, nextStart: 250, prevEnd: 80 })).toEqual({ placement: 'code', side: 'left' });
+  it('never goes below the real width', () => {
+    expect(visualWidth({ ...base, realW: 30, nextStart: 220 })).toBe(30);
   });
-  it('shows nothing when no space is available', () => {
-    expect(placeLabel({ ...base, nextStart: 250, prevEnd: 190 }).placement).toBe('none');
+  it('never overlaps the next bar', () => {
+    for (const next of [215, 240, 260, 280, 400]) {
+      expect(200 + visualWidth({ ...base, nextStart: next })).toBeLessThanOrEqual(Math.max(next, 210));
+    }
   });
-  it('does not overflow the right edge or the machine column', () => {
-    expect(placeLabel({ ...base, left: 1950, maxRight: 2000, prevEnd: 1920 }).placement).toBe('none');
-    expect(placeLabel({ ...base, left: 10, nextStart: 80 }).placement).toBe('none');
+  it('does not overflow the right edge of the axis', () => {
+    expect(visualWidth({ ...base, left: 4980, maxRight: 5000 })).toBe(18);
   });
 });
 
-describe('fitLeftChip', () => {
-  it('keeps the full chip when it is fully visible', () => {
-    expect(fitLeftChip(300, 120, 40, 100)).toBe('full');
+describe('placementFor', () => {
+  it('degrades with the width', () => {
+    expect(placementFor(100)).toBe('inside');
+    expect(placementFor(72)).toBe('inside');
+    expect(placementFor(50)).toBe('truncated');
+    expect(placementFor(28)).toBe('code');
+    expect(placementFor(8)).toBe('none');
   });
-  it('falls back to the code when the full chip would sit under the sticky column', () => {
-    expect(fitLeftChip(300, 120, 40, 250)).toBe('code');
-  });
-  it('hides the chip when not even the code fits', () => {
-    expect(fitLeftChip(300, 120, 40, 290)).toBe('none');
+  it('layoutBar combines both', () => {
+    expect(layoutBar({ ...base, nextStart: 250 })).toEqual({ visualWidth: 48, placement: 'truncated' });
   });
 });
 
-describe('barHitRect', () => {
-  it('is the block alone without chip', () => {
-    expect(barHitRect(200, 40, 0, null)).toEqual({ left: 200, width: 40 });
-  });
-  it('extends to the right by the chip width', () => {
-    expect(barHitRect(200, 40, 120, 'right')).toEqual({ left: 200, width: 160 });
-  });
-  it('extends to the left by the chip width', () => {
-    expect(barHitRect(200, 40, 120, 'left')).toEqual({ left: 80, width: 160 });
-  });
-  it('never overlaps the next bar when the chip is placed on the right', () => {
-    const input = { ...base, nextStart: 400 };
-    const res = placeLabel(input);
-    const hit = barHitRect(input.left, input.width, input.labelW, res.side);
-    expect(hit.left + hit.width).toBeLessThanOrEqual(input.nextStart);
-  });
-  it('never overlaps the previous bar when the chip is placed on the left', () => {
-    const input = { ...base, nextStart: 260, prevEnd: 50 };
-    const res = placeLabel(input);
-    expect(res.side).toBe('left');
-    expect(barHitRect(input.left, input.width, input.labelW, res.side).left).toBeGreaterThanOrEqual(input.prevEnd);
+describe('allowsDashedBorder', () => {
+  it('only on bars of at least 96px', () => {
+    expect(allowsDashedBorder(95)).toBe(false);
+    expect(allowsDashedBorder(96)).toBe(true);
   });
 });

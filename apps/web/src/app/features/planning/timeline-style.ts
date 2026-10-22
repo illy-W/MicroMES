@@ -7,28 +7,37 @@ export const PALETTE_SIZE = 8;
 export const orderColor = (index: number): string => `var(--chart-${(index % PALETTE_SIZE) + 1})`;
 
 interface StatusStyle {
-  /** Bordo, sfondo (tinta dell'ordine) e testo. */
-  box: string;
+  /** Livello "durata reale" (bordo pieno/tratteggiato, tinta) per barre larghe e per barre strette (senza bordi tratteggiati). */
+  real: string;
+  narrow: string;
+  /** Livello esteso oltre la durata reale: tinta leggera, senza bordo. */
+  ext: string;
+  /** Colore del testo. */
+  text: string;
   /** Striscia piena sul bordo sinistro (4 px; 6 px se in esecuzione). */
   strip: string;
 }
 
 const STRIP = 'before:absolute before:inset-y-0 before:left-0 before:bg-(--oc)';
-const TINT = (pct: number) => `bg-[color-mix(in_oklch,var(--oc)_${pct}%,var(--card))]`;
 
 /**
- * Stato = pattern, non solo colore:
- * In attesa tratteggio chiaro · Pronto bordo pieno sottile · In esecuzione verde pieno + riflesso diagonale ·
- * In pausa punteggiato · Terminato grigio · Interrotto grigio con testo barrato.
+ * Stato = pattern, non solo colore. Le tinte sono classi letterali `tl-tint-*` (styles.scss): Tailwind non genera classi interpolate.
+ * In attesa tratteggio chiaro · Pronto bordo pieno · In esecuzione verde pieno · In pausa punteggiato · Terminato grigio · Interrotto barrato.
+ * Tratteggi/punteggiati solo su barre >= 96 px (`narrow` altrove).
  */
 export const STATUS_STYLE: Record<WorkOrderStatus, StatusStyle> = {
-  Waiting: { box: `border border-dashed border-(color:--oc) ${TINT(7)} text-foreground`, strip: `${STRIP} before:w-1` },
-  Ready: { box: `border border-(color:--oc) ${TINT(16)} text-foreground`, strip: `${STRIP} before:w-1` },
-  // Verde pieno (token --running); accento 4 px nel colore dell'ordine + 2 px di separatore chiaro per restare visibile sul verde.
-  Running: { box: 'tl-running border border-running bg-running text-running-foreground shadow-sm', strip: `${STRIP} before:w-1.5 before:border-r-2 before:border-running-foreground/80` },
-  Interrupted: { box: `border-2 border-dotted border-(color:--oc) ${TINT(10)} text-foreground`, strip: `${STRIP} before:w-1` },
-  Ended: { box: 'border border-border bg-muted text-muted-foreground', strip: `${STRIP} before:w-1 before:opacity-50` },
-  Aborted: { box: 'border border-border bg-muted text-muted-foreground line-through', strip: `${STRIP} before:w-1 before:opacity-50` },
+  Waiting: { real: 'border border-dashed border-(color:--oc) tl-tint-7', narrow: 'tl-tint-7', ext: 'tl-tint-7', text: 'text-foreground', strip: `${STRIP} before:w-1` },
+  Ready: { real: 'border border-(color:--oc) tl-tint-16', narrow: 'border border-(color:--oc) tl-tint-16', ext: 'tl-tint-7', text: 'text-foreground', strip: `${STRIP} before:w-1` },
+  Running: {
+    real: 'tl-running border border-running bg-running shadow-sm',
+    narrow: 'tl-running border border-running bg-running shadow-sm',
+    ext: 'bg-running',
+    text: 'text-running-foreground',
+    strip: `${STRIP} before:w-1.5 before:border-r-2 before:border-running-foreground/80`,
+  },
+  Interrupted: { real: 'border-2 border-dotted border-(color:--oc) tl-tint-10', narrow: 'tl-tint-10', ext: 'tl-tint-7', text: 'text-foreground', strip: `${STRIP} before:w-1` },
+  Ended: { real: 'border border-border bg-muted', narrow: 'border border-border bg-muted', ext: 'bg-muted', text: 'text-foreground/70', strip: `${STRIP} before:w-1 before:opacity-50` },
+  Aborted: { real: 'border border-border bg-muted', narrow: 'border border-border bg-muted', ext: 'bg-muted', text: 'text-foreground/70 line-through', strip: `${STRIP} before:w-1 before:opacity-50` },
 };
 
 /** Nome della colonna "Op." dal codice lavoro `OP-2026-0003/20` → `20`. */
@@ -36,6 +45,3 @@ export const operationNumber = (workOrderCode: string): string | null => {
   const i = workOrderCode.lastIndexOf('/');
   return i >= 0 && i < workOrderCode.length - 1 ? workOrderCode.slice(i + 1) : null;
 };
-
-/** Livello di dettaglio della barra in base alla larghezza: 3 icona+2 righe, 2 solo fase, 1 solo codice fase, 0 blocco pieno. */
-export const detailLevel = (width: number): 0 | 1 | 2 | 3 => (width >= 120 ? 3 : width >= 72 ? 2 : width >= 40 ? 1 : 0);
