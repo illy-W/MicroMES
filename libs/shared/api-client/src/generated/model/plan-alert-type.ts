@@ -14,4 +14,8 @@ export const PlanAlertType = {
   StalePlan: 'StalePlan',
   MachineOverloaded: 'MachineOverloaded',
   InactiveOrDisabledMachine: 'InactiveOrDisabledMachine',
+  LockedPredecessorConflict: 'LockedPredecessorConflict',
+  LockedMachineUnavailable: 'LockedMachineUnavailable',
+  LockedOverCapacity: 'LockedOverCapacity',
+  LockedLate: 'LockedLate',
 } as const;

@@ -14,4 +14,5 @@ search?: string;
 equipmentId?: number;
 sort?: string;
 planStatus?: PlanStatus;
+locked?: boolean;
 };

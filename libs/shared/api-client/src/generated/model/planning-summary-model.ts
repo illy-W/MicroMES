@@ -6,6 +6,8 @@
  */
 
 export interface PlanningSummaryModel {
+  lockedCount?: number;
+  conflictCount?: number;
   considered: number;
   planned: number;
   new: number;

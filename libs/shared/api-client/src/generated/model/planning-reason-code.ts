@@ -14,4 +14,5 @@ export const PlanningReasonCode = {
   CalendarClosed: 'CalendarClosed',
   MachineBusy: 'MachineBusy',
   AssignedMachineNotEnabled: 'AssignedMachineNotEnabled',
+  Locked: 'Locked',
 } as const;

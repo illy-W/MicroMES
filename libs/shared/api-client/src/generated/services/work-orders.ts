@@ -28,6 +28,9 @@ import type {
   CloseSessionRequest,
   CorrectSessionRequest,
   GetWorkOrdersParams,
+  MoveApplyModel,
+  MovePreviewModel,
+  MoveWorkOrderRequest,
   OpenSessionRequest,
   WorkOrderDetailModel,
   WorkOrderModel
@@ -405,6 +408,72 @@ export class WorkOrdersService {
       }
     );
   }
+ lockWorkOrderPlan<TData = WorkOrderDetailModel>(id: number, options?: HttpClientBodyOptions): Observable<TData>;
+ lockWorkOrderPlan<TData = WorkOrderDetailModel>(id: number, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ lockWorkOrderPlan<TData = WorkOrderDetailModel>(id: number, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  lockWorkOrderPlan<TData = WorkOrderDetailModel>(
+    id: number, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    if (options?.observe === 'events') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/lock`,
+      undefined,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+      }
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/lock`,
+      undefined,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+      }
+    );
+    }
+
+    return this.http.post<TData>(
+      `/api/work-orders/${id}/lock`,
+      undefined,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+      }
+    );
+  }
+ unlockWorkOrderPlan<TData = WorkOrderDetailModel>(id: number, options?: HttpClientBodyOptions): Observable<TData>;
+ unlockWorkOrderPlan<TData = WorkOrderDetailModel>(id: number, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ unlockWorkOrderPlan<TData = WorkOrderDetailModel>(id: number, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  unlockWorkOrderPlan<TData = WorkOrderDetailModel>(
+    id: number, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    if (options?.observe === 'events') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/unlock`,
+      undefined,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+      }
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/unlock`,
+      undefined,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+      }
+    );
+    }
+
+    return this.http.post<TData>(
+      `/api/work-orders/${id}/unlock`,
+      undefined,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+      }
+    );
+  }
  abortWorkOrder<TData = WorkOrderDetailModel>(id: number,
     nullAbortRequest?: null | AbortRequest, options?: HttpClientBodyOptions): Observable<TData>;
  abortWorkOrder<TData = WorkOrderDetailModel>(id: number,
@@ -478,6 +547,80 @@ export class WorkOrdersService {
     return this.http.post<TData>(
       `/api/work-orders/${id}/responses/${responseId}/corrections`,
       correctSessionRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+      }
+    );
+  }
+ previewMoveWorkOrder<TData = MovePreviewModel>(id: number,
+    moveWorkOrderRequest: MoveWorkOrderRequest, options?: HttpClientBodyOptions): Observable<TData>;
+ previewMoveWorkOrder<TData = MovePreviewModel>(id: number,
+    moveWorkOrderRequest: MoveWorkOrderRequest, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ previewMoveWorkOrder<TData = MovePreviewModel>(id: number,
+    moveWorkOrderRequest: MoveWorkOrderRequest, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  previewMoveWorkOrder<TData = MovePreviewModel>(
+    id: number,
+    moveWorkOrderRequest: MoveWorkOrderRequest, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    if (options?.observe === 'events') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/move/preview`,
+      moveWorkOrderRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+      }
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/move/preview`,
+      moveWorkOrderRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+      }
+    );
+    }
+
+    return this.http.post<TData>(
+      `/api/work-orders/${id}/move/preview`,
+      moveWorkOrderRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+      }
+    );
+  }
+ moveWorkOrder<TData = MoveApplyModel>(id: number,
+    moveWorkOrderRequest: MoveWorkOrderRequest, options?: HttpClientBodyOptions): Observable<TData>;
+ moveWorkOrder<TData = MoveApplyModel>(id: number,
+    moveWorkOrderRequest: MoveWorkOrderRequest, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ moveWorkOrder<TData = MoveApplyModel>(id: number,
+    moveWorkOrderRequest: MoveWorkOrderRequest, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  moveWorkOrder<TData = MoveApplyModel>(
+    id: number,
+    moveWorkOrderRequest: MoveWorkOrderRequest, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    if (options?.observe === 'events') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/move`,
+      moveWorkOrderRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+      }
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.post<TData>(
+      `/api/work-orders/${id}/move`,
+      moveWorkOrderRequest,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+      }
+    );
+    }
+
+    return this.http.post<TData>(
+      `/api/work-orders/${id}/move`,
+      moveWorkOrderRequest,{
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'body',
       }

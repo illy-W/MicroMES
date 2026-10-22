@@ -8,4 +8,6 @@
 export interface RemovePlanModel {
   productionOrderId: number;
   clearedWorkOrders: number;
+  keptLocked?: string[];
+  keptLockedWorkOrderIds?: number[];
 }

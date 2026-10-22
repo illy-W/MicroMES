@@ -6,6 +6,7 @@
  */
 import type { PlanStatus } from './plan-status';
 import type { ProductionOrderStatus } from './production-order-status';
+import type { StaleCause } from './stale-cause';
 import type { UnitOfMeasure } from './unit-of-measure';
 import type { WorkOrderEquipmentModel } from './work-order-equipment-model';
 import type { WorkOrderLinkModel } from './work-order-link-model';
@@ -49,6 +50,10 @@ export interface WorkOrderModel {
   /** @nullable */
   plannedAt?: string | null;
   planStatus: PlanStatus;
+  planStatusReason: StaleCause;
+  isPlanLocked: boolean;
+  /** @nullable */
+  planLockedAt?: string | null;
   predecessors: WorkOrderLinkModel[];
   successors: WorkOrderLinkModel[];
   allowedActions: string[];

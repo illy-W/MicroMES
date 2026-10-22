@@ -41,6 +41,7 @@ export interface ProductionOrderModel {
   planStatus: PlanStatus;
   producedQuantity: number;
   progressPercent: number;
+  lockedWorkOrdersCount: number;
   allowedActions: string[];
   createdAt: string;
   updatedAt: string;

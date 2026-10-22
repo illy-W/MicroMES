@@ -914,6 +914,124 @@
         }
       }
     },
+    "/api/production-orders/{id}/lock-all": {
+      "post": {
+        "tags": [
+          "ProductionOrders"
+        ],
+        "operationId": "LockAllProductionOrderWorkOrders",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "includeChildren",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LockAllResultModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/production-orders/{id}/unlock-all": {
+      "post": {
+        "tags": [
+          "ProductionOrders"
+        ],
+        "operationId": "UnlockAllProductionOrderWorkOrders",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "includeChildren",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnlockAllResultModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/work-orders": {
       "get": {
         "tags": [
@@ -963,6 +1081,13 @@
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/PlanStatus"
+            }
+          },
+          {
+            "name": "locked",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -1472,6 +1597,108 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/work-orders/{id}/lock": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "operationId": "LockWorkOrderPlan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetailModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/work-orders/{id}/unlock": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "operationId": "UnlockWorkOrderPlan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetailModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -2172,6 +2399,13 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "locked",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2187,6 +2421,168 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/work-orders/{id}/move/preview": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "operationId": "PreviewMoveWorkOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveWorkOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovePreviewModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/work-orders/{id}/move": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "operationId": "MoveWorkOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveWorkOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveApplyModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -5397,6 +5793,45 @@
           }
         }
       },
+      "LockAllResultModel": {
+        "required": [
+          "locked",
+          "skipped"
+        ],
+        "type": "object",
+        "properties": {
+          "locked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LockSkippedWorkOrderModel"
+            }
+          }
+        }
+      },
+      "LockSkippedWorkOrderModel": {
+        "required": [
+          "workOrderId",
+          "code",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "workOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "MaterialModel": {
         "required": [
           "id",
@@ -5464,6 +5899,200 @@
           "FinishedGood",
           "Consumable"
         ]
+      },
+      "MoveApplyModel": {
+        "required": [
+          "workOrder",
+          "conflicts"
+        ],
+        "type": "object",
+        "properties": {
+          "workOrder": {
+            "$ref": "#/components/schemas/WorkOrderDetailModel"
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoveConflictModel"
+            }
+          }
+        }
+      },
+      "MoveConflictCode": {
+        "enum": [
+          "PredecessorEndsAfterStart",
+          "SuccessorsStartBeforeEnd",
+          "MachineOverCapacity",
+          "Late"
+        ]
+      },
+      "MoveConflictModel": {
+        "required": [
+          "code",
+          "message",
+          "workOrderIds",
+          "workOrderCodes"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/MoveConflictCode"
+          },
+          "message": {
+            "type": "string"
+          },
+          "workOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "workOrderCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "minutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "lateDays": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "MovePreviewModel": {
+        "required": [
+          "workOrderId",
+          "code",
+          "newStart",
+          "newEnd",
+          "durationMinutes",
+          "expectedUpdatedAt",
+          "conflicts"
+        ],
+        "type": "object",
+        "properties": {
+          "workOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "equipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
+            ]
+          },
+          "currentEquipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
+            ]
+          },
+          "currentStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "currentEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "newStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "newEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoveConflictModel"
+            }
+          }
+        }
+      },
+      "MoveWorkOrderRequest": {
+        "required": [
+          "startAt"
+        ],
+        "type": "object",
+        "properties": {
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "expectedUpdatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
       },
       "OpenSessionRequest": {
         "type": "object",
@@ -5608,7 +6237,11 @@
           "Unplannable",
           "StalePlan",
           "MachineOverloaded",
-          "InactiveOrDisabledMachine"
+          "InactiveOrDisabledMachine",
+          "LockedPredecessorConflict",
+          "LockedMachineUnavailable",
+          "LockedOverCapacity",
+          "LockedLate"
         ]
       },
       "PlanChangeKind": {
@@ -5651,6 +6284,18 @@
               "$ref": "#/components/schemas/PlanningUnplannedModel"
             }
           },
+          "notMoved": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningNotMovedModel"
+            }
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningConflictModel"
+            }
+          },
           "summary": {
             "$ref": "#/components/schemas/PlanningSummaryModel"
           },
@@ -5666,6 +6311,69 @@
           "appliedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "PlanningConflictCode": {
+        "enum": [
+          "PredecessorAfterLockedStart",
+          "LockedOverCapacity"
+        ]
+      },
+      "PlanningConflictModel": {
+        "required": [
+          "code",
+          "workOrderId",
+          "workOrderIds",
+          "start",
+          "end",
+          "minutes",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/PlanningConflictCode"
+          },
+          "workOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "relatedWorkOrderId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "equipmentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "workOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "minutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },
@@ -5777,6 +6485,67 @@
           }
         }
       },
+      "PlanningNotMovedModel": {
+        "required": [
+          "workOrderId",
+          "code",
+          "productionOrderId",
+          "productionOrderCode",
+          "processSegmentCode",
+          "processSegmentName",
+          "start",
+          "end",
+          "isLocked",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "workOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "productionOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productionOrderCode": {
+            "type": "string"
+          },
+          "processSegmentCode": {
+            "type": "string"
+          },
+          "processSegmentName": {
+            "type": "string"
+          },
+          "equipment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOrderEquipmentModel"
+              }
+            ]
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isLocked": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "PlanningPreviewModel": {
         "required": [
           "scope",
@@ -5810,6 +6579,18 @@
               "$ref": "#/components/schemas/PlanningUnplannedModel"
             }
           },
+          "notMoved": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningNotMovedModel"
+            }
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningConflictModel"
+            }
+          },
           "summary": {
             "$ref": "#/components/schemas/PlanningSummaryModel"
           },
@@ -5828,7 +6609,8 @@
           "WaitsForRequestedStart",
           "CalendarClosed",
           "MachineBusy",
-          "AssignedMachineNotEnabled"
+          "AssignedMachineNotEnabled",
+          "Locked"
         ]
       },
       "PlanningReasonModel": {
@@ -5911,6 +6693,14 @@
         ],
         "type": "object",
         "properties": {
+          "lockedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "conflictCount": {
+            "type": "integer",
+            "format": "int32"
+          },
           "considered": {
             "type": "integer",
             "format": "int32"
@@ -6144,6 +6934,7 @@
           "planStatus",
           "producedQuantity",
           "progressPercent",
+          "lockedWorkOrdersCount",
           "allowedActions",
           "createdAt",
           "updatedAt"
@@ -6294,6 +7085,10 @@
             "type": "number",
             "format": "double"
           },
+          "lockedWorkOrdersCount": {
+            "type": "integer",
+            "format": "int32"
+          },
           "allowedActions": {
             "type": "array",
             "items": {
@@ -6324,6 +7119,7 @@
           "planStatus",
           "producedQuantity",
           "progressPercent",
+          "lockedWorkOrdersCount",
           "allowedActions",
           "createdAt",
           "updatedAt"
@@ -6439,6 +7235,10 @@
           "progressPercent": {
             "type": "number",
             "format": "double"
+          },
+          "lockedWorkOrdersCount": {
+            "type": "integer",
+            "format": "int32"
           },
           "allowedActions": {
             "type": "array",
@@ -6631,6 +7431,8 @@
           "plannedMinutes",
           "workedMinutes",
           "planStatus",
+          "planStatusReason",
+          "isPlanLocked",
           "allowedActions",
           "materials"
         ],
@@ -6716,6 +7518,19 @@
           },
           "planStatus": {
             "$ref": "#/components/schemas/PlanStatus"
+          },
+          "planStatusReason": {
+            "$ref": "#/components/schemas/StaleCause"
+          },
+          "isPlanLocked": {
+            "type": "boolean"
+          },
+          "planLockedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "allowedActions": {
             "type": "array",
@@ -6846,6 +7661,19 @@
           "clearedWorkOrders": {
             "type": "integer",
             "format": "int32"
+          },
+          "keptLocked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "keptLockedWorkOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         }
       },
@@ -7363,6 +8191,16 @@
           }
         }
       },
+      "StaleCause": {
+        "enum": [
+          "None",
+          "PredecessorEndsAfterStart",
+          "MachineNotUsable",
+          "RunningPastPlannedEnd",
+          "LockedPredecessorConflict",
+          "LockedMachineNotUsable"
+        ]
+      },
       "TimelineEquipmentModel": {
         "required": [
           "id",
@@ -7545,6 +8383,8 @@
           "processSegmentName",
           "status",
           "planStatus",
+          "planStatusReason",
+          "isPlanLocked",
           "isLate",
           "lateDays",
           "predecessorIds",
@@ -7616,6 +8456,19 @@
           },
           "planStatus": {
             "$ref": "#/components/schemas/PlanStatus"
+          },
+          "planStatusReason": {
+            "$ref": "#/components/schemas/StaleCause"
+          },
+          "isPlanLocked": {
+            "type": "boolean"
+          },
+          "planLockedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "isLate": {
             "type": "boolean"
@@ -7689,6 +8542,18 @@
           "Meter",
           "Liter"
         ]
+      },
+      "UnlockAllResultModel": {
+        "required": [
+          "unlocked"
+        ],
+        "type": "object",
+        "properties": {
+          "unlocked": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       },
       "UnplannedReasonCode": {
         "enum": [
@@ -8489,6 +9354,8 @@
           "shortfallQuantity",
           "status",
           "planStatus",
+          "planStatusReason",
+          "isPlanLocked",
           "predecessors",
           "successors",
           "allowedActions"
@@ -8650,6 +9517,19 @@
           "planStatus": {
             "$ref": "#/components/schemas/PlanStatus"
           },
+          "planStatusReason": {
+            "$ref": "#/components/schemas/StaleCause"
+          },
+          "isPlanLocked": {
+            "type": "boolean"
+          },
+          "planLockedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
           "predecessors": {
             "type": "array",
             "items": {
@@ -8799,6 +9679,8 @@
           "shortfallQuantity",
           "status",
           "planStatus",
+          "planStatusReason",
+          "isPlanLocked",
           "predecessors",
           "successors",
           "allowedActions"
@@ -8947,6 +9829,19 @@
           },
           "planStatus": {
             "$ref": "#/components/schemas/PlanStatus"
+          },
+          "planStatusReason": {
+            "$ref": "#/components/schemas/StaleCause"
+          },
+          "isPlanLocked": {
+            "type": "boolean"
+          },
+          "planLockedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           },
           "predecessors": {
             "type": "array",

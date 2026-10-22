@@ -26,9 +26,13 @@ import type {
   AbortRequest,
   CreateProductionOrderRequest,
   GetProductionOrdersParams,
+  LockAllProductionOrderWorkOrdersParams,
+  LockAllResultModel,
   ProductionOrderDetailModel,
   ProductionOrderModel,
   ProductionOrderOverviewModel,
+  UnlockAllProductionOrderWorkOrdersParams,
+  UnlockAllResultModel,
   UpdateProductionOrderRequest
 } from '../model';
 
@@ -420,6 +424,84 @@ export class ProductionOrdersService {
         ...(options as Omit<NonNullable<typeof options>, 'observe'>),
         observe: 'body',
       }
+    );
+  }
+ lockAllProductionOrderWorkOrders<TData = LockAllResultModel>(id: number,
+    params?: LockAllProductionOrderWorkOrdersParams, options?: HttpClientBodyOptions): Observable<TData>;
+ lockAllProductionOrderWorkOrders<TData = LockAllResultModel>(id: number,
+    params?: LockAllProductionOrderWorkOrdersParams, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ lockAllProductionOrderWorkOrders<TData = LockAllResultModel>(id: number,
+    params?: LockAllProductionOrderWorkOrdersParams, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  lockAllProductionOrderWorkOrders<TData = LockAllResultModel>(
+    id: number,
+    params?: LockAllProductionOrderWorkOrdersParams, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    const filteredParams = filterParams({...params, ...options?.params}, new Set<string>([]));
+
+    if (options?.observe === 'events') {
+      return this.http.post<TData>(
+      `/api/production-orders/${id}/lock-all`,
+      undefined,{
+    ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+        params: filteredParams,}
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.post<TData>(
+      `/api/production-orders/${id}/lock-all`,
+      undefined,{
+    ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+        params: filteredParams,}
+    );
+    }
+
+    return this.http.post<TData>(
+      `/api/production-orders/${id}/lock-all`,
+      undefined,{
+    ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+        params: filteredParams,}
+    );
+  }
+ unlockAllProductionOrderWorkOrders<TData = UnlockAllResultModel>(id: number,
+    params?: UnlockAllProductionOrderWorkOrdersParams, options?: HttpClientBodyOptions): Observable<TData>;
+ unlockAllProductionOrderWorkOrders<TData = UnlockAllResultModel>(id: number,
+    params?: UnlockAllProductionOrderWorkOrdersParams, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ unlockAllProductionOrderWorkOrders<TData = UnlockAllResultModel>(id: number,
+    params?: UnlockAllProductionOrderWorkOrdersParams, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  unlockAllProductionOrderWorkOrders<TData = UnlockAllResultModel>(
+    id: number,
+    params?: UnlockAllProductionOrderWorkOrdersParams, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    const filteredParams = filterParams({...params, ...options?.params}, new Set<string>([]));
+
+    if (options?.observe === 'events') {
+      return this.http.post<TData>(
+      `/api/production-orders/${id}/unlock-all`,
+      undefined,{
+    ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+        params: filteredParams,}
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.post<TData>(
+      `/api/production-orders/${id}/unlock-all`,
+      undefined,{
+    ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+        params: filteredParams,}
+    );
+    }
+
+    return this.http.post<TData>(
+      `/api/production-orders/${id}/unlock-all`,
+      undefined,{
+    ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+        params: filteredParams,}
     );
   }
 };

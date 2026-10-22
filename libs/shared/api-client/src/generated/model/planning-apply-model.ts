@@ -4,7 +4,9 @@
  * MicroMES.Api | v1
  * OpenAPI spec version: 1.0.0
  */
+import type { PlanningConflictModel } from './planning-conflict-model';
 import type { PlanningItemModel } from './planning-item-model';
+import type { PlanningNotMovedModel } from './planning-not-moved-model';
 import type { PlanningScope } from './planning-scope';
 import type { PlanningSummaryModel } from './planning-summary-model';
 import type { PlanningUnplannedModel } from './planning-unplanned-model';
@@ -15,6 +17,8 @@ export interface PlanningApplyModel {
   productionOrderId?: number | null;
   items: PlanningItemModel[];
   unplanned: PlanningUnplannedModel[];
+  notMoved?: PlanningNotMovedModel[];
+  conflicts?: PlanningConflictModel[];
   summary: PlanningSummaryModel;
   token: string;
   /** @nullable */

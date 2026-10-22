@@ -5,6 +5,7 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { PlanStatus } from './plan-status';
+import type { StaleCause } from './stale-cause';
 import type { WorkOrderEquipmentModel } from './work-order-equipment-model';
 import type { WorkOrderMaterialModel } from './work-order-material-model';
 import type { WorkOrderStatus } from './work-order-status';
@@ -29,6 +30,10 @@ export interface ProductionOrderOverviewWorkOrderModel {
   /** @nullable */
   plannedEndAt?: string | null;
   planStatus: PlanStatus;
+  planStatusReason: StaleCause;
+  isPlanLocked: boolean;
+  /** @nullable */
+  planLockedAt?: string | null;
   allowedActions: string[];
   materials: WorkOrderMaterialModel[];
 }

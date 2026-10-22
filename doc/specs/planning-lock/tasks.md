@@ -19,7 +19,7 @@
 - [x] 1.5 [Backend] `PlanLockService` e endpoint di anteprima/applicazione di «Sposta» (`startAt`, `equipmentId`): fine calcolata sul calendario, errori 422 (passato, istante non lavorabile con motivo e prossimo istante, macchina non abilitata), 409 se il lavoro è cambiato; anteprima con conflitti (predecessore, successore obsoleto, capacità, ritardo) senza bloccare l'applicazione; l'applicazione fissa il lavoro. Test unitari e di integrazione. _Satisfies: REQ-2_
 - [x] 1.6 [Backend] Azioni sull'ordine: «Fissa tutti i lavori aperti» e «Sblocca tutti» (transazione, riepilogo). _Satisfies: REQ-1, REQ-5_
 - [x] 1.7 [Backend] Segnalazioni: fissato in conflitto con predecessore, su macchina chiusa/disattivata/non abilitata, oltre la capacità, in ritardo; causa nominata e suggerimento; causa distinta del piano `Obsoleto`. Filtro «solo fissati» sulla timeline e sulla lista lavori. Test. _Satisfies: REQ-4, REQ-5_
-- [ ] 1.8 [Backend] Rigenerare il contratto OpenAPI e il client (`npx nx run api-client:generate-api`) e riportare il riepilogo del contratto. _Satisfies: REQ-1, REQ-2, REQ-3, REQ-4, REQ-5_
+- [x] 1.8 [Backend] Rigenerare il contratto OpenAPI e il client (`npx nx run api-client:generate-api`) e riportare il riepilogo del contratto. _Satisfies: REQ-1, REQ-2, REQ-3, REQ-4, REQ-5_
 
 ## Frontend
 

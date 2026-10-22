@@ -5,6 +5,7 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { PlanStatus } from './plan-status';
+import type { StaleCause } from './stale-cause';
 import type { WorkOrderStatus } from './work-order-status';
 
 export interface TimelineWorkOrderModel {
@@ -27,6 +28,10 @@ export interface TimelineWorkOrderModel {
   actualEndAt?: string | null;
   status: WorkOrderStatus;
   planStatus: PlanStatus;
+  planStatusReason: StaleCause;
+  isPlanLocked: boolean;
+  /** @nullable */
+  planLockedAt?: string | null;
   isLate: boolean;
   lateDays: number;
   predecessorIds: number[];
