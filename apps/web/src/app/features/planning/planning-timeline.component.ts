@@ -43,6 +43,7 @@ import { isOffRange, routeConnector, stubRoute } from './dependency-route';
 import { WorkOrdersStore } from '../work-orders/work-orders.store';
 import { type DepLink, PlanningWorkPanelComponent } from './planning-work-panel.component';
 import { isWorkVisible } from './timeline-visibility';
+import { chooseEmptyMessage } from './timeline-empty';
 import { PlanningStore } from './planning.store';
 import { allowsDashedBorder, layoutBar, type LabelPlacement } from './bar-label';
 import { type Axis, buildAxis, centreTime, clampSpan, commonClosedRanges, type Range, scrollForCentre, visibleTimeRange } from './timeline-axis';
@@ -215,7 +216,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           <button hlmBtn type="button" size="icon-sm" [variant]="showDone() ? 'secondary' : 'outline'" aria-label="Mostra fasi terminate" [hlmTooltip]="showDone() ? 'Nascondi fasi terminate' : 'Mostra fasi terminate'" [attr.aria-pressed]="showDone()" (click)="showDone.set(!showDone())">
             <ng-icon [name]="showDone() ? 'lucideCircleCheck' : 'lucideEyeOff'" aria-hidden="true" />
           </button>
-          <button hlmBtn type="button" size="icon-sm" [variant]="lockedOnly() ? 'secondary' : 'outline'" aria-label="Solo fissati" [hlmTooltip]="lockedOnly() ? 'Mostra tutti i lavori' : 'Mostra solo i lavori fissati'" [attr.aria-pressed]="lockedOnly()" (click)="lockedOnly.set(!lockedOnly())">
+          <button hlmBtn type="button" size="icon-sm" [variant]="lockedOnly() ? 'default' : 'outline'" aria-label="Solo fissati" [hlmTooltip]="lockedOnly() ? 'Mostra tutti i lavori' : 'Mostra solo i lavori fissati'" [attr.aria-pressed]="lockedOnly()" (click)="lockedOnly.set(!lockedOnly())">
             <ng-icon name="lucideLock" aria-hidden="true" />
           </button>
           <button hlmBtn type="button" size="icon-sm" [variant]="depsAll() ? 'secondary' : 'outline'" aria-label="Mostra tutte le dipendenze" hlmTooltip="Mostra tutte le dipendenze (altrimenti solo quelle del lavoro selezionato o sotto il mouse)" [attr.aria-pressed]="depsAll()" (click)="depsAll.set(!depsAll())">
@@ -373,10 +374,18 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
             @if (windowEmpty(); as we) {
               <div class="bg-card/95 absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-1.5 text-sm shadow-xs" role="status">
                 <ng-icon name="lucideCalendarX" aria-hidden="true" class="text-muted-foreground" />
-                <span class="font-medium">{{ we === 'onlyEnded' ? 'Nessun lavoro attivo in questa finestra' : 'Nessun lavoro in questo periodo' }}</span>
-                @if (we === 'onlyEnded') {
-                  <span class="text-muted-foreground">Ci sono solo fasi terminate.</span>
+                <span class="font-medium">{{ emptyMsg().title }}</span>
+                @if (emptyMsg().kind === 'filters') {
+                  @for (f of activeFilterLabels(); track f) {
+                    <span class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">{{ f }}</span>
+                  }
+                }
+                @if (emptyMsg().hint; as h) { <span class="text-muted-foreground">{{ h }}</span> }
+                @if (emptyMsg().kind === 'onlyEnded') {
                   <button hlmBtn type="button" size="sm" variant="outline" (click)="showDone.set(true)">Mostra fasi terminate</button>
+                }
+                @if (emptyMsg().kind === 'filters') {
+                  <button hlmBtn type="button" size="sm" (click)="clearFilters()">Azzera filtri</button>
                 }
                 @if (jump(); as j) {
                   <button hlmBtn type="button" size="sm" variant="outline" (click)="goTo(j.ms)">{{ j.label }}</button>
@@ -848,6 +857,24 @@ export class PlanningTimelineComponent {
     }
     return hidden ? 'onlyEnded' : 'empty';
   });
+  protected readonly activeFilterLabels = computed<string[]>(() => {
+    const out: string[] = [];
+    const q = this.search().trim();
+    if (q) out.push(`Ricerca: «${q}»`);
+    if (this.orderFilter() !== ALL) out.push(`Ordine: ${this.orderLabel(this.orderFilter())}`);
+    if (this.statusFilter() !== ALL) out.push(`Stato: ${this.statusLabel(this.statusFilter())}`);
+    if (this.machineFilter() !== ALL) out.push(`Macchina: ${this.machineLabel(this.machineFilter())}`);
+    if (this.lockedOnly()) out.push('Solo fissati');
+    return out;
+  });
+  protected readonly emptyMsg = computed(() =>
+    chooseEmptyMessage({
+      state: this.windowEmpty() === 'onlyEnded' ? 'onlyEnded' : 'empty',
+      activeFilters: this.activeFilterLabels(),
+      lockedOnly: this.lockedOnly(),
+      lockedCount: (this.data()?.workOrders ?? []).filter((w) => w.isPlanLocked).length,
+    }),
+  );
   /** Lavoro pianificato più vicino all'intervallo visibile: prima il successivo, altrimenti l'ultimo precedente. */
   protected readonly jump = computed<{ ms: number; label: string } | null>(() => {
     const v = this.visible();
@@ -1729,6 +1756,7 @@ export class PlanningTimelineComponent {
     this.statusFilter.set(ALL);
     this.machineFilter.set(ALL);
     this.search.set('');
+    this.lockedOnly.set(false);
   }
   protected select(w: TimelineWorkOrderModel): void {
     this.lastSelected.set(w);
