@@ -10,6 +10,7 @@ import {
   lucideCircleCheck,
   lucideCircleDot,
   lucideClock,
+  lucideEyeOff,
   lucideFoldHorizontal,
   lucideInfo,
   lucideMinus,
@@ -40,6 +41,7 @@ import { buildGraph, chainOf } from './dependency-graph';
 import { isOffRange, routeConnector, stubRoute } from './dependency-route';
 import { WorkOrdersStore } from '../work-orders/work-orders.store';
 import { type DepLink, PlanningWorkPanelComponent } from './planning-work-panel.component';
+import { isWorkVisible } from './timeline-visibility';
 import { PlanningStore } from './planning.store';
 import { CHIP_EXTRA_CODE, CHIP_EXTRA_FULL, estimateTextWidth, fitLeftChip, LABEL_INSIDE_MIN, placeLabel } from './bar-label';
 import { type Axis, buildAxis, centreTime, clampSpan, commonClosedRanges, type Range, scrollForCentre, visibleTimeRange } from './timeline-axis';
@@ -116,6 +118,9 @@ interface BarVm {
   name: string;
   segCode: string;
   sub: string;
+  /** Seconda riga dentro la barra: per i lavori in corso aggiunge "In corso" se la larghezza lo consente. */
+  subBar: string;
+  running: boolean;
   color: string;
   padRight: number;
   cls: string;
@@ -180,7 +185,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
   imports: [HlmButton, HlmEmptyImports, HlmInput, HlmPopoverImports, HlmSelectImports, HlmSheetImports, HlmSkeleton, HlmTooltip, NgIcon, PlanningWorkPanelComponent],
   providers: [
     provideIcons({
-      lucideAlarmClock, lucideCalendarX, lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideCircleCheck, lucideCircleDot, lucideClock,
+      lucideAlarmClock, lucideCalendarX, lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideCircleCheck, lucideCircleDot, lucideClock, lucideEyeOff,
       lucideFoldHorizontal, lucideInfo, lucideMinus, lucideOctagonX, lucidePause, lucidePlay, lucidePlus, lucideRefreshCw, lucideSearch, lucideTriangleAlert, lucideWorkflow,
     }),
   ],
@@ -207,6 +212,9 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
           <button hlmBtn type="button" size="icon-sm" [variant]="collapse() ? 'secondary' : 'outline'" aria-label="Comprimi tempo non lavorativo" hlmTooltip="Comprimi tempo non lavorativo" [attr.aria-pressed]="collapse()" (click)="toggleCollapse()">
             <ng-icon name="lucideFoldHorizontal" aria-hidden="true" />
           </button>
+          <button hlmBtn type="button" size="icon-sm" [variant]="showDone() ? 'secondary' : 'outline'" aria-label="Mostra fasi terminate" [hlmTooltip]="showDone() ? 'Nascondi fasi terminate' : 'Mostra fasi terminate'" [attr.aria-pressed]="showDone()" (click)="showDone.set(!showDone())">
+            <ng-icon [name]="showDone() ? 'lucideCircleCheck' : 'lucideEyeOff'" aria-hidden="true" />
+          </button>
           <button hlmBtn type="button" size="icon-sm" [variant]="depsAll() ? 'secondary' : 'outline'" aria-label="Mostra tutte le dipendenze" hlmTooltip="Mostra tutte le dipendenze (altrimenti solo quelle del lavoro selezionato o sotto il mouse)" [attr.aria-pressed]="depsAll()" (click)="depsAll.set(!depsAll())">
             <ng-icon name="lucideWorkflow" aria-hidden="true" />
           </button>
@@ -223,6 +231,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                     </li>
                   }
                 </ul>
+                <p class="text-muted-foreground text-xs">Le fasi terminate sono nascoste di default: usa il pulsante con l'occhio per mostrarle.</p>
               </section>
               <section class="flex flex-col gap-1.5" aria-label="Segnali">
                 <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Segnali sulla barra</p>
@@ -291,12 +300,13 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
               <button
                 type="button"
                 class="hover:bg-muted focus-visible:ring-ring flex h-6 shrink-0 items-center gap-1.5 rounded-md border px-1.5 text-xs whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none"
+                [class.opacity-50]="!o.visible && highlight() !== o.id"
                 [class.bg-muted]="highlight() === o.id"
                 [class.ring-2]="highlight() === o.id"
                 [class.ring-primary]="highlight() === o.id"
                 [attr.aria-pressed]="highlight() === o.id"
                 [attr.aria-label]="'Evidenzia ordine ' + o.code + ' ' + o.material"
-                [title]="o.code + ' · ' + o.material"
+                [title]="o.code + ' · ' + o.material + (o.visible ? '' : ' (nessuna fase visibile)')"
                 (click)="toggleHighlight(o.id)"
                 (mouseenter)="hoverOrder.set(o.id)"
                 (mouseleave)="hoverOrder.set(null)"
@@ -351,10 +361,14 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                 }
               </div>
             }
-            @if (windowEmpty()) {
+            @if (windowEmpty(); as we) {
               <div class="bg-card/95 absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-1.5 text-sm shadow-xs" role="status">
                 <ng-icon name="lucideCalendarX" aria-hidden="true" class="text-muted-foreground" />
-                <span class="font-medium">Nessun lavoro in questo periodo</span>
+                <span class="font-medium">{{ we === 'onlyEnded' ? 'Nessun lavoro attivo in questa finestra' : 'Nessun lavoro in questo periodo' }}</span>
+                @if (we === 'onlyEnded') {
+                  <span class="text-muted-foreground">Ci sono solo fasi terminate.</span>
+                  <button hlmBtn type="button" size="sm" variant="outline" (click)="showDone.set(true)">Mostra fasi terminate</button>
+                }
                 @if (jump(); as j) {
                   <button hlmBtn type="button" size="sm" variant="outline" (click)="goTo(j.ms)">{{ j.label }}</button>
                 }
@@ -476,7 +490,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                                 @if (b.level >= 3) { <ng-icon [name]="b.statusIcon" size="14" class="shrink-0" aria-hidden="true" /> }
                                 <span class="truncate" [class.font-medium]="b.level >= 2">{{ b.level === 1 ? b.segCode : b.name }}</span>
                               </span>
-                              @if (b.level >= 3) { <span class="truncate text-[11px] opacity-75">{{ b.sub }}</span> }
+                              @if (b.level >= 3) { <span class="truncate text-[11px]" [class.opacity-75]="!b.running" [class.opacity-90]="b.running">{{ b.subBar }}</span> }
                             }
                             @if (b.late || b.stale || b.overload) {
                               <span class="absolute top-0.5 right-0.5 flex gap-0.5" [class.flex-col]="b.width < 56">
@@ -488,11 +502,11 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                           </div>
                           @if (b.chip; as ch0) {
                             @if (chipView(ch0); as ch) {
-                              <span class="bg-background ring-border group-hover:bg-muted flex items-center gap-1 border-(color:--oc) px-1.5 py-0.5 text-xs leading-tight whitespace-nowrap ring-1" [class]="ch0.end ? 'rounded-l-md border-r-[3px]' : 'rounded-r-md border-l-[3px]'" [style.--oc]="b.color" aria-hidden="true">
+                              <span class="flex items-center gap-1 border-(color:--oc) px-1.5 py-0.5 text-xs leading-tight whitespace-nowrap ring-1" [class]="(ch0.end ? 'rounded-l-md border-r-[3px] ' : 'rounded-r-md border-l-[3px] ') + (b.running ? 'bg-running text-running-foreground ring-running' : 'bg-background ring-border group-hover:bg-muted')" [style.--oc]="b.color" aria-hidden="true">
                                 @if (ch.sub) { <ng-icon [name]="b.statusIcon" size="12" class="shrink-0" /> }
                                 <span class="flex flex-col" [class.text-right]="ch0.end">
                                   <span [class.font-medium]="ch.sub">{{ ch.text }}</span>
-                                  @if (ch.sub) { <span class="text-muted-foreground text-[11px]">{{ ch.sub }}</span> }
+                                  @if (ch.sub) { <span class="text-[11px]" [class]="b.running ? 'text-running-foreground/90' : 'text-muted-foreground'">{{ ch.sub }}</span> }
                                 </span>
                               </span>
                             }
@@ -606,6 +620,21 @@ export class PlanningTimelineComponent {
   protected readonly focusedId = signal<number | null>(null);
   /** Modalità dipendenze: `false` = solo catena del lavoro attivo; `true` = tutte (query `deps=all`). */
   protected readonly depsAll = signal(this.qp.get('deps') === 'all');
+  /** Mostra le fasi terminate (URL `done=1`); di default sono nascoste. */
+  protected readonly showDone = signal(this.qp.get('done') === '1');
+  /** Terminate visibili anche con il filtro di stato esplicito "Terminato". */
+  private readonly showEnded = computed(() => this.showDone() || this.statusFilter() === 'Ended');
+  /** Lavori terminati che restano visibili perché selezionati o col focus (valore solo se terminati: evita ricalcoli inutili). */
+  private readonly keepSel = computed(() => this.endedId(this.selectedId()));
+  private readonly keepFocus = computed(() => this.endedId(this.focusedId()));
+  private endedId(id: number | null): number | null {
+    return id != null && this.pool().get(id)?.status === 'Ended' ? id : null;
+  }
+  private readonly shown = computed(() => {
+    const showEnded = this.showEnded();
+    const keepIds = [this.keepSel(), this.keepFocus()];
+    return (w: TimelineWorkOrderModel): boolean => isWorkVisible(w, { showEnded, keepIds });
+  });
 
   /** Richieste già ricevute, ognuna per un intervallo di al più 28 giorni; l'unione è l'intervallo caricato (contiguo). */
   private readonly chunkList = signal<Chunk[]>([]);
@@ -780,26 +809,33 @@ export class PlanningTimelineComponent {
   private readonly matches = (w: TimelineWorkOrderModel, q: string): boolean => !q || w.code.toLowerCase().includes(q) || w.productionOrderCode.toLowerCase().includes(q);
   protected readonly matchCount = computed(() => {
     const q = this.search().trim().toLowerCase();
-    return (this.data()?.workOrders ?? []).filter((w) => this.matches(w, q)).length;
+    const shown = this.shown();
+    return (this.data()?.workOrders ?? []).filter((w) => this.matches(w, q) && shown(w)).length;
   });
   protected readonly undated = computed(() => (this.data()?.workOrders ?? []).filter((w) => !this.range(w)).length);
 
-  /** Nessun lavoro nell'intervallo visibile (avviso sovrapposto, senza spostare il layout). */
-  protected readonly windowEmpty = computed(() => {
+  /** Nessun lavoro visibile nell'intervallo (avviso sovrapposto): `onlyEnded` se ci sono solo fasi terminate nascoste. */
+  protected readonly windowEmpty = computed<false | 'empty' | 'onlyEnded'>(() => {
     const d = this.data();
     const v = this.visible();
     if (!d || !v || this.loading() || this.loadingLeft() || this.loadingRight()) return false;
-    return !d.workOrders.some((x) => {
+    const shown = this.shown();
+    let hidden = false;
+    for (const x of d.workOrders) {
       const r = this.range(x);
-      return r && r.e > v.start && r.s < v.end;
-    });
+      if (!r || r.e <= v.start || r.s >= v.end) continue;
+      if (shown(x)) return false;
+      hidden = true;
+    }
+    return hidden ? 'onlyEnded' : 'empty';
   });
   /** Lavoro pianificato più vicino all'intervallo visibile: prima il successivo, altrimenti l'ultimo precedente. */
   protected readonly jump = computed<{ ms: number; label: string } | null>(() => {
     const v = this.visible();
     if (!v) return null;
     const tz = this.tz();
-    const starts = [...this.probe(), ...(this.data()?.workOrders ?? [])].flatMap((x) => (x.plannedStartAt ? [new Date(x.plannedStartAt).getTime()] : []));
+    const shown = this.shown();
+    const starts = [...this.probe(), ...(this.data()?.workOrders ?? [])].flatMap((x) => (x.plannedStartAt && shown(x) ? [new Date(x.plannedStartAt).getTime()] : []));
     const next = Math.min(...starts.filter((t) => t >= v.end));
     if (Number.isFinite(next)) return { ms: next, label: `Vai al primo lavoro pianificato (${this.ddmm(next, tz)})` };
     const prev = Math.max(...starts.filter((t) => t < v.start));
@@ -872,7 +908,8 @@ export class PlanningTimelineComponent {
         return [{ left: px(s0), width: Math.max(24, px(e0) - px(s0)), pct, title: `Carico ${pct}%: ${pct > 100 ? 'sovraccarico' : 'quasi saturo'} · ${l.busyMinutes}/${l.capacityMinutes} min` }];
       });
       const rowPad = marks.length ? MARK_PAD : ROW_PAD;
-      const items = (byRow.get(r.key) ?? []).filter((x) => this.range(x));
+      const shown = this.shown();
+      const items = (byRow.get(r.key) ?? []).filter((x) => this.range(x) && shown(x));
       const lanes = Math.max(1, ...items.map((x) => x.lane + 1));
       const height = Math.max(ROW_MIN, rowPad + lanes * LANE_H);
       const rowTop = top;
@@ -892,6 +929,9 @@ export class PlanningTimelineComponent {
           const op = operationNumber(x.code);
           const name = x.processSegmentName || x.processSegmentCode;
           const sub = `${x.productionOrderCode}${op ? ` · Op. ${op}` : ''}`;
+          const running = x.status === 'Running';
+          const subRun = `${sub} · In corso`;
+          const subBar = running && estimateTextWidth(subRun, 6, 0) <= width - 10 - (width >= 56 && (late || stale || overload) ? ((late ? 1 : 0) + (stale ? 1 : 0) + (overload ? 1 : 0)) * 18 + 4 : 4) ? subRun : sub;
           const machine = r.key === NONE_ROW ? 'nessuna macchina' : (machineName.get(r.key) ?? r.code);
           const status = st.label;
           const plan = late ? `In ritardo${x.lateDays ? ` di ${x.lateDays} g` : ''}` : stale ? 'Piano obsoleto' : x.planStatus === 'Planned' ? 'Pianificato' : 'Non pianificato';
@@ -902,7 +942,7 @@ export class PlanningTimelineComponent {
           const cls = `relative flex h-full shrink-0 flex-col justify-center overflow-hidden rounded-md pl-2.5 text-left text-xs leading-tight whitespace-nowrap before:rounded-l-md group-hover:brightness-95 ${style.box} ${style.strip}${overload ? ' outline outline-1 -outline-offset-1 outline-destructive' : ''}`;
           return {
             w: x, left, width, y: rowTop + rowPad + x.lane * LANE_H, height: BAR_H, lane: x.lane, rowKey: r.key, overload, dim, late, stale, level, inside: true, chip: null,
-            statusIcon: st.icon, name, segCode: x.processSegmentCode || name, sub, color: orderColor(hues.get(x.productionOrderId) ?? 0),
+            statusIcon: st.icon, name, segCode: x.processSegmentCode || name, sub, subBar, running, color: orderColor(hues.get(x.productionOrderId) ?? 0),
             padRight: width >= 56 && markers ? markers * 18 + 4 : 4, cls, aria,
             tip: {
               phase: name, workOrder: x.code, order: `${x.productionOrderCode} · ${x.materialName}`, machine, period,
@@ -977,6 +1017,7 @@ export class PlanningTimelineComponent {
     const { from, to } = this.vp();
     const geo = this.barGeometry();
     const pool = this.pool();
+    const shown = this.shown();
     const hues = this.orderHue();
     const out: DepDrawn[] = [];
     for (const succ of d.workOrders) {
@@ -986,6 +1027,9 @@ export class PlanningTimelineComponent {
         const inChain = !!ch && ch.all.has(pid) && ch.all.has(succ.id);
         if (!all && !inChain) continue;
         const p = geo.get(pid);
+        const pw = pool.get(pid);
+        // Predecessore nascosto (fase terminata): nessun connettore né stub; il pannello laterale lo elenca comunque.
+        if (!p && pw && !shown(pw)) continue;
         // Prefiltro economico sul rettangolo che racchiude le due barre: il routing è solo per i collegamenti nell'area renderizzata.
         const lo = Math.min(s.x, p ? p.x : s.x - 40);
         const hi = Math.max(s.x + s.w, p ? p.x + p.w : s.x);
@@ -1078,11 +1122,16 @@ export class PlanningTimelineComponent {
     const d = this.data();
     if (!d) return [];
     const hues = this.orderHue();
-    const seen = new Map<number, { id: number; code: string; short: string; material: string; idx: number; color: string }>();
+    const seen = new Map<number, { id: number; code: string; short: string; material: string; idx: number; color: string; visible: boolean }>();
+    const shown = this.shown();
     for (const w of d.workOrders) {
-      if (seen.has(w.productionOrderId)) continue;
+      const cur = seen.get(w.productionOrderId);
+      if (cur) {
+        if (!cur.visible && shown(w)) cur.visible = true;
+        continue;
+      }
       const idx = hues.get(w.productionOrderId) ?? 0;
-      seen.set(w.productionOrderId, { id: w.productionOrderId, code: w.productionOrderCode, short: w.productionOrderCode.replace(/^OP-\d{4}-/, ''), material: w.materialName, idx, color: orderColor(idx) });
+      seen.set(w.productionOrderId, { id: w.productionOrderId, code: w.productionOrderCode, short: w.productionOrderCode.replace(/^OP-\d{4}-/, ''), material: w.materialName, idx, color: orderColor(idx), visible: shown(w) });
     }
     return [...seen.values()].sort((a, b) => a.code.localeCompare(b.code));
   });
@@ -1198,6 +1247,7 @@ export class PlanningTimelineComponent {
         machine: this.machineFilter() === ALL ? null : this.machineFilter(),
         q: this.search().trim() || null,
         deps: this.depsAll() ? 'all' : null,
+        done: this.showDone() ? '1' : null,
         wo: this.selectedId(),
       };
       untracked(() => void this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge', replaceUrl: true }));
@@ -1424,10 +1474,10 @@ export class PlanningTimelineComponent {
     const today = anchor;
     const busyNear = d.workOrders.some((x) => {
       const r = this.range(x);
-      return r && r.e > today - 24 * HOUR && r.s < today + 7 * 24 * HOUR;
+      return r && this.shown()(x) && r.e > today - 24 * HOUR && r.s < today + 7 * 24 * HOUR;
     });
     if (busyNear) return;
-    const starts = d.workOrders.flatMap((x) => (x.plannedStartAt ? [new Date(x.plannedStartAt).getTime()] : [])).filter((t) => t >= today + 7 * 24 * HOUR && t <= today + 14 * 24 * HOUR);
+    const starts = d.workOrders.flatMap((x) => (x.plannedStartAt && this.shown()(x) ? [new Date(x.plannedStartAt).getTime()] : [])).filter((t) => t >= today + 7 * 24 * HOUR && t <= today + 14 * 24 * HOUR);
     if (!starts.length) return;
     const first = Math.min(...starts);
     afterNextRender(() => {

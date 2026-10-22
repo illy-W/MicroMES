@@ -18,13 +18,14 @@ const TINT = (pct: number) => `bg-[color-mix(in_oklch,var(--oc)_${pct}%,var(--ca
 
 /**
  * Stato = pattern, non solo colore:
- * In attesa tratteggio chiaro · Pronto bordo pieno sottile · In esecuzione striscia larga + diagonale ·
+ * In attesa tratteggio chiaro · Pronto bordo pieno sottile · In esecuzione verde pieno + riflesso diagonale ·
  * In pausa punteggiato · Terminato grigio · Interrotto grigio con testo barrato.
  */
 export const STATUS_STYLE: Record<WorkOrderStatus, StatusStyle> = {
   Waiting: { box: `border border-dashed border-(color:--oc) ${TINT(7)} text-foreground`, strip: `${STRIP} before:w-1` },
   Ready: { box: `border border-(color:--oc) ${TINT(16)} text-foreground`, strip: `${STRIP} before:w-1` },
-  Running: { box: `tl-running border border-(color:--oc) ${TINT(28)} text-foreground shadow-sm`, strip: `${STRIP} before:w-1.5` },
+  // Verde pieno (token --running); accento 4 px nel colore dell'ordine + 2 px di separatore chiaro per restare visibile sul verde.
+  Running: { box: 'tl-running border border-running bg-running text-running-foreground shadow-sm', strip: `${STRIP} before:w-1.5 before:border-r-2 before:border-running-foreground/80` },
   Interrupted: { box: `border-2 border-dotted border-(color:--oc) ${TINT(10)} text-foreground`, strip: `${STRIP} before:w-1` },
   Ended: { box: 'border border-border bg-muted text-muted-foreground', strip: `${STRIP} before:w-1 before:opacity-50` },
   Aborted: { box: 'border border-border bg-muted text-muted-foreground line-through', strip: `${STRIP} before:w-1 before:opacity-50` },

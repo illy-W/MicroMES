@@ -40,12 +40,15 @@
   /* Identità ordini (timeline): 8 tonalità distinguibili, leggibili su bianco. Testo sempre su tinta chiara con --foreground. */
   --chart-1: oklch(0.55 0.19 255);
   --chart-2: oklch(0.66 0.17 55);
-  --chart-3: oklch(0.58 0.15 150);
+  --chart-3: oklch(0.52 0.13 30);
   --chart-4: oklch(0.56 0.2 330);
   --chart-5: oklch(0.6 0.12 205);
   --chart-6: oklch(0.52 0.2 290);
   --chart-7: oklch(0.72 0.15 95);
   --chart-8: oklch(0.6 0.17 355);
+  /* Stato "in esecuzione" (timeline): il verde è riservato a questo stato, nessuna tonalità --chart-n è verde. Contrasto testo/sfondo > 6:1. */
+  --running: oklch(0.48 0.12 150);
+  --running-foreground: oklch(0.985 0 0);
 }
 
 :root.dark {
@@ -79,12 +82,14 @@
   --sidebar-ring: oklch(0.556 0 0);
   --chart-1: oklch(0.68 0.17 255);
   --chart-2: oklch(0.76 0.15 55);
-  --chart-3: oklch(0.72 0.15 150);
+  --chart-3: oklch(0.7 0.13 30);
   --chart-4: oklch(0.7 0.18 330);
   --chart-5: oklch(0.74 0.11 205);
   --chart-6: oklch(0.68 0.17 290);
   --chart-7: oklch(0.82 0.14 95);
   --chart-8: oklch(0.72 0.16 355);
+  --running: oklch(0.5 0.12 150);
+  --running-foreground: oklch(0.985 0 0);
 }
 
 @theme inline {
@@ -96,6 +101,8 @@
   --color-chart-6: var(--chart-6);
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
+  --color-running: var(--running);
+  --color-running-foreground: var(--running-foreground);
 }
 
 @layer base {
@@ -177,7 +184,7 @@ table {
   --ngd-minimap-stroke-primary-default: var(--border);
 }
 
-/* Timeline: striscia diagonale sulle fasi in esecuzione (statica con prefers-reduced-motion). */
+/* Timeline: riflesso diagonale chiaro sulle fasi in esecuzione (verde pieno; statico con prefers-reduced-motion). */
 .tl-running::after {
   content: '';
   position: absolute;
@@ -185,11 +192,11 @@ table {
   pointer-events: none;
   background-image: linear-gradient(
     135deg,
-    color-mix(in oklch, var(--foreground) 7%, transparent) 25%,
+    color-mix(in oklch, var(--running-foreground) 9%, transparent) 25%,
     transparent 25%,
     transparent 50%,
-    color-mix(in oklch, var(--foreground) 7%, transparent) 50%,
-    color-mix(in oklch, var(--foreground) 7%, transparent) 75%,
+    color-mix(in oklch, var(--running-foreground) 9%, transparent) 50%,
+    color-mix(in oklch, var(--running-foreground) 9%, transparent) 75%,
     transparent 75%
   );
   background-size: 20px 20px;
