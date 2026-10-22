@@ -91,7 +91,9 @@ public enum PlanningReasonCode
     /// <summary>The assigned machine is not among the candidates: another one was chosen.</summary>
     AssignedMachineNotEnabled,
     /// <summary>The job is locked: it keeps its plan and machine.</summary>
-    Locked
+    Locked,
+    /// <summary>Planned before its turn because it must end before the start of a locked job (RelatedWorkOrderId).</summary>
+    AdvancedForLocked
 }
 
 public sealed record PlanningReason(

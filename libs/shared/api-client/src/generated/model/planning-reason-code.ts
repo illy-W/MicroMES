@@ -15,4 +15,5 @@ export const PlanningReasonCode = {
   MachineBusy: 'MachineBusy',
   AssignedMachineNotEnabled: 'AssignedMachineNotEnabled',
   Locked: 'Locked',
+  AdvancedForLocked: 'AdvancedForLocked',
 } as const;

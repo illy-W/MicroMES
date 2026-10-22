@@ -21,7 +21,7 @@
 - [x] 1.7 [Backend] Segnalazioni: fissato in conflitto con predecessore, su macchina chiusa/disattivata/non abilitata, oltre la capacità, in ritardo; causa nominata e suggerimento; causa distinta del piano `Obsoleto`. Filtro «solo fissati» sulla timeline e sulla lista lavori. Test. _Satisfies: REQ-4, REQ-5_
 - [x] 1.8 [Backend] Rigenerare il contratto OpenAPI e il client (`npx nx run api-client:generate-api`) e riportare il riepilogo del contratto. _Satisfies: REQ-1, REQ-2, REQ-3, REQ-4, REQ-5_
 
-- [ ] 1.9 [Backend] Motore: scadenze dei predecessori dei lavori fissati (inizio fissato meno le durate della catena), pianificati prima degli altri per scadenza crescente; nuovo motivo `AdvancedForLocked` con il codice del lavoro fissato; conflitto solo se la catena non entra; test (caso OP-0004/OP-0006: catena anticipata davanti a un ordine a priorità più alta, catena infattibile, ordini figlio/padre, determinismo) e banco di prova. Se serve, rigenerare il client. _Satisfies: REQ-3_
+- [x] 1.9 [Backend] Motore: scadenze dei predecessori dei lavori fissati (inizio fissato meno le durate della catena), pianificati prima degli altri per scadenza crescente; nuovo motivo `AdvancedForLocked` con il codice del lavoro fissato; conflitto solo se la catena non entra; test (caso OP-0004/OP-0006: catena anticipata davanti a un ordine a priorità più alta, catena infattibile, ordini figlio/padre, determinismo) e banco di prova. Se serve, rigenerare il client. _Satisfies: REQ-3_
 
 ## Frontend
 

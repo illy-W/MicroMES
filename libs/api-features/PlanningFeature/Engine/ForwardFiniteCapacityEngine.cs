@@ -96,6 +96,76 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
             return c != 0 ? c : a.WorkOrderId.CompareTo(b.WorkOrderId);
         }
 
+        private readonly Dictionary<int, (DateTime Deadline, int LockedId)> _deadlines = [];
+
+        /// <summary>Jobs with a deadline (predecessors of a locked job) first, by deadline; then the usual keys.</summary>
+        private int CompareWithDeadline(PlanningJob a, PlanningJob b)
+        {
+            var ha = _deadlines.TryGetValue(a.WorkOrderId, out var da);
+            var hb = _deadlines.TryGetValue(b.WorkOrderId, out var db);
+            if (ha != hb) return ha ? -1 : 1;
+            if (ha)
+            {
+                var c = da.Deadline.CompareTo(db.Deadline);
+                if (c != 0) return c;
+            }
+            return CompareKeys(a, b);
+        }
+
+        /// <summary>
+        /// Latest start of each open, free transitive predecessor P of a locked job L (fixed start S): S minus the standard durations
+        /// (minutes / efficiency of the assigned, else default, else first candidate machine; calendar-agnostic, so it is an
+        /// approximation: breaks and closures are ignored) of the jobs on the longest path between P and L, P and L excluded.
+        /// Minimum over all locked descendants. Used only to anticipate the chain in the processing order; conflicts are still
+        /// reported from the real plan.
+        /// </summary>
+        private void ComputeDeadlines()
+        {
+            var succs = _jobs.Keys.ToDictionary(k => k, _ => new List<int>());
+            foreach (var j in _jobs.Values)
+                foreach (var p in j.PredecessorIds.Where(p => p != j.WorkOrderId && _jobs.ContainsKey(p)).Distinct())
+                    succs[p].Add(j.WorkOrderId);
+            if (!_jobs.Values.Any(j => j.Locked)) return;
+
+            TimeSpan Dur(PlanningJob j)
+            {
+                var eqId = j.AssignedEquipmentId ?? j.DefaultEquipmentId ?? j.CandidateEquipmentIds.FirstOrDefault();
+                var eff = _equipment.TryGetValue(eqId, out var m) ? m.EfficiencyPercent : 100m;
+                return TimeSpan.FromMinutes((double)WorkingTimeCalculator.ApplyEfficiency(Math.Max(0m, j.StandardMinutes), eff));
+            }
+
+            // Latest start of a job as seen by its predecessors; null = no deadline. Memoized, cycle-safe.
+            var memo = new Dictionary<int, (DateTime, int)?>();
+            var visiting = new HashSet<int>();
+            (DateTime, int)? LatestStart(int id)
+            {
+                var j = _jobs[id];
+                if (j.Locked) return (CeilMinute(j.LockedStart ?? _now), id);
+                if (IsFx(j)) return null;
+                if (memo.TryGetValue(id, out var cached)) return cached;
+                if (!visiting.Add(id)) return null;
+                (DateTime, int)? best = null;
+                foreach (var q in succs[id].OrderBy(x => x))
+                {
+                    var l = LatestStart(q);
+                    if (l is null) continue;
+                    var cand = (l.Value.Item1 - (_jobs[q].Locked ? TimeSpan.Zero : Dur(_jobs[q])), l.Value.Item2);
+                    if (best is null || cand.Item1 < best.Value.Item1) best = cand;
+                }
+                visiting.Remove(id);
+                memo[id] = best;
+                return best;
+            }
+
+            // Deadline of P = latest start allowed to its successors, i.e. latest finish of P.
+            foreach (var j in _jobs.Values)
+            {
+                if (IsFx(j)) continue;
+                var d = LatestStart(j.WorkOrderId);
+                if (d is not null) _deadlines[j.WorkOrderId] = d.Value;
+            }
+        }
+
         private static int CompareNullsLast(DateTime? a, DateTime? b)
             => a is null ? (b is null ? 0 : 1) : b is null ? -1 : a.Value.CompareTo(b.Value);
 
@@ -108,7 +178,8 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
             foreach (var (id, ps) in preds) foreach (var p in ps) succs[p].Add(id);
             var waiting = preds.ToDictionary(kv => kv.Key, kv => kv.Value.Count);
 
-            var queue = new PriorityQueue<int, PlanningJob>(Comparer<PlanningJob>.Create(CompareKeys));
+            ComputeDeadlines();
+            var queue = new PriorityQueue<int, PlanningJob>(Comparer<PlanningJob>.Create(CompareWithDeadline));
             foreach (var (id, n) in waiting)
                 if (n == 0 && !IsFx(_jobs[id])) queue.Enqueue(id, _jobs[id]);
 
@@ -262,6 +333,9 @@ public sealed class ForwardFiniteCapacityEngine : IPlanningEngine
         private void Place(PlanningJob job, List<int> predecessors)
         {
             var reasons = new List<PlanningReason>();
+            if (_deadlines.TryGetValue(job.WorkOrderId, out var dl))
+                reasons.Add(new PlanningReason(PlanningReasonCode.AdvancedForLocked,
+                    $"Anticipato per rispettare il lavoro fissato {Label(dl.LockedId)}", null, dl.LockedId));
 
             // Earliest start from now, the requested start and the predecessors.
             var ready = _now;

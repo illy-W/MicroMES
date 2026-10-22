@@ -630,6 +630,86 @@ public class ForwardFiniteCapacityEngineTests
         c.Minutes.Should().Be(120);
     }
 
+    // ---- deadlines of the predecessors of locked jobs -----------------------------------------
+
+    private static List<PlanningJob> LockScenario(bool withLock, int lockHour = 11) =>
+    [
+        Job(1, 300, M1, order: "H", priority: 5, orderId: 1),
+        Job(2, 60, M1, order: "B", priority: 4, orderId: 2),
+        Job(3, 60, [2], [2], order: "B", priority: 4, orderId: 2),
+        withLock ? LockedJob(4, 3, N(2, lockHour), N(2, lockHour + 1), after: [3], order: "B", op: 40, orderId: 2)
+                 : Job(4, 60, [3], [3], order: "B", priority: 4, orderId: 2)
+    ];
+
+    private static List<PlanningEquipment> LockMachines() => [Machine(1), Machine(2), Machine(3)];
+
+    [Fact]
+    public void Without_lock_the_higher_priority_order_goes_first()
+    {
+        var r = Plan(LockScenario(false), LockMachines());
+        r.Of(1).Start.Should().Be(N(2, 8));
+        r.Of(2).Start.Should().BeAfter(N(2, 13));
+        r.Planned.SelectMany(p => p.Reasons).Should().NotContain(x => x.Code == PlanningReasonCode.AdvancedForLocked);
+    }
+
+    [Fact]
+    public void Predecessors_of_a_locked_job_are_advanced_and_no_conflict_remains()
+    {
+        var r = Plan(LockScenario(true), LockMachines());
+        r.ConflictList.Should().BeEmpty();
+        r.Of(2).Start.Should().Be(N(2, 8));
+        r.Of(3).End.Should().BeOnOrBefore(N(2, 11));
+        r.Of(1).Start.Should().BeAfter(N(2, 8));
+        var reason = r.Of(2).Reasons.Single(x => x.Code == PlanningReasonCode.AdvancedForLocked);
+        reason.RelatedWorkOrderId.Should().Be(4);
+        reason.Message.Should().Be("Anticipato per rispettare il lavoro fissato B/40");
+        r.Of(1).Reasons.Should().NotContain(x => x.Code == PlanningReasonCode.AdvancedForLocked);
+    }
+
+    [Fact]
+    public void Infeasible_chain_still_reports_the_conflict()
+    {
+        var r = Plan(LockScenario(true, 9), LockMachines());
+        r.ConflictList.Should().ContainSingle(c => c.Code == PlanningConflictCode.PredecessorAfterLockedStart && c.WorkOrderId == 4);
+    }
+
+    [Fact]
+    public void Cross_order_child_to_parent_dependency_is_advanced()
+    {
+        var r = Plan(
+        [
+            Job(1, 300, M1, order: "H", priority: 5, orderId: 1),
+            Job(2, 60, M1, order: "CH", priority: 1, orderId: 2),
+            Job(3, 60, [2], [2], order: "PA", priority: 1, orderId: 3),
+            LockedJob(4, 3, N(2, 11), N(2, 12), after: [3], order: "PA", op: 40, orderId: 3)
+        ], LockMachines());
+        r.ConflictList.Should().BeEmpty();
+        r.Of(2).Start.Should().Be(N(2, 8));
+    }
+
+    [Fact]
+    public void With_several_locked_descendants_the_minimum_deadline_wins()
+    {
+        var r = Plan(
+        [
+            Job(1, 300, M1, order: "H", priority: 5, orderId: 1),
+            Job(2, 60, M1, order: "B", priority: 1, orderId: 2),
+            LockedJob(3, 2, N(2, 15), N(2, 16), after: [2], order: "X", op: 10, orderId: 3),
+            LockedJob(4, 3, N(2, 10), N(2, 11), after: [2], order: "Y", op: 10, orderId: 4)
+        ], LockMachines());
+        r.ConflictList.Should().BeEmpty();
+        r.Of(2).Start.Should().Be(N(2, 8));
+        r.Of(2).Reasons.Single(x => x.Code == PlanningReasonCode.AdvancedForLocked).RelatedWorkOrderId.Should().Be(4);
+    }
+
+    [Fact]
+    public void Deadline_plan_is_deterministic()
+    {
+        var a = Plan(LockScenario(true), LockMachines());
+        var b = Plan(LockScenario(true), LockMachines());
+        a.Planned.Should().BeEquivalentTo(b.Planned, o => o.WithStrictOrdering());
+    }
+
     [Fact]
     public void Locked_plan_is_deterministic()
     {

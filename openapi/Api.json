@@ -6610,7 +6610,8 @@
           "CalendarClosed",
           "MachineBusy",
           "AssignedMachineNotEnabled",
-          "Locked"
+          "Locked",
+          "AdvancedForLocked"
         ]
       },
       "PlanningReasonModel": {
