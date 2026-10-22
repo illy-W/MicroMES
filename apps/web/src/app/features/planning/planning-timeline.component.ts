@@ -222,7 +222,7 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                   @for (s of legend; track s.label) {
                     <li class="inline-flex items-center gap-1.5">
                       <span class="relative inline-block h-4 w-9 shrink-0 overflow-hidden rounded-sm" [style.--oc]="legendColor" aria-hidden="true">
-                        <span class="absolute inset-0" [class]="s.ext"></span>
+                        <span class="absolute inset-0 rounded-sm" [class]="s.ext"></span>
                         <span class="absolute inset-y-0 left-0 w-6 rounded-sm" [class]="s.real + ' ' + s.strip"></span>
                         <span class="absolute bottom-0 left-0 h-[3px] w-6 bg-(--oc)"></span>
                       </span>
@@ -230,15 +230,15 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                     </li>
                   }
                 </ul>
-                <p class="text-muted-foreground text-xs">La traccia sul bordo inferiore è la durata reale; l'area più chiara oltre la traccia serve solo a leggere l'etichetta.</p>
+                <p class="text-muted-foreground text-xs">La traccia sul bordo inferiore è la durata reale; l'area grigia (o verde chiara se in esecuzione) oltre la traccia serve solo a leggere l'etichetta. Il colore dell'ordine compare solo sulla striscia a sinistra, sulla traccia e nel chip.</p>
                 <p class="text-muted-foreground text-xs">Le fasi terminate sono nascoste di default: usa il pulsante con l'occhio per mostrarle.</p>
               </section>
               <section class="flex flex-col gap-1.5" aria-label="Segnali">
                 <p class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Segnali sulla barra</p>
                 <ul class="flex flex-col gap-1.5">
-                  <li class="inline-flex items-center gap-1.5"><ng-icon name="lucideAlarmClock" size="14" class="text-destructive" aria-hidden="true" /> In ritardo</li>
-                  <li class="inline-flex items-center gap-1.5"><ng-icon name="lucideTriangleAlert" size="14" aria-hidden="true" /> Piano obsoleto</li>
-                  <li class="inline-flex items-center gap-1.5"><ng-icon name="lucideCircleAlert" size="14" class="text-destructive" aria-hidden="true" /> Sovraccarico della macchina</li>
+                  <li class="inline-flex items-center gap-1.5"><span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" aria-hidden="true"><ng-icon name="lucideAlarmClock" size="11" /></span> In ritardo (pallino rosso)</li>
+                  <li class="inline-flex items-center gap-1.5"><span class="bg-secondary text-secondary-foreground ring-border flex size-4 items-center justify-center rounded-full ring-1" aria-hidden="true"><ng-icon name="lucideTriangleAlert" size="11" /></span> Piano obsoleto</li>
+                  <li class="inline-flex items-center gap-1.5"><span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" aria-hidden="true"><ng-icon name="lucideCircleAlert" size="11" /></span> Sovraccarico della macchina</li>
                 </ul>
               </section>
               <section class="flex flex-col gap-1.5" aria-label="Tempo">

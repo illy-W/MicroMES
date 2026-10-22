@@ -21,21 +21,21 @@ interface StatusStyle {
 const STRIP = 'before:absolute before:inset-y-0 before:left-0 before:bg-(--oc)';
 
 /**
- * Stato = pattern, non solo colore. Le tinte sono classi letterali `tl-tint-*` (styles.scss): Tailwind non genera classi interpolate.
- * In attesa tratteggio chiaro · Pronto bordo pieno · In esecuzione verde pieno · In pausa punteggiato · Terminato grigio · Interrotto barrato.
+ * Stato = pattern, non solo colore. Nessuna tinta dell'ordine: lo sfondo è neutro (card), l'ordine si legge solo da striscia, traccia e chip; i bordi sono neutri.
+ * In attesa tratteggio chiaro · Pronto bordo pieno · In esecuzione verde tenue · In pausa punteggiato · Terminato grigio · Interrotto barrato.
  * Tratteggi/punteggiati solo su barre >= 96 px (`narrow` altrove).
  */
 export const STATUS_STYLE: Record<WorkOrderStatus, StatusStyle> = {
-  Waiting: { real: 'border border-dashed border-(color:--oc) tl-tint-7', narrow: 'tl-tint-7', ext: 'tl-tint-7', text: 'text-foreground', strip: `${STRIP} before:w-1` },
-  Ready: { real: 'border border-(color:--oc) tl-tint-16', narrow: 'border border-(color:--oc) tl-tint-16', ext: 'tl-tint-7', text: 'text-foreground', strip: `${STRIP} before:w-1` },
+  Waiting: { real: 'border border-dashed border-foreground/40 bg-card', narrow: 'bg-card', ext: 'bg-muted/40', text: 'text-foreground', strip: `${STRIP} before:w-1` },
+  Ready: { real: 'border border-foreground/50 bg-card', narrow: 'border border-foreground/50 bg-card', ext: 'bg-muted/40', text: 'text-foreground', strip: `${STRIP} before:w-1` },
   Running: {
-    real: 'tl-running border border-running bg-running shadow-sm',
-    narrow: 'tl-running border border-running bg-running shadow-sm',
-    ext: 'bg-running',
+    real: 'tl-running border border-running-foreground/25 bg-running shadow-sm',
+    narrow: 'tl-running border border-running-foreground/25 bg-running shadow-sm',
+    ext: 'bg-running/35',
     text: 'text-running-foreground',
-    strip: `${STRIP} before:w-1.5 before:border-r-2 before:border-running-foreground/80`,
+    strip: `${STRIP} before:w-1.5 before:border-r-2 before:border-running-foreground/60`,
   },
-  Interrupted: { real: 'border-2 border-dotted border-(color:--oc) tl-tint-10', narrow: 'tl-tint-10', ext: 'tl-tint-7', text: 'text-foreground', strip: `${STRIP} before:w-1` },
+  Interrupted: { real: 'border-2 border-dotted border-foreground/50 bg-card', narrow: 'bg-card', ext: 'bg-muted/40', text: 'text-foreground', strip: `${STRIP} before:w-1` },
   Ended: { real: 'border border-border bg-muted', narrow: 'border border-border bg-muted', ext: 'bg-muted', text: 'text-foreground/70', strip: `${STRIP} before:w-1 before:opacity-50` },
   Aborted: { real: 'border border-border bg-muted', narrow: 'border border-border bg-muted', ext: 'bg-muted', text: 'text-foreground/70 line-through', strip: `${STRIP} before:w-1 before:opacity-50` },
 };

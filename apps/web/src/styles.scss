@@ -47,8 +47,8 @@
   --chart-7: oklch(0.58 0.12 95);
   --chart-8: oklch(0.6 0.17 355);
   /* Stato "in esecuzione" (timeline): il verde è riservato a questo stato, nessuna tonalità --chart-n è verde. Contrasto testo/sfondo > 6:1. */
-  --running: oklch(0.48 0.12 150);
-  --running-foreground: oklch(0.985 0 0);
+  --running: oklch(0.85 0.09 150);
+  --running-foreground: oklch(0.27 0.06 150);
 }
 
 :root.dark {
@@ -88,8 +88,8 @@
   --chart-6: oklch(0.68 0.17 290);
   --chart-7: oklch(0.82 0.14 95);
   --chart-8: oklch(0.72 0.16 355);
-  --running: oklch(0.5 0.12 150);
-  --running-foreground: oklch(0.985 0 0);
+  --running: oklch(0.42 0.07 150);
+  --running-foreground: oklch(0.96 0.03 150);
 }
 
 @theme inline {
@@ -184,17 +184,6 @@ table {
   --ngd-minimap-stroke-primary-default: var(--border);
 }
 
-/* Timeline: tinte dell'ordine (--oc) su --card. Classi letterali: Tailwind non genera classi interpolate. */
-.tl-tint-7 {
-  background-color: color-mix(in oklch, var(--oc) 7%, var(--card));
-}
-.tl-tint-10 {
-  background-color: color-mix(in oklch, var(--oc) 10%, var(--card));
-}
-.tl-tint-16 {
-  background-color: color-mix(in oklch, var(--oc) 16%, var(--card));
-}
-
 /* Timeline: riflesso diagonale chiaro sulle fasi in esecuzione (verde pieno; statico con prefers-reduced-motion). */
 .tl-running::after {
   content: '';
@@ -203,11 +192,11 @@ table {
   pointer-events: none;
   background-image: linear-gradient(
     135deg,
-    color-mix(in oklch, var(--running-foreground) 9%, transparent) 25%,
+    color-mix(in oklch, var(--running-foreground) 5%, transparent) 25%,
     transparent 25%,
     transparent 50%,
-    color-mix(in oklch, var(--running-foreground) 9%, transparent) 50%,
-    color-mix(in oklch, var(--running-foreground) 9%, transparent) 75%,
+    color-mix(in oklch, var(--running-foreground) 5%, transparent) 50%,
+    color-mix(in oklch, var(--running-foreground) 5%, transparent) 75%,
     transparent 75%
   );
   background-size: 20px 20px;
