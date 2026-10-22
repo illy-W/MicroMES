@@ -119,6 +119,13 @@ See `AGENTS.md` for the project table and dependency direction.
 - Bench: `PlanningBench` (libs/api-tests) measures total lateness, last end and utilization on fixed scenarios; the baselines are regression ceilings for any future engine.
 - Web: `features/planning` (page, preview dialog reusable from the order detail, timeline with an own CSS grid in the company time zone, work panel, alerts); plan columns in work orders; a "Piano" block and a banner in the order detail. The toaster is deferred (`@defer (on idle)`) to keep the initial bundle under 500 kB.
 
+### Plan lock (specs/planning-lock)
+
+- `WorkOrder.IsPlanLocked/PlanLockedAt`; `allowedActions` `Lock`/`Move`/`Unlock` (work order) and `LockAll`/`UnlockAll` (order). The lock is cleared in `WorkOrderService.ApplyAsync` when the job starts, ends or is aborted, and when the order is closed or cancelled.
+- Engine: locked jobs are fixed intervals (reason `Locked`); conflicts (`PredecessorAfterLockedStart`, `LockedOverCapacity`) are in the result, `notMoved[]` and `conflicts[]` in preview/apply, `keptLocked` in remove-plan. Bench scenario 5 covers locked jobs.
+- `PlanLockService` + `ManualMoveCalculator` (pure): `move/preview` and `move` (start UTC + optional machine; end computed with the calendar; 422 for past or non-working start with the next working instant; conflicts `PredecessorEndsAfterStart`, `SuccessorsStartBeforeEnd`, `MachineOverCapacity`, `Late` never block; `expectedUpdatedAt` for 409). Alerts `LockedPredecessorConflict`, `LockedMachineUnavailable`, `LockedOverCapacity`, `LockedLate`; `planStatusReason` (`StaleCause`) with locked causes; filter `locked=true` on timeline and work orders.
+- Web: `features/planning` `plan-lock.ts` (company time zone conversion, labels), `plan-lock-actions.ts`, `plan-move-dialog.component.ts`; padlock on bars, legend and 'Solo fissati' filter (`locked=1`); order actions and badge in `features/production-orders`.
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.

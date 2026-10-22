@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideArrowRight, lucideCircleCheck, lucideClock, lucideMove, lucidePlus, lucideSearch, lucideTriangleAlert } from '@ng-icons/lucide';
-import type { PlanChangeKind, PlanningItemModel, PlanningPreviewModel, PlanningScope } from '@micromes/api-client/models';
+import { lucideArrowRight, lucideCircleCheck, lucideClock, lucideLock, lucideMove, lucidePlus, lucideSearch, lucideTriangleAlert } from '@ng-icons/lucide';
+import type { PlanChangeKind, PlanningConflictModel, PlanningItemModel, PlanningPreviewModel, PlanningScope } from '@micromes/api-client/models';
 import { PlanningService } from '@micromes/api-client/services/planning';
 import { toast } from '@spartan-ng/brain/sonner';
 import { HlmBadge } from '@spartan-ng/helm/badge';
@@ -28,7 +28,7 @@ const CHANGE: Record<PlanChangeKind, { label: string; icon: string }> = {
 @Component({
   selector: 'app-plan-preview-dialog',
   imports: [HlmDialogImports, HlmButton, HlmBadge, HlmInput, HlmLabel, HlmSkeleton, HlmSwitch, HlmTableImports, HlmTooltipImports, NgIcon],
-  providers: [provideIcons({ lucideArrowRight, lucideCircleCheck, lucideClock, lucideMove, lucidePlus, lucideSearch, lucideTriangleAlert })],
+  providers: [provideIcons({ lucideArrowRight, lucideCircleCheck, lucideClock, lucideLock, lucideMove, lucidePlus, lucideSearch, lucideTriangleAlert })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-dialog state="open" (closed)="closed.emit()">
@@ -61,6 +61,12 @@ const CHANGE: Record<PlanChangeKind, { label: string; icon: string }> = {
                 @if (p.summary.lateOrders > 0) { (max {{ p.summary.maxLateDays }} giorni) }
               </span>
               · <strong>{{ p.summary.unplanned }}</strong> non pianificabili
+              @if ((p.summary.lockedCount ?? 0) > 0) {
+                · <span hlmBadge variant="outline" class="gap-1 px-1.5" data-testid="locked-chip"><ng-icon name="lucideLock" size="12" aria-hidden="true" /> {{ p.summary.lockedCount }} fissati</span>
+              }
+              @if ((p.summary.conflictCount ?? 0) > 0) {
+                · <span hlmBadge variant="outline" class="text-destructive gap-1 px-1.5" data-testid="conflict-chip"><ng-icon name="lucideTriangleAlert" size="12" aria-hidden="true" /> {{ p.summary.conflictCount }} conflitti</span>
+              }
               @if (p.summary.lastEnd) { · fine ultimo lavoro <strong class="tabular-nums">{{ fmt(p.summary.lastEnd) }}</strong> }
             </p>
 
@@ -156,6 +162,50 @@ const CHANGE: Record<PlanChangeKind, { label: string; icon: string }> = {
               </section>
             }
 
+            @if (p.conflicts?.length) {
+              <section aria-labelledby="plan-conflicts-title" class="grid gap-2" data-testid="plan-conflicts">
+                <h3 id="plan-conflicts-title" class="text-sm font-semibold">Conflitti ({{ p.conflicts!.length }})</h3>
+                <p class="text-muted-foreground text-xs">I conflitti non bloccano l'applicazione del piano: i lavori fissati restano dove sono.</p>
+                <ul class="grid gap-1.5">
+                  @for (c of p.conflicts!; track $index) {
+                    <li class="border-destructive/40 flex items-start gap-2 rounded-md border p-2 text-sm">
+                      <ng-icon name="lucideTriangleAlert" class="text-destructive mt-0.5 shrink-0" size="16" aria-hidden="true" />
+                      <span>
+                        <span class="sr-only">Conflitto: </span>{{ c.message }}
+                        @if (c.minutes > 0) { <span class="text-muted-foreground tabular-nums"> ({{ c.minutes }} min)</span> }
+                      </span>
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
+
+            @if (p.notMoved?.length) {
+              <section aria-labelledby="plan-notmoved-title" class="grid gap-2" data-testid="plan-not-moved">
+                <h3 id="plan-notmoved-title" class="text-sm font-semibold">
+                  <button type="button" class="flex items-center gap-1.5" [attr.aria-expanded]="notMovedOpen(p.notMoved!.length)" aria-controls="plan-notmoved-list" (click)="notMovedToggle.set(!notMovedOpen(p.notMoved!.length))">
+                    <ng-icon name="lucideLock" size="14" aria-hidden="true" /> Non spostati (fissati) ({{ p.notMoved!.length }})
+                    <span class="text-muted-foreground text-xs font-normal">{{ notMovedOpen(p.notMoved!.length) ? 'Comprimi' : 'Espandi' }}</span>
+                  </button>
+                </h3>
+                @if (notMovedOpen(p.notMoved!.length)) {
+                  <ul id="plan-notmoved-list" class="grid gap-1.5">
+                    @for (n of p.notMoved!; track n.workOrderId) {
+                      <li class="flex items-start gap-2 rounded-md border p-2 text-sm">
+                        <ng-icon name="lucideLock" class="text-muted-foreground mt-0.5 shrink-0" size="16" aria-hidden="true" />
+                        <span>
+                          <span class="font-medium">{{ n.code }}</span> · {{ n.processSegmentName }}
+                          @if (n.equipment) { · {{ n.equipment.code }} }
+                          · <span class="tabular-nums">{{ fmt(n.start) }} → {{ fmt(n.end) }}</span>
+                          <span class="text-muted-foreground block text-xs">{{ n.message }}</span>
+                        </span>
+                      </li>
+                    }
+                  </ul>
+                }
+              </section>
+            }
+
             @if (error()) {
               <p class="text-destructive text-sm" role="alert">{{ error() }}</p>
             }
@@ -187,6 +237,10 @@ export class PlanPreviewDialogComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly onlyChanges = signal(true);
   protected readonly search = signal('');
+  protected readonly notMovedToggle = signal<boolean | null>(null);
+  protected notMovedOpen(count: number): boolean {
+    return this.notMovedToggle() ?? count <= 5;
+  }
 
   protected readonly title = computed(() =>
     this.scope() === 'All' ? 'Ripianifica tutto' : this.scope() === 'Order' ? 'Pianifica ordine' : 'Pianifica non pianificati',
@@ -250,6 +304,14 @@ export class PlanPreviewDialogComponent implements OnInit {
         this.api.applyPlan({ scope: this.scope(), productionOrderId: this.productionOrderId(), previewToken: p.token }),
       );
       toast.success(`Piano applicato: ${r.summary.planned} lavori pianificati (${r.summary.new} nuovi, ${r.summary.moved} spostati)`);
+      if ((r.summary.conflictCount ?? 0) > 0) {
+        toast.warning(`${r.summary.conflictCount} conflitti con lavori fissati`, {
+          description: (r.conflicts ?? []).slice(0, 3).map((c: PlanningConflictModel) => c.message).join(' · '),
+        });
+      }
+      if ((r.summary.lockedCount ?? 0) > 0) {
+        toast.info(`${r.summary.lockedCount} lavori fissati non spostati`, { description: (r.notMoved ?? []).map((n) => n.code).join(', ') });
+      }
       if (r.differsFromPreview) {
         toast.warning("Il piano è cambiato rispetto all'anteprima", { description: 'Controlla le date applicate.' });
       }

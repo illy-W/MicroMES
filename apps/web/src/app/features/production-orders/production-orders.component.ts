@@ -4,6 +4,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideCalendarClock,
   lucideCircleCheck,
+  lucideLock,
   lucideCircleDot,
   lucideCircleOff,
   lucideClipboardList,
@@ -85,6 +86,7 @@ const ALL = 'all';
     provideIcons({
       lucideCalendarClock,
       lucideCircleCheck,
+      lucideLock,
       lucideCircleDot,
       lucideCircleOff,
       lucideClipboardList,
@@ -218,6 +220,11 @@ const ALL = 'all';
                             <span hlmBadge variant="outline" class="px-1.5" [class]="st.tone">
                               <ng-icon [name]="st.icon" /> {{ st.label }}
                             </span>
+                            @if (o.lockedWorkOrdersCount > 0) {
+                              <span hlmBadge variant="outline" class="ml-1 gap-1 px-1.5">
+                                <ng-icon name="lucideLock" size="12" aria-hidden="true" /> {{ o.lockedWorkOrdersCount }} fissati
+                              </span>
+                            }
                           }
                           @case ('priority') {
                             {{ o.priority }}

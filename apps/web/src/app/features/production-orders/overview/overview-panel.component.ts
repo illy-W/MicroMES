@@ -7,6 +7,7 @@ import {
   lucideCircleDot,
   lucideCircleOff,
   lucideClock,
+  lucideLock,
   lucideOctagonX,
   lucidePause,
   lucidePlay,
@@ -55,6 +56,7 @@ interface LinkedWork {
       lucideCircleDot,
       lucideCircleOff,
       lucideClock,
+      lucideLock,
       lucideOctagonX,
       lucidePause,
       lucidePlay,
@@ -106,6 +108,9 @@ interface LinkedWork {
                 <span class="text-muted-foreground">—</span>
               }
               <app-plan-status-badge [status]="w.planStatus" [hide]="hiddenPlan(w)" />
+              @if (w.isPlanLocked) {
+                <span hlmBadge variant="outline" class="gap-1 px-1.5"><ng-icon name="lucideLock" size="12" aria-hidden="true" /> Fissato</span>
+              }
             </dd>
             <dt class="text-muted-foreground">Pianificato</dt>
             <dd class="tabular-nums">{{ qty(w.plannedQuantity) }} {{ unit(workOrder()?.unitOfMeasure) }}</dd>

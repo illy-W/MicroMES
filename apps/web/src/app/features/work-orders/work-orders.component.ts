@@ -188,6 +188,10 @@ const NUMERIC_COLUMNS = new Set(['planned', 'good', 'scrap', 'plannedTime', 'wor
             }
           </hlm-select-content>
         </hlm-select>
+        <label class="flex items-center gap-2 text-sm" for="wo-only-locked">
+          <hlm-switch inputId="wo-only-locked" [checked]="onlyLocked()" (checkedChange)="setOnlyLocked($event)" />
+          Solo fissati
+        </label>
         <label class="flex items-center gap-2 text-sm" for="wo-sort-plan">
           <hlm-switch inputId="wo-sort-plan" [checked]="sortByPlan()" (checkedChange)="sortByPlan.set($event)" />
           Ordina per inizio previsto
@@ -426,6 +430,7 @@ export class WorkOrdersComponent implements OnInit {
   protected readonly planLabel = (value: string): string => this.planOptions.find((o) => o.value === value)?.label ?? value;
   protected readonly planFilter = signal<string>(ALL);
   protected readonly sortByPlan = signal(false);
+  protected readonly onlyLocked = signal(false);
   private readonly calendars = inject(CalendarsStore);
   protected readonly fmt = (iso: string): string => formatDateTime(iso, this.calendars.timeZone());
 
@@ -474,6 +479,7 @@ export class WorkOrdersComponent implements OnInit {
     const m = this.machineFilter();
     const p = this.planFilter();
     const byPlan = this.sortByPlan();
+    const lockedOnly = this.onlyLocked();
     return this.store
       .workOrders()
       .filter(
@@ -481,6 +487,7 @@ export class WorkOrdersComponent implements OnInit {
           (s === ALL || (s === OPERATIONAL ? OPERATIONAL_STATUSES.includes(w.status) : w.status === s)) &&
           (o === ALL || String(w.productionOrderId) === o) &&
           (p === ALL || (w.planStatus === p && (p !== 'Unplanned' || isOpen(w)))) &&
+          (!lockedOnly || w.isPlanLocked) &&
           (m === ALL || String(w.assignedEquipment?.id) === m) &&
           (!q ||
             w.code.toLowerCase().includes(q) ||
@@ -518,6 +525,7 @@ export class WorkOrdersComponent implements OnInit {
       this.orderFilter();
       this.machineFilter();
       this.planFilter();
+      this.onlyLocked();
       untracked(() => this.table.resetPageIndex());
     });
     // ?order=<id> dalla pagina dell'ordine: mostra tutti i lavori di quell'ordine.
@@ -529,6 +537,11 @@ export class WorkOrdersComponent implements OnInit {
           this.statusFilter.set(ALL);
         }
       });
+    });
+    // ?locked=true: filtro «Solo fissati» persistito nell'URL.
+    effect(() => {
+      const v = this.queryParams().get('locked') === 'true';
+      untracked(() => this.onlyLocked.set(v));
     });
   }
 
@@ -571,11 +584,17 @@ export class WorkOrdersComponent implements OnInit {
     return w.predecessors.map((p) => `${p.code} (${workStatus(p.status).label})`).join(', ');
   }
 
+  protected setOnlyLocked(value: boolean): void {
+    this.onlyLocked.set(value);
+    void this.router.navigate([], { queryParams: { locked: value ? 'true' : null }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
   protected resetFilters(): void {
     this.search.set('');
     this.statusFilter.set(OPERATIONAL);
     this.machineFilter.set(ALL);
     this.planFilter.set(ALL);
+    this.setOnlyLocked(false);
     this.clearOrderFilter();
   }
 

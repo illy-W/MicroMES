@@ -10,6 +10,7 @@ import {
   lucideCircleOff,
   lucideClock,
   lucideFileQuestion,
+  lucideLock,
   lucideOctagonX,
   lucidePause,
   lucidePlay,
@@ -27,11 +28,15 @@ import {
 } from '@tanstack/angular-table';
 import {
   ProductionOrderStatus,
+  type LockAllResultModel,
   type ProductionOrderDetailModel,
   type ProductionOrderTreeModel,
   type WorkOrderLinkModel,
 } from '@micromes/api-client/models';
 import { HlmBadge } from '@spartan-ng/helm/badge';
+import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
+import { HlmLabel } from '@spartan-ng/helm/label';
+import { ProductionOrdersService } from '@micromes/api-client/services/production-orders';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmProgressImports } from '@spartan-ng/helm/progress';
@@ -80,6 +85,8 @@ const columns = columnHelper.columns([
     HlmTabsImports,
     HlmAlertDialogImports,
     HlmBadge,
+    HlmCheckbox,
+    HlmLabel,
     HlmButton,
     PlanPreviewDialogComponent,
     PlanStatusBadgeComponent,
@@ -99,6 +106,7 @@ const columns = columnHelper.columns([
       lucideCircleOff,
       lucideClock,
       lucideFileQuestion,
+      lucideLock,
       lucideOctagonX,
       lucidePause,
       lucidePlay,
@@ -166,6 +174,17 @@ const columns = columnHelper.columns([
                   <span class="tabular-nums">{{ planDate(o.plannedStart) }} – {{ planDate(o.plannedEnd) }}</span>
                 }
                 <app-plan-status-badge [status]="o.planStatus" />
+                @if (o.lockedWorkOrdersCount > 0) {
+                  <span hlmBadge variant="outline" class="gap-1 px-1.5" data-testid="locked-badge">
+                    <ng-icon name="lucideLock" size="12" aria-hidden="true" /> {{ o.lockedWorkOrdersCount }} fissati
+                  </span>
+                }
+                @if (can('LockAll')) {
+                  <button hlmBtn size="sm" variant="ghost" type="button" (click)="openLockAll('lock')">Fissa tutti i lavori aperti</button>
+                }
+                @if (can('UnlockAll')) {
+                  <button hlmBtn size="sm" variant="ghost" type="button" (click)="openLockAll('unlock')">Sblocca tutti</button>
+                }
                 <button hlmBtn size="sm" variant="outline" type="button" (click)="planOpen.set(true)">Pianifica</button>
                 @if (hasPlan()) {
                   <button hlmBtn size="sm" variant="ghost" type="button" (click)="removeOpen.set(true)">Rimuovi piano</button>
@@ -463,6 +482,56 @@ const columns = columnHelper.columns([
             </ng-template>
           </hlm-alert-dialog>
         }
+        @if (lockAllMode(); as mode) {
+          <hlm-alert-dialog state="open" (closed)="lockAllMode.set(null)">
+            <ng-template hlmAlertDialogPortal>
+              <hlm-alert-dialog-content>
+                <hlm-alert-dialog-header>
+                  <h2 hlmAlertDialogTitle>{{ mode === 'lock' ? 'Fissare tutti i lavori aperti?' : 'Sbloccare tutti i lavori?' }}</h2>
+                  <p hlmAlertDialogDescription>
+                    @if (mode === 'lock') {
+                      I lavori aperti pianificati di {{ o.code }} saranno fissati e la ripianificazione non li sposterà.
+                    } @else {
+                      {{ o.lockedWorkOrdersCount }} {{ o.lockedWorkOrdersCount === 1 ? 'lavoro fissato' : 'lavori fissati' }} di {{ o.code }} {{ o.lockedWorkOrdersCount === 1 ? 'sarà sbloccato' : 'saranno sbloccati' }}.
+                    }
+                  </p>
+                </hlm-alert-dialog-header>
+                <div class="flex items-center gap-2">
+                  <hlm-checkbox inputId="lock-all-children" [checked]="includeChildren()" (checkedChange)="includeChildren.set($event)" />
+                  <label hlmLabel for="lock-all-children">Includi gli ordini figli</label>
+                </div>
+                <hlm-alert-dialog-footer>
+                  <button hlmAlertDialogCancel>Indietro</button>
+                  <button hlmBtn type="button" [disabled]="lockAllBusy()" (click)="runLockAll(o.id, mode)">
+                    {{ lockAllBusy() ? 'Operazione in corso…' : mode === 'lock' ? 'Fissa tutti' : 'Sblocca tutti' }}
+                  </button>
+                </hlm-alert-dialog-footer>
+              </hlm-alert-dialog-content>
+            </ng-template>
+          </hlm-alert-dialog>
+        }
+        @if (lockResult(); as lr) {
+          <hlm-alert-dialog state="open" (closed)="lockResult.set(null)">
+            <ng-template hlmAlertDialogPortal>
+              <hlm-alert-dialog-content>
+                <hlm-alert-dialog-header>
+                  <h2 hlmAlertDialogTitle>{{ lr.locked }} {{ lr.locked === 1 ? 'lavoro fissato' : 'lavori fissati' }}</h2>
+                  <p hlmAlertDialogDescription>{{ lr.skipped.length }} {{ lr.skipped.length === 1 ? 'lavoro non fissato' : 'lavori non fissati' }}.</p>
+                </hlm-alert-dialog-header>
+                @if (lr.skipped.length) {
+                  <ul class="grid max-h-60 gap-1.5 overflow-auto text-sm" aria-label="Lavori non fissati">
+                    @for (k of lr.skipped; track k.workOrderId) {
+                      <li class="rounded-md border p-2"><span class="font-medium">{{ k.code }}</span>: {{ k.reason }}</li>
+                    }
+                  </ul>
+                }
+                <hlm-alert-dialog-footer>
+                  <button hlmAlertDialogCancel>Chiudi</button>
+                </hlm-alert-dialog-footer>
+              </hlm-alert-dialog-content>
+            </ng-template>
+          </hlm-alert-dialog>
+        }
         @if (formOpen()) {
           <app-production-order-form-dialog [order]="o" (saved)="formOpen.set(false); reload()" (closed)="formOpen.set(false)" />
         }
@@ -494,6 +563,11 @@ export class ProductionOrderDetailComponent {
   protected readonly planOpen = signal(false);
   protected readonly removeOpen = signal(false);
   protected readonly removing = signal(false);
+  protected readonly lockAllMode = signal<'lock' | 'unlock' | null>(null);
+  protected readonly includeChildren = signal(false);
+  protected readonly lockAllBusy = signal(false);
+  protected readonly lockResult = signal<LockAllResultModel | null>(null);
+  private readonly ordersApi = inject(ProductionOrdersService);
   /** Incrementato dopo applica/rimuovi piano: ricarica anche la panoramica. */
   protected readonly refreshTick = signal(0);
   private readonly calendars = inject(CalendarsStore);
@@ -583,11 +657,44 @@ export class ProductionOrderDetailComponent {
     this.reload();
   }
 
+  protected openLockAll(mode: 'lock' | 'unlock'): void {
+    this.includeChildren.set(false);
+    this.lockAllMode.set(mode);
+  }
+
+  protected async runLockAll(id: number, mode: 'lock' | 'unlock'): Promise<void> {
+    this.lockAllBusy.set(true);
+    try {
+      const params = { includeChildren: this.includeChildren() };
+      if (mode === 'lock') {
+        const r = await firstValueFrom(this.ordersApi.lockAllProductionOrderWorkOrders(id, params));
+        this.lockAllMode.set(null);
+        if (r.skipped.length) this.lockResult.set(r);
+        else toast.success(`${r.locked} ${r.locked === 1 ? 'lavoro fissato' : 'lavori fissati'}`);
+      } else {
+        const r = await firstValueFrom(this.ordersApi.unlockAllProductionOrderWorkOrders(id, params));
+        this.lockAllMode.set(null);
+        toast.success(`${r.unlocked} ${r.unlocked === 1 ? 'lavoro sbloccato' : 'lavori sbloccati'}`);
+      }
+      this.reloadAll();
+    } catch (e) {
+      toast.error(toFailure(e).message);
+    } finally {
+      this.lockAllBusy.set(false);
+    }
+  }
+
   protected async removePlan(id: number): Promise<void> {
     this.removing.set(true);
     try {
       const r = await firstValueFrom(this.planning.removeOrderPlan(id));
       toast.success(`Piano rimosso: ${r.clearedWorkOrders} ${r.clearedWorkOrders === 1 ? 'lavoro' : 'lavori'} non più pianificati`);
+      const kept = r.keptLocked ?? [];
+      if (kept.length) {
+        toast.warning(`${kept.length} ${kept.length === 1 ? 'lavoro fissato non è stato toccato' : 'lavori fissati non sono stati toccati'}: ${kept.join(', ')}`, {
+          description: 'Sbloccali dalla pagina Lavori per poterli rimuovere dal piano.',
+        });
+      }
       this.removeOpen.set(false);
       this.reloadAll();
     } catch (e) {
