@@ -32,6 +32,10 @@ public class WorkOrder : IEntity<int>
     public DateTime? PlannedEndAt { get; set; }
     /// <summary>When the plan was written (UTC); null = not planned.</summary>
     public DateTime? PlannedAt { get; set; }
+    /// <summary>Manual lock of the plan: the engine never moves a locked work order. Cleared when the work order starts or its order is closed.</summary>
+    public bool IsPlanLocked { get; set; }
+    /// <summary>When the plan was locked (UTC); null when not locked.</summary>
+    public DateTime? PlanLockedAt { get; set; }
     public WorkOrderStatus Status { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }

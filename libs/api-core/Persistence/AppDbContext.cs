@@ -116,6 +116,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.PlannedQuantity).HasPrecision(18, 4);
             entity.Property(x => x.Notes).HasMaxLength(1000);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(50);
+            entity.Property(x => x.IsPlanLocked).HasDefaultValue(false);
             entity.HasIndex(x => new { x.ProductionOrderId, x.OperationNumber }).IsUnique();
             entity.HasOne<ProductionOrder>().WithMany().HasForeignKey(x => x.ProductionOrderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ProcessSegment>().WithMany().HasForeignKey(x => x.ProcessSegmentId).OnDelete(DeleteBehavior.Restrict);

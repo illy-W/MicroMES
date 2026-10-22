@@ -203,10 +203,42 @@ public class ProductionData(TimeProvider timeProvider)
             PlannedEndAt = wo.PlannedEndAt,
             PlannedAt = wo.PlannedAt,
             PlanStatus = PlanStatusOf(wo),
+            IsPlanLocked = wo.IsPlanLocked,
+            PlanLockedAt = wo.PlanLockedAt,
             Predecessors = PredecessorIds(wo.Id).Select(ToLink).OrderBy(l => l.Code, StringComparer.Ordinal).ToList(),
             Successors = SuccessorIds(wo.Id).Select(ToLink).OrderBy(l => l.Code, StringComparer.Ordinal).ToList(),
-            AllowedActions = MachineOf(wo).AllowedActions.ToList()
+            AllowedActions = MachineOf(wo).AllowedActions.Concat(PlanActionsOf(wo)).ToList()
         };
+    }
+
+    // ---- plan lock ---------------------------------------------------------------------------------
+
+    /// <summary>True when the phase of the work order has machines linked (so a plan needs an assigned machine).</summary>
+    public bool SegmentHasMachines(int processSegmentId) => EquipmentLinks.Any(l => l.ProcessSegmentId == processSegmentId);
+
+    /// <summary>Why the work order cannot take plan commands (lock/move), or null when it can. Not a state machine rule.</summary>
+    public string? PlanCommandDenial(WorkOrder wo, string verb)
+    {
+        var order = Orders[wo.ProductionOrderId];
+        if (wo.Status is not (WorkOrderStatus.Waiting or WorkOrderStatus.Ready or WorkOrderStatus.Interrupted))
+            return $"Il lavoro è in stato '{WorkOrderMachineState.StatusLabel(wo.Status)}': {verb} solo un lavoro In attesa, Pronto o Interrotto.";
+        if (order.Status is not (ProductionOrderStatus.Released or ProductionOrderStatus.InProgress))
+            return $"L'ordine di produzione {order.Code} non è in corso (stato {order.Status}): {verb} solo un lavoro di un ordine Rilasciato o In corso.";
+        return null;
+    }
+
+    /// <summary>True when the work order has what a lock needs: planned start and, if the phase has machines, an assigned one.</summary>
+    public bool IsPlanLockable(WorkOrder wo)
+        => wo.PlannedStartAt is not null && wo.PlannedEndAt is not null
+            && (wo.AssignedEquipmentId is not null || !SegmentHasMachines(wo.ProcessSegmentId));
+
+    /// <summary>Lock / Move / Unlock: single source for the plan commands of the UI.</summary>
+    public IEnumerable<string> PlanActionsOf(WorkOrder wo)
+    {
+        var open = PlanCommandDenial(wo, "") is null;
+        if (open && !wo.IsPlanLocked && IsPlanLockable(wo)) yield return "Lock";
+        if (open) yield return "Move";
+        if (wo.IsPlanLocked) yield return "Unlock";
     }
 
     public WorkOrderEquipmentModel? ToEquipmentModel(int? equipmentId, int processSegmentId)
@@ -239,7 +271,7 @@ public class ProductionData(TimeProvider timeProvider)
             Notes = m.Notes, Status = m.Status,
             AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
             StartedAt = m.StartedAt, EndedAt = m.EndedAt, PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt,
-            PlannedAt = m.PlannedAt, PlanStatus = m.PlanStatus, Predecessors = m.Predecessors, Successors = m.Successors,
+            PlannedAt = m.PlannedAt, PlanStatus = m.PlanStatus, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt, Predecessors = m.Predecessors, Successors = m.Successors,
             AllowedActions = m.AllowedActions,
             Sessions = SessionsOf(wo.Id).Select(s => new WorkOrderSessionModel
             {
@@ -401,7 +433,7 @@ public class ProductionData(TimeProvider timeProvider)
                     AssignedEquipment = m.AssignedEquipment, CurrentEquipment = m.CurrentEquipment,
                     PlannedQuantity = m.PlannedQuantity, GoodQuantity = m.GoodQuantity, ScrapQuantity = m.ScrapQuantity,
                     PlannedMinutes = m.PlannedMinutes, WorkedMinutes = m.WorkedMinutes,
-                    PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt, PlanStatus = m.PlanStatus,
+                    PlannedStartAt = m.PlannedStartAt, PlannedEndAt = m.PlannedEndAt, PlanStatus = m.PlanStatus, IsPlanLocked = m.IsPlanLocked, PlanLockedAt = m.PlanLockedAt,
                     AllowedActions = m.AllowedActions,
                     Materials = Lines.Where(l => l.WorkOrderId == w.Id).OrderBy(l => l.Id).Select(ToMaterialModel).ToList()
                 };

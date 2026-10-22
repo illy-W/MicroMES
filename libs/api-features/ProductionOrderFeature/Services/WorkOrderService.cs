@@ -176,6 +176,49 @@ public class WorkOrderService(
         return ProductionOrderResult<WorkOrderDetailModel>.Ok(data.ToWorkOrderDetail(wo));
     }
 
+    /// <summary>Locks the current plan (start, end, machine unchanged). 409 when not planned or not lockable.</summary>
+    public Task<ProductionOrderResult<WorkOrderDetailModel>> LockPlanAsync(int id) => SetPlanLockAsync(id, true);
+
+    /// <summary>Removes the lock; nothing else changes.</summary>
+    public Task<ProductionOrderResult<WorkOrderDetailModel>> UnlockPlanAsync(int id) => SetPlanLockAsync(id, false);
+
+    private async Task<ProductionOrderResult<WorkOrderDetailModel>> SetPlanLockAsync(int id, bool locked)
+    {
+        var data = await loader.LoadFamilyByWorkOrderAsync(id);
+        if (data is null || !data.WorkOrders.TryGetValue(id, out var wo))
+            return ProductionOrderResult<WorkOrderDetailModel>.NotFound("Ordine di lavoro non trovato.");
+
+        if (locked)
+        {
+            if (data.PlanCommandDenial(wo, "si fissa") is { } denial) return ProductionOrderResult<WorkOrderDetailModel>.Conflict(denial);
+            if (wo.IsPlanLocked) return ProductionOrderResult<WorkOrderDetailModel>.Conflict("Il lavoro è già fissato.");
+            if (wo.PlannedStartAt is null || wo.PlannedEndAt is null)
+                return ProductionOrderResult<WorkOrderDetailModel>.Conflict("Il lavoro non è pianificato: pianifica il lavoro oppure scegli un orario con Sposta.");
+            if (!data.IsPlanLockable(wo))
+                return ProductionOrderResult<WorkOrderDetailModel>.Conflict("Il lavoro non ha una macchina assegnata: assegna la macchina oppure scegli macchina e orario con Sposta.");
+        }
+        else if (!wo.IsPlanLocked)
+            return ProductionOrderResult<WorkOrderDetailModel>.Conflict("Il lavoro non è fissato: non c'è nulla da sbloccare.");
+
+        try
+        {
+            unitOfWork.BeginTransaction();
+            var now = data.TimeProvider.GetUtcNow().UtcDateTime;
+            wo.IsPlanLocked = locked;
+            wo.PlanLockedAt = locked ? now : null;
+            wo.UpdatedAt = now;
+            Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile aggiornare l'ordine di lavoro.");
+            unitOfWork.Commit();
+        }
+        catch (Exception ex)
+        {
+            try { unitOfWork.Rollback(); } catch { /* transaction already gone */ }
+            return ProductionOrderResult<WorkOrderDetailModel>.Failed(ProductionOrderFailure.None,
+                $"Impossibile {(locked ? "fissare" : "sbloccare")} il lavoro: {ex.Message}");
+        }
+        return ProductionOrderResult<WorkOrderDetailModel>.Ok(data.ToWorkOrderDetail(wo));
+    }
+
     private static void Remember(ProductionData data, WorkOrder wo, Equipment equipment)
     {
         data.Equipment[equipment.Id] = equipment;
@@ -203,6 +246,13 @@ public class WorkOrderService(
                 session.EquipmentCode = equipment.Code;
                 session.EquipmentName = equipment.Name;
             }
+        }
+
+        // The plan lock disappears when the work order starts or ends (also when its order is closed): the real dates take over.
+        if (wo.Status is WorkOrderStatus.Running or WorkOrderStatus.Ended or WorkOrderStatus.Aborted && wo.IsPlanLocked)
+        {
+            wo.IsPlanLocked = false;
+            wo.PlanLockedAt = null;
         }
 
         Persist.Ensure(await WorkOrders.UpdateAsync(wo), "Impossibile aggiornare l'ordine di lavoro.");

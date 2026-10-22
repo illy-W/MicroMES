@@ -729,12 +729,20 @@ namespace MicroMES.ApiCore.Persistence.Migrations
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IsPlanLocked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
                     b.Property<int>("OperationNumber")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PlanLockedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("PlannedAt")
                         .HasColumnType("timestamp with time zone");

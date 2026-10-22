@@ -50,6 +50,9 @@ public class TimelineWorkOrderModel
     public DateTime? ActualEndAt { get; set; }
     public required WorkOrderStatus Status { get; set; }
     public required PlanStatus PlanStatus { get; set; }
+    /// <summary>Manual lock of the plan and when it was set (UTC).</summary>
+    public required bool IsPlanLocked { get; set; }
+    public DateTime? PlanLockedAt { get; set; }
     /// <summary>Planned end after the requested end of the order.</summary>
     public required bool IsLate { get; set; }
     /// <summary>Whole days of delay (rounded up); 0 when not late.</summary>

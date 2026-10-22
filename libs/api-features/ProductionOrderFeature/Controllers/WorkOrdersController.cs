@@ -72,6 +72,22 @@ public class WorkOrdersController(WorkOrderService service) : ControllerBase
     public async Task<IActionResult> AssignWorkOrderEquipment(int id, [FromBody] AssignEquipmentRequest request)
         => ToResponse(await service.AssignEquipmentAsync(id, request));
 
+    /// <summary>Locks the current plan of the work order (no body). 409 when not planned or status/order not allowed.</summary>
+    [HttpPost("{id:int}/lock", Name = "LockWorkOrderPlan")]
+    [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> LockWorkOrderPlan(int id)
+        => ToResponse(await service.LockPlanAsync(id));
+
+    /// <summary>Removes the plan lock; changes nothing else. 409 when not locked.</summary>
+    [HttpPost("{id:int}/unlock", Name = "UnlockWorkOrderPlan")]
+    [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UnlockWorkOrderPlan(int id)
+        => ToResponse(await service.UnlockPlanAsync(id));
+
     [HttpPost("{id:int}/abort", Name = "AbortWorkOrder")]
     [ProducesResponseType<WorkOrderDetailModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

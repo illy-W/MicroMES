@@ -116,9 +116,12 @@ public class WorkOrderModel
     public DateTime? PlannedAt { get; set; }
     /// <summary>Derived (never stored): Unplanned, Planned, Late (planned end after the requested end of the order), Stale (plan no longer coherent).</summary>
     public required PlanStatus PlanStatus { get; set; }
+    /// <summary>Manual lock of the plan (the planning engine never moves it) and when it was set (UTC).</summary>
+    public required bool IsPlanLocked { get; set; }
+    public DateTime? PlanLockedAt { get; set; }
     public required List<WorkOrderLinkModel> Predecessors { get; set; }
     public required List<WorkOrderLinkModel> Successors { get; set; }
-    /// <summary>Commands the UI may offer now: Start, Pause, Resume, Stop, Abort.</summary>
+    /// <summary>Commands the UI may offer now: Start, Pause, Resume, Stop, Abort, plus the plan commands Lock, Move, Unlock.</summary>
     public required List<string> AllowedActions { get; set; }
 }
 

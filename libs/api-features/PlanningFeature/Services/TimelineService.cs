@@ -142,7 +142,7 @@ public class TimelineService(
             EquipmentId = b.EquipmentId, PlannedStartAt = Utc(wo.PlannedStartAt), PlannedEndAt = Utc(wo.PlannedEndAt),
             ActualStartAt = wo.Status is WorkOrderStatus.Running or WorkOrderStatus.Ended or WorkOrderStatus.Aborted ? Utc(started) : null,
             ActualEndAt = wo.Status is WorkOrderStatus.Ended or WorkOrderStatus.Aborted ? Utc(wo.EndedAt ?? sessions.LastOrDefault()?.EndedAt) : null,
-            Status = wo.Status, PlanStatus = data.PlanStatusOf(wo), IsLate = late,
+            Status = wo.Status, PlanStatus = data.PlanStatusOf(wo), IsPlanLocked = wo.IsPlanLocked, PlanLockedAt = Utc(wo.PlanLockedAt), IsLate = late,
             LateDays = late ? (int)Math.Ceiling((wo.PlannedEndAt!.Value - order.RequestedEnd!.Value).TotalDays) : 0,
             PredecessorIds = data.PredecessorIds(wo.Id).OrderBy(i => i).ToList(), Lane = lane, Priority = order.Priority
         };

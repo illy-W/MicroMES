@@ -12,8 +12,8 @@
 
 ## Backend
 
-- [ ] 1.1 [Backend] Entità e migration: `IsPlanLocked`, `PlanLockedAt` su `WorkOrder` (default false/null), modelli di lavoro, timeline e ordine con `isPlanLocked`; `allowedActions` con `Lock`/`Move`/`Unlock` secondo stato del lavoro e dell'ordine. _Satisfies: REQ-1_
-- [ ] 1.2 [Backend] Ciclo di vita del blocco: tolto alla partenza (`Running`) e alla chiusura/annullamento dell'ordine; «Fissa» senza dati nuovi blocca il piano attuale (409 se non pianificato); «Sblocca» non modifica altro. Endpoint e test. _Satisfies: REQ-1_
+- [x] 1.1 [Backend] Entità e migration: `IsPlanLocked`, `PlanLockedAt` su `WorkOrder` (default false/null), modelli di lavoro, timeline e ordine con `isPlanLocked`; `allowedActions` con `Lock`/`Move`/`Unlock` secondo stato del lavoro e dell'ordine. _Satisfies: REQ-1_
+- [x] 1.2 [Backend] Ciclo di vita del blocco: tolto alla partenza (`Running`) e alla chiusura/annullamento dell'ordine; «Fissa» senza dati nuovi blocca il piano attuale (409 se non pianificato); «Sblocca» non modifica altro. Endpoint e test. _Satisfies: REQ-1_
 - [ ] 1.3 [Backend] Motore: estendere ingresso e uscita di `IPlanningEngine` con i lavori fissati come intervalli fissi (mai modificati, occupano capacità, successori dopo la fine), conflitti con predecessori e capacità, riepilogo con conteggio fissati; scenario nel banco di prova e test di determinismo. _Satisfies: REQ-3_
 - [ ] 1.4 [Backend] Anteprima/applicazione di pianificazione (`Order`, `Unplanned`, `All`, «Rimuovi piano»): i lavori fissati restano invariati e compaiono nell'elenco «non spostati» con i conflitti; «Rimuovi piano» non li tocca e li elenca. _Satisfies: REQ-3_
 - [ ] 1.5 [Backend] `PlanLockService` e endpoint di anteprima/applicazione di «Sposta» (`startAt`, `equipmentId`): fine calcolata sul calendario, errori 422 (passato, istante non lavorabile con motivo e prossimo istante, macchina non abilitata), 409 se il lavoro è cambiato; anteprima con conflitti (predecessore, successore obsoleto, capacità, ritardo) senza bloccare l'applicazione; l'applicazione fissa il lavoro. Test unitari e di integrazione. _Satisfies: REQ-2_
