@@ -24,7 +24,10 @@ import type {
 
 import type {
   CreateEquipmentRequest,
+  EquipmentHistoryModel,
   EquipmentModel,
+  EquipmentOverviewModel,
+  GetEquipmentHistoryParams,
   GetEquipmentListParams,
   UpdateEquipmentRequest
 } from '../model';
@@ -154,6 +157,72 @@ function filterParams(
 @Injectable({ providedIn: 'root' })
 export class EquipmentService {
   private readonly http = inject(HttpClient);
+ getEquipmentOverview<TData = EquipmentOverviewModel>(id: number, options?: HttpClientBodyOptions): Observable<TData>;
+ getEquipmentOverview<TData = EquipmentOverviewModel>(id: number, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ getEquipmentOverview<TData = EquipmentOverviewModel>(id: number, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  getEquipmentOverview<TData = EquipmentOverviewModel>(
+    id: number, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    if (options?.observe === 'events') {
+      return this.http.get<TData>(
+      `/api/equipment/${id}/overview`,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+      }
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.get<TData>(
+      `/api/equipment/${id}/overview`,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+      }
+    );
+    }
+
+    return this.http.get<TData>(
+      `/api/equipment/${id}/overview`,{
+        ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+      }
+    );
+  }
+ getEquipmentHistory<TData = EquipmentHistoryModel>(id: number,
+    params?: GetEquipmentHistoryParams, options?: HttpClientBodyOptions): Observable<TData>;
+ getEquipmentHistory<TData = EquipmentHistoryModel>(id: number,
+    params?: GetEquipmentHistoryParams, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
+ getEquipmentHistory<TData = EquipmentHistoryModel>(id: number,
+    params?: GetEquipmentHistoryParams, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;
+  getEquipmentHistory<TData = EquipmentHistoryModel>(
+    id: number,
+    params?: GetEquipmentHistoryParams, options?: HttpClientObserveOptions): Observable<TData | HttpEvent<TData> | AngularHttpResponse<TData>> {
+    const filteredParams = filterParams({...params, ...options?.params}, new Set<string>([]));
+
+    if (options?.observe === 'events') {
+      return this.http.get<TData>(
+      `/api/equipment/${id}/history`,{
+    ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'events',
+        params: filteredParams,}
+    );
+    }
+
+    if (options?.observe === 'response') {
+      return this.http.get<TData>(
+      `/api/equipment/${id}/history`,{
+    ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'response',
+        params: filteredParams,}
+    );
+    }
+
+    return this.http.get<TData>(
+      `/api/equipment/${id}/history`,{
+    ...(options as Omit<NonNullable<typeof options>, 'observe'>),
+        observe: 'body',
+        params: filteredParams,}
+    );
+  }
  getEquipmentList<TData = EquipmentModel[]>(params?: GetEquipmentListParams, options?: HttpClientBodyOptions): Observable<TData>;
  getEquipmentList<TData = EquipmentModel[]>(params?: GetEquipmentListParams, options?: HttpClientEventOptions): Observable<HttpEvent<TData>>;
  getEquipmentList<TData = EquipmentModel[]>(params?: GetEquipmentListParams, options?: HttpClientResponseOptions): Observable<AngularHttpResponse<TData>>;

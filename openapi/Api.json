@@ -5,6 +5,592 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/setup-attributes": {
+      "get": {
+        "tags": [
+          "SetupAttributes"
+        ],
+        "operationId": "GetSetupAttributesList",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SetupAttributeModel"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "SetupAttributes"
+        ],
+        "operationId": "CreateSetupAttribute",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSetupAttributeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSetupAttributeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSetupAttributeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupAttributeModel"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup-attributes/{id}": {
+      "get": {
+        "tags": [
+          "SetupAttributes"
+        ],
+        "operationId": "GetSetupAttribute",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupAttributeModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SetupAttributes"
+        ],
+        "operationId": "UpdateSetupAttribute",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSetupAttributeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSetupAttributeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSetupAttributeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupAttributeModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SetupAttributes"
+        ],
+        "operationId": "DeactivateSetupAttribute",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup-attributes/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "SetupAttributes"
+        ],
+        "operationId": "ReactivateSetupAttribute",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupAttributeModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tooling": {
+      "get": {
+        "tags": [
+          "Tooling"
+        ],
+        "operationId": "GetToolingList",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ToolingModel"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tooling"
+        ],
+        "operationId": "CreateTooling",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateToolingRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateToolingRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateToolingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolingDetailModel"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tooling/{id}": {
+      "get": {
+        "tags": [
+          "Tooling"
+        ],
+        "operationId": "GetTooling",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolingDetailModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Tooling"
+        ],
+        "operationId": "UpdateTooling",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateToolingRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateToolingRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateToolingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolingDetailModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tooling"
+        ],
+        "operationId": "DeactivateTooling",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tooling/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "Tooling"
+        ],
+        "operationId": "ReactivateTooling",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolingDetailModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scrap-reasons": {
       "get": {
         "tags": [
@@ -2143,6 +2729,135 @@
         }
       }
     },
+    "/api/equipment/{id}/overview": {
+      "get": {
+        "tags": [
+          "Equipment"
+        ],
+        "operationId": "GetEquipmentOverview",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentOverviewModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipment/{id}/history": {
+      "get": {
+        "tags": [
+          "Equipment"
+        ],
+        "operationId": "GetEquipmentHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 30
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentHistoryModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/planning/preview": {
       "post": {
         "tags": [
@@ -2405,6 +3120,14 @@
             "in": "query",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "toolingId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -5468,6 +6191,83 @@
           }
         }
       },
+      "CreateSetupAttributeRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "changeMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CreateToolingRequest": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quantity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "setupMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "equipmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
       "CreateWorkCalendarRequest": {
         "required": [
           "code",
@@ -5571,6 +6371,219 @@
           }
         }
       },
+      "EquipmentHistoryModel": {
+        "required": [
+          "equipmentId",
+          "days",
+          "periodStart",
+          "periodEnd",
+          "summary",
+          "scrapByReason",
+          "sessions"
+        ],
+        "type": "object",
+        "properties": {
+          "equipmentId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/EquipmentHistorySummaryModel"
+          },
+          "scrapByReason": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentScrapByReasonModel"
+            }
+          },
+          "sessions": {
+            "$ref": "#/components/schemas/EquipmentHistorySessionPageModel"
+          }
+        }
+      },
+      "EquipmentHistorySessionModel": {
+        "required": [
+          "sessionId",
+          "workOrderId",
+          "workOrderCode",
+          "productionOrderId",
+          "productionOrderCode",
+          "processSegmentName",
+          "startedAt",
+          "durationMinutes",
+          "goodQuantity",
+          "scrapQuantity",
+          "isRunning"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workOrderCode": {
+            "type": "string"
+          },
+          "productionOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productionOrderCode": {
+            "type": "string"
+          },
+          "processSegmentName": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "goodQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "isRunning": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EquipmentHistorySessionPageModel": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentHistorySessionModel"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "EquipmentHistorySummaryModel": {
+        "required": [
+          "workOrders",
+          "completedWorkOrders",
+          "workedMinutes",
+          "availableMinutes",
+          "goodQuantity",
+          "scrapQuantity"
+        ],
+        "type": "object",
+        "properties": {
+          "workOrders": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "completedWorkOrders": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workedMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "availableMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "utilizationPercent": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "goodQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapQuantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "scrapPercent": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "EquipmentLoadSummaryModel": {
+        "type": "object",
+        "properties": {
+          "loadToday": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "load7": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "load30": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "EquipmentModel": {
         "required": [
           "id",
@@ -5635,6 +6648,18 @@
               "$ref": "#/components/schemas/EquipmentSegmentModel"
             }
           },
+          "compatibleTooling": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentToolingModel"
+            }
+          },
+          "universalTooling": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentToolingModel"
+            }
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -5642,6 +6667,268 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "EquipmentMountedSetupValueModel": {
+        "required": [
+          "attributeCode",
+          "attributeName",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "attributeCode": {
+            "type": "string"
+          },
+          "attributeName": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "EquipmentMountedStateModel": {
+        "required": [
+          "known",
+          "tooling",
+          "setupValues"
+        ],
+        "type": "object",
+        "properties": {
+          "known": {
+            "type": "boolean"
+          },
+          "tooling": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentMountedToolingModel"
+            }
+          },
+          "setupValues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentMountedSetupValueModel"
+            }
+          },
+          "fromWorkOrderCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "EquipmentMountedToolingModel": {
+        "required": [
+          "id",
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "EquipmentNowState": {
+        "enum": [
+          "Free",
+          "Working",
+          "ClosedNow",
+          "Inactive"
+        ]
+      },
+      "EquipmentOverviewModel": {
+        "required": [
+          "equipmentId",
+          "state",
+          "running",
+          "queue",
+          "mountedState",
+          "load",
+          "alerts",
+          "generatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "equipmentId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EquipmentNowState"
+          },
+          "closedReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "running": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentRunningModel"
+            }
+          },
+          "queue": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentQueueItemModel"
+            }
+          },
+          "mountedState": {
+            "$ref": "#/components/schemas/EquipmentMountedStateModel"
+          },
+          "load": {
+            "$ref": "#/components/schemas/EquipmentLoadSummaryModel"
+          },
+          "alerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanAlertModel"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EquipmentQueueItemModel": {
+        "required": [
+          "workOrderId",
+          "workOrderCode",
+          "productionOrderId",
+          "productionOrderCode",
+          "processSegmentCode",
+          "processSegmentName",
+          "plannedStartAt",
+          "plannedEndAt",
+          "planStatus",
+          "planStatusReason",
+          "isPlanLocked"
+        ],
+        "type": "object",
+        "properties": {
+          "workOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workOrderCode": {
+            "type": "string"
+          },
+          "productionOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productionOrderCode": {
+            "type": "string"
+          },
+          "processSegmentCode": {
+            "type": "string"
+          },
+          "processSegmentName": {
+            "type": "string"
+          },
+          "plannedStartAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plannedEndAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plannedSetupMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "planStatus": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
+          "planStatusReason": {
+            "$ref": "#/components/schemas/StaleCause"
+          },
+          "isPlanLocked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EquipmentRunningModel": {
+        "required": [
+          "workOrderId",
+          "workOrderCode",
+          "productionOrderId",
+          "productionOrderCode",
+          "processSegmentName",
+          "actualStartAt",
+          "elapsedMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "workOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workOrderCode": {
+            "type": "string"
+          },
+          "productionOrderId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productionOrderCode": {
+            "type": "string"
+          },
+          "processSegmentName": {
+            "type": "string"
+          },
+          "actualStartAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "elapsedMinutes": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "EquipmentScrapByReasonModel": {
+        "required": [
+          "code",
+          "name",
+          "quantity"
+        ],
+        "type": "object",
+        "properties": {
+          "reasonId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
@@ -5669,6 +6956,44 @@
             "type": "boolean"
           },
           "isDefault": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EquipmentToolingModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "quantity",
+          "setupMinutes",
+          "isActive",
+          "isMountedNow"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "setupMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isMountedNow": {
             "type": "boolean"
           }
         }
@@ -5923,7 +7248,9 @@
           "PredecessorEndsAfterStart",
           "SuccessorsStartBeforeEnd",
           "MachineOverCapacity",
-          "Late"
+          "Late",
+          "ToolingOverCapacity",
+          "ToolingIncompatible"
         ]
       },
       "MoveConflictModel": {
@@ -6056,6 +7383,19 @@
             "type": "number",
             "format": "double"
           },
+          "setupMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "setupReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isFullSetup": {
+            "type": "boolean"
+          },
           "expectedUpdatedAt": {
             "type": "string",
             "format": "date-time"
@@ -6160,6 +7500,26 @@
               "string"
             ]
           },
+          "toolingId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "toolingCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "workOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
           "causeWorkOrderId": {
             "type": [
               "null",
@@ -6241,7 +7601,11 @@
           "LockedPredecessorConflict",
           "LockedMachineUnavailable",
           "LockedOverCapacity",
-          "LockedLate"
+          "LockedLate",
+          "ToolingOverbooked",
+          "ToolingIncompatibleMachine",
+          "ToolingInactive",
+          "UnplannableForTooling"
         ]
       },
       "PlanChangeKind": {
@@ -6482,6 +7846,26 @@
             "items": {
               "$ref": "#/components/schemas/PlanningReasonModel"
             }
+          },
+          "setupMinutes": {
+            "type": "number",
+            "format": "double"
+          },
+          "setupReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isFullSetup": {
+            "type": "boolean"
+          },
+          "currentSetupMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -6611,7 +7995,8 @@
           "MachineBusy",
           "AssignedMachineNotEnabled",
           "Locked",
-          "AdvancedForLocked"
+          "AdvancedForLocked",
+          "WaitingForTooling"
         ]
       },
       "PlanningReasonModel": {
@@ -6733,6 +8118,14 @@
           "unplanned": {
             "type": "integer",
             "format": "int32"
+          },
+          "setupMinutesBefore": {
+            "type": "number",
+            "format": "double"
+          },
+          "setupMinutesAfter": {
+            "type": "number",
+            "format": "double"
           },
           "lastEnd": {
             "type": [
@@ -7517,6 +8910,22 @@
             ],
             "format": "date-time"
           },
+          "plannedSetupMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "plannedSetupReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isFullSetup": {
+            "type": "boolean"
+          },
           "planStatus": {
             "$ref": "#/components/schemas/PlanStatus"
           },
@@ -7537,6 +8946,18 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "tooling": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderToolingModel"
+            }
+          },
+          "setupValues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderSetupValueModel"
             }
           },
           "materials": {
@@ -7852,6 +9273,66 @@
             "items": {
               "$ref": "#/components/schemas/RoutingStepComponentModel"
             }
+          },
+          "tooling": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoutingStepToolingModel"
+            }
+          },
+          "setupValues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoutingStepSetupValueModel"
+            }
+          }
+        }
+      },
+      "RoutingStepSetupValueModel": {
+        "required": [
+          "attributeId",
+          "code",
+          "name",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "attributeId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "RoutingStepToolingModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
           }
         }
       },
@@ -8192,6 +9673,45 @@
           }
         }
       },
+      "SetupAttributeModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "changeMinutes",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "changeMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "StaleCause": {
         "enum": [
           "None",
@@ -8492,6 +10012,34 @@
           "priority": {
             "type": "integer",
             "format": "int32"
+          },
+          "plannedSetupMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "plannedSetupReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isFullSetup": {
+            "type": "boolean"
+          },
+          "tooling": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderToolingModel"
+            }
+          },
+          "setupValues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderSetupValueModel"
+            }
           }
         }
       },
@@ -8535,6 +10083,181 @@
           }
         }
       },
+      "ToolingDetailModel": {
+        "required": [
+          "equipment",
+          "routingSteps",
+          "workOrders",
+          "id",
+          "code",
+          "name",
+          "quantity",
+          "setupMinutes",
+          "isActive",
+          "equipmentCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "equipment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolingEquipmentModel"
+            }
+          },
+          "routingSteps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolingUsageModel"
+            }
+          },
+          "workOrders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolingUsageModel"
+            }
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "setupMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "equipmentCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ToolingEquipmentModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ToolingModel": {
+        "required": [
+          "id",
+          "code",
+          "name",
+          "quantity",
+          "setupMinutes",
+          "isActive",
+          "equipmentCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "setupMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "equipmentCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ToolingUsageModel": {
+        "required": [
+          "id",
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "UnitOfMeasure": {
         "enum": [
           "Piece",
@@ -8562,7 +10285,9 @@
           "HorizonExceeded",
           "NoCandidateMachine",
           "CyclicDependency",
-          "PredecessorUnplanned"
+          "PredecessorUnplanned",
+          "ToolingInactive",
+          "ToolingIncompatible"
         ]
       },
       "UpcomingClosureModel": {
@@ -8914,6 +10639,29 @@
           }
         }
       },
+      "UpdateRoutingSetupValueRequest": {
+        "required": [
+          "attributeId"
+        ],
+        "type": "object",
+        "properties": {
+          "attributeId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "value": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "UpdateRoutingStepRequest": {
         "required": [
           "key",
@@ -8987,6 +10735,25 @@
               "number"
             ],
             "format": "double"
+          },
+          "toolingIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "setupValues": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/UpdateRoutingSetupValueRequest"
+            }
           }
         }
       },
@@ -9023,6 +10790,97 @@
             ]
           },
           "processSegmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "UpdateSetupAttributeRequest": {
+        "required": [
+          "code",
+          "name",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "changeMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "isActive": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "UpdateToolingRequest": {
+        "required": [
+          "code",
+          "name",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isActive": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "quantity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "setupMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "equipmentIds": {
             "type": [
               "null",
               "array"
@@ -9363,6 +11221,18 @@
         ],
         "type": "object",
         "properties": {
+          "tooling": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderToolingModel"
+            }
+          },
+          "setupValues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderSetupValueModel"
+            }
+          },
           "sessions": {
             "type": "array",
             "items": {
@@ -9514,6 +11384,22 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "plannedSetupMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "plannedSetupReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isFullSetup": {
+            "type": "boolean"
           },
           "planStatus": {
             "$ref": "#/components/schemas/PlanStatus"
@@ -9828,6 +11714,22 @@
             ],
             "format": "date-time"
           },
+          "plannedSetupMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "plannedSetupReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isFullSetup": {
+            "type": "boolean"
+          },
           "planStatus": {
             "$ref": "#/components/schemas/PlanStatus"
           },
@@ -9984,6 +11886,25 @@
           }
         }
       },
+      "WorkOrderSetupValueModel": {
+        "required": [
+          "code",
+          "name",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
       "WorkOrderStatus": {
         "enum": [
           "Waiting",
@@ -10030,10 +11951,36 @@
             "format": "int32"
           }
         }
+      },
+      "WorkOrderToolingModel": {
+        "required": [
+          "toolingId",
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "toolingId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
       }
     }
   },
   "tags": [
+    {
+      "name": "SetupAttributes"
+    },
+    {
+      "name": "Tooling"
+    },
     {
       "name": "ScrapReasons"
     },
@@ -10053,13 +12000,13 @@
       "name": "ProcessSegments"
     },
     {
+      "name": "Equipment"
+    },
+    {
       "name": "Planning"
     },
     {
       "name": "Materials"
-    },
-    {
-      "name": "Equipment"
     },
     {
       "name": "Calendars"

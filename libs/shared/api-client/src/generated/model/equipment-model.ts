@@ -6,6 +6,7 @@
  */
 import type { EffectiveCalendarModel } from './effective-calendar-model';
 import type { EquipmentSegmentModel } from './equipment-segment-model';
+import type { EquipmentToolingModel } from './equipment-tooling-model';
 
 export interface EquipmentModel {
   id: number;
@@ -20,6 +21,8 @@ export interface EquipmentModel {
   efficiencyPercent: number;
   effectiveCalendar?: null | EffectiveCalendarModel;
   processSegments: EquipmentSegmentModel[];
+  compatibleTooling?: EquipmentToolingModel[];
+  universalTooling?: EquipmentToolingModel[];
   createdAt: string;
   updatedAt: string;
 }
