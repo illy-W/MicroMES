@@ -442,20 +442,19 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                             </div>
                           </div>
                         </ng-template>
-                        <button
-                          type="button"
-                          [class]="b.cls"
+                        <div
+                          role="button"
+                          class="group absolute z-[1] flex cursor-pointer rounded-md transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          [class.flex-row-reverse]="b.chip?.end"
+                          [class.-translate-x-full]="b.chip?.end"
                           [class.opacity-25]="dimmed(b)"
                           [class.ring-2]="selectedId() === b.w.id"
                           [class.ring-1]="chainRing(b)"
                           [class.ring-primary]="selectedId() === b.w.id || chainRing(b)"
                           [class.opacity-35]="chainDim(b)"
-                          [style.left.px]="b.left"
-                          [style.width.px]="b.width"
+                          [style.left.px]="b.chip?.end ? b.left + b.width : b.left"
                           [style.top.px]="b.y - r.top"
                           [style.height.px]="b.height"
-                          [style.padding-right.px]="b.padRight"
-                          [style.--oc]="b.color"
                           [attr.data-bar]="b.w.id"
                           [attr.aria-label]="b.aria"
                           [attr.aria-pressed]="selectedId() === b.w.id"
@@ -470,36 +469,34 @@ const clampPph = (n: number): number => Math.min(PPH_MAX, Math.max(PPH_MIN, Math
                           (mouseleave)="hoverOrder.set(null); hoverId.set(null)"
                           (keydown)="onKey($event, b)"
                         >
-                          @if (b.level >= 1 && b.inside) {
-                            <span class="flex min-w-0 items-center gap-1">
-                              @if (b.level >= 3) { <ng-icon [name]="b.statusIcon" size="14" class="shrink-0" aria-hidden="true" /> }
-                              <span class="truncate" [class.font-medium]="b.level >= 2">{{ b.level === 1 ? b.segCode : b.name }}</span>
-                            </span>
-                            @if (b.level >= 3) { <span class="truncate text-[11px] opacity-75">{{ b.sub }}</span> }
-                          }
-                          @if (b.late || b.stale || b.overload) {
-                            <span class="absolute top-0.5 right-0.5 flex gap-0.5" [class.flex-col]="b.width < 56">
-                              @if (b.late) { <span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" title="In ritardo"><ng-icon name="lucideAlarmClock" size="11" aria-hidden="true" /></span> }
-                              @if (b.stale) { <span class="bg-secondary text-secondary-foreground ring-border flex size-4 items-center justify-center rounded-full ring-1" title="Piano obsoleto"><ng-icon name="lucideTriangleAlert" size="11" aria-hidden="true" /></span> }
-                              @if (b.overload) { <span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" title="Sovraccarico"><ng-icon name="lucideCircleAlert" size="11" aria-hidden="true" /></span> }
-                            </span>
-                          }
-                        </button>
-                      }
-                      @for (c of r.bars; track c.w.id) {
-                        @if (c.chip; as ch0) {
-                          @if (chipView(ch0); as ch) {
-                            <div class="pointer-events-none absolute z-[2] flex items-center" [class.-translate-x-full]="ch0.end" [style.left.px]="ch0.left" [style.top.px]="c.y - r.top" [style.height.px]="c.height" aria-hidden="true">
-                              <span class="bg-background ring-border flex items-center gap-1 rounded border-l-[3px] border-(color:--oc) px-1.5 py-0.5 text-xs leading-tight whitespace-nowrap ring-1" [style.--oc]="c.color" [class.opacity-25]="dimmed(c)">
-                                @if (ch.sub) { <ng-icon [name]="c.statusIcon" size="12" class="shrink-0" /> }
+                          <div [class]="b.cls" [style.width.px]="b.width" [style.padding-right.px]="b.padRight" [style.--oc]="b.color">
+                            @if (b.level >= 1 && b.inside) {
+                              <span class="flex min-w-0 items-center gap-1">
+                                @if (b.level >= 3) { <ng-icon [name]="b.statusIcon" size="14" class="shrink-0" aria-hidden="true" /> }
+                                <span class="truncate" [class.font-medium]="b.level >= 2">{{ b.level === 1 ? b.segCode : b.name }}</span>
+                              </span>
+                              @if (b.level >= 3) { <span class="truncate text-[11px] opacity-75">{{ b.sub }}</span> }
+                            }
+                            @if (b.late || b.stale || b.overload) {
+                              <span class="absolute top-0.5 right-0.5 flex gap-0.5" [class.flex-col]="b.width < 56">
+                                @if (b.late) { <span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" title="In ritardo"><ng-icon name="lucideAlarmClock" size="11" aria-hidden="true" /></span> }
+                                @if (b.stale) { <span class="bg-secondary text-secondary-foreground ring-border flex size-4 items-center justify-center rounded-full ring-1" title="Piano obsoleto"><ng-icon name="lucideTriangleAlert" size="11" aria-hidden="true" /></span> }
+                                @if (b.overload) { <span class="bg-destructive text-destructive-foreground flex size-4 items-center justify-center rounded-full" title="Sovraccarico"><ng-icon name="lucideCircleAlert" size="11" aria-hidden="true" /></span> }
+                              </span>
+                            }
+                          </div>
+                          @if (b.chip; as ch0) {
+                            @if (chipView(ch0); as ch) {
+                              <span class="bg-background ring-border group-hover:bg-muted flex items-center gap-1 border-(color:--oc) px-1.5 py-0.5 text-xs leading-tight whitespace-nowrap ring-1" [class]="ch0.end ? 'rounded-l-md border-r-[3px]' : 'rounded-r-md border-l-[3px]'" [style.--oc]="b.color" aria-hidden="true">
+                                @if (ch.sub) { <ng-icon [name]="b.statusIcon" size="12" class="shrink-0" /> }
                                 <span class="flex flex-col" [class.text-right]="ch0.end">
                                   <span [class.font-medium]="ch.sub">{{ ch.text }}</span>
                                   @if (ch.sub) { <span class="text-muted-foreground text-[11px]">{{ ch.sub }}</span> }
                                 </span>
                               </span>
-                            </div>
+                            }
                           }
-                        }
+                        </div>
                       }
                       @for (m of r.marks; track $index) {
                         <div class="absolute top-0 z-[3] flex items-center justify-center" [style.left.px]="m.left" [style.width.px]="m.width">
@@ -899,7 +896,7 @@ export class PlanningTimelineComponent {
           const markers = (late ? 1 : 0) + (stale ? 1 : 0) + (overload ? 1 : 0);
           const aria = `${name}, ordine ${x.productionOrderCode}, lavoro ${x.code} su ${machine}, dal ${formatDateTime(rg.s, tz)} al ${formatDateTime(rg.e, tz)}, ${status.toLowerCase()}${late ? ', in ritardo' : ''}${stale ? ', piano obsoleto' : ''}${overload ? ', sovraccarico' : ''}${x.predecessorIds.length === 1 ? `, dopo ${pool.get(x.predecessorIds[0])?.code ?? 'un altro lavoro'}` : x.predecessorIds.length > 1 ? `, dopo ${x.predecessorIds.length} lavori` : ''}`;
           const style = STATUS_STYLE[x.status];
-          const cls = `absolute flex flex-col justify-center overflow-hidden rounded-md pl-2.5 text-left text-xs leading-tight whitespace-nowrap transition-opacity before:rounded-l-md hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${style.box} ${style.strip}${overload ? ' outline outline-1 -outline-offset-1 outline-destructive' : ''}`;
+          const cls = `relative flex h-full shrink-0 flex-col justify-center overflow-hidden rounded-md pl-2.5 text-left text-xs leading-tight whitespace-nowrap before:rounded-l-md group-hover:brightness-95 ${style.box} ${style.strip}${overload ? ' outline outline-1 -outline-offset-1 outline-destructive' : ''}`;
           return {
             w: x, left, width, y: rowTop + rowPad + x.lane * LANE_H, height: BAR_H, lane: x.lane, rowKey: r.key, overload, dim, late, stale, level, inside: true, chip: null,
             statusIcon: st.icon, name, segCode: x.processSegmentCode || name, sub, color: orderColor(hues.get(x.productionOrderId) ?? 0),
@@ -1053,7 +1050,7 @@ export class PlanningTimelineComponent {
         used = Math.max(used, b.left + b.width);
         if (res.placement === 'inside' || res.placement === 'none' || !res.side) return;
         const w = res.placement === 'code' ? codeW : labelW;
-        const chip: ChipVm = { left: res.side === 'right' ? b.left + b.width + 4 : b.left - 4, end: res.side === 'left', text: res.placement === 'code' ? b.segCode : b.name, sub: res.placement === 'code' ? null : b.sub, fullW: labelW, codeW, code: b.segCode };
+        const chip: ChipVm = { left: res.side === 'right' ? b.left + b.width : b.left, end: res.side === 'left', text: res.placement === 'code' ? b.segCode : b.name, sub: res.placement === 'code' ? null : b.sub, fullW: labelW, codeW, code: b.segCode };
         b.chip = chip;
         b.inside = false;
         if (res.side === 'right') used = Math.max(used, chip.left + w);

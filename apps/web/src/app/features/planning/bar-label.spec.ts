@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitLeftChip, placeLabel } from './bar-label';
+import { barHitRect, fitLeftChip, placeLabel } from './bar-label';
 
 const base = { left: 200, width: 40, prevEnd: 0, nextStart: Infinity, labelW: 120, codeW: 40, maxRight: 2000 };
 
@@ -35,5 +35,29 @@ describe('fitLeftChip', () => {
   });
   it('hides the chip when not even the code fits', () => {
     expect(fitLeftChip(300, 120, 40, 290)).toBe('none');
+  });
+});
+
+describe('barHitRect', () => {
+  it('is the block alone without chip', () => {
+    expect(barHitRect(200, 40, 0, null)).toEqual({ left: 200, width: 40 });
+  });
+  it('extends to the right by the chip width', () => {
+    expect(barHitRect(200, 40, 120, 'right')).toEqual({ left: 200, width: 160 });
+  });
+  it('extends to the left by the chip width', () => {
+    expect(barHitRect(200, 40, 120, 'left')).toEqual({ left: 80, width: 160 });
+  });
+  it('never overlaps the next bar when the chip is placed on the right', () => {
+    const input = { ...base, nextStart: 400 };
+    const res = placeLabel(input);
+    const hit = barHitRect(input.left, input.width, input.labelW, res.side);
+    expect(hit.left + hit.width).toBeLessThanOrEqual(input.nextStart);
+  });
+  it('never overlaps the previous bar when the chip is placed on the left', () => {
+    const input = { ...base, nextStart: 260, prevEnd: 50 };
+    const res = placeLabel(input);
+    expect(res.side).toBe('left');
+    expect(barHitRect(input.left, input.width, input.labelW, res.side).left).toBeGreaterThanOrEqual(input.prevEnd);
   });
 });

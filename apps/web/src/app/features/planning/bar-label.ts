@@ -59,3 +59,9 @@ export function fitLeftChip(right: number, fullW: number, codeW: number, minLeft
   if (right - codeW >= minLeft) return 'code';
   return 'none';
 }
+
+/** Area cliccabile di una barra con chip esterno: blocco + chip, senza spazio in mezzo (il chip occupa solo spazio libero della corsia). */
+export function barHitRect(left: number, width: number, chipW: number, side: 'right' | 'left' | null): { left: number; width: number } {
+  if (!side || chipW <= 0) return { left, width };
+  return side === 'right' ? { left, width: width + chipW } : { left: left - chipW, width: width + chipW };
+}
