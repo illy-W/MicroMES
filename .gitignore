@@ -49,3 +49,6 @@ bin/
 obj/
 *.user
 .angular
+
+# .NET test results
+**/TestResults/

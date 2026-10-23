@@ -1,0 +1,39 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Unit tests with coverage
+        run: dotnet test libs/api-tests/ApiTests.csproj --collect:"XPlat Code Coverage" --results-directory ./coverage/ApiTests
+      # Richiede Docker (Testcontainers), disponibile su ubuntu-latest.
+      - name: Integration tests with coverage
+        run: dotnet test libs/api-tests-integration/ApiTests.Integration.csproj --collect:"XPlat Code Coverage" --results-directory ./coverage/ApiTests.Integration
+      # Le PR da fork non hanno il secret: lo step non deve far fallire il workflow
+      # (fail_ci_if_error: false). Codecov v5 supporta l'upload senza token per i fork
+      # se abilitato nelle impostazioni di Codecov.
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/**/coverage.cobertura.xml
+          flags: backend
+          fail_ci_if_error: false
+          verbose: true
