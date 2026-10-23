@@ -50,7 +50,8 @@
       "@spartan-ng/helm/popover": ["./libs/ui/popover/src/index.ts"],
       "@spartan-ng/helm/pagination": ["./libs/ui/pagination/src/index.ts"],
       "@spartan-ng/helm/toggle-group": ["./libs/ui/toggle-group/src/index.ts"],
-      "@spartan-ng/helm/toggle": ["./libs/ui/toggle/src/index.ts"]
+      "@spartan-ng/helm/toggle": ["./libs/ui/toggle/src/index.ts"],
+      "@spartan-ng/helm/accordion": ["./libs/ui/accordion/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

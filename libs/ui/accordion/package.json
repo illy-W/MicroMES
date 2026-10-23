@@ -1,0 +1,14 @@
+{
+  "name": "@spartan-ng/helm/accordion",
+  "version": "0.0.1",
+  "peerDependencies": {
+    "@angular/core": "^22.1.0",
+    "@spartan-ng/brain": "1.5.0",
+    "@spartan-ng/helm/utils": "0.0.1",
+    "@ng-icons/core": "33.2.2",
+    "@ng-icons/lucide": "33.2.2",
+    "clsx": "2.1.1"
+  },
+  "sideEffects": false,
+  "private": true
+}
