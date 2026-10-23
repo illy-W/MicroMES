@@ -32,10 +32,10 @@ Stato: requisiti APPROVATI. Task in attesa di approvazione. Owner: `[Nx]` = infr
 
 ## Fase 2: Versioning e pubblicazione
 
-- [ ] **N4** [Nx] Release Please: `release-please-config.json` e `.release-please-manifest.json` con componenti `app` (apps/api, apps/web, libs/api-*, libs/ui, libs/shared, deploy) e `landing` (apps/landing), tag `app-v*`/`landing-v*`, changelog; regola pre-1.0 documentata; workflow `release-please.yml` con token di GitHub App/PAT (non `GITHUB_TOKEN`). _Satisfies: REQ-2, REQ-11_
-- [ ] **N5** [Nx] Workflow `publish-edge.yml` (merge su `main`): immagini `api`/`web`/`landing` solo se toccate, tag `edge` + `sha-*`, multi-arch amd64/arm64, SBOM, cosign keyless, mai `latest`. _Satisfies: REQ-1, REQ-3_
-- [ ] **N6** [Nx] Workflow `release-app.yml` (tag `app-v*`): test, immagini `api`/`web` con tag `X.Y.Z`, `X.Y`, `X`, `latest`, push chart OCI, firma, avanzamento del branch `stable` solo dopo e2e verde (N12); `release-landing.yml` (tag `landing-v*`) per l'immagine landing. Versione iniettata come build-arg/`InformationalVersion`. _Satisfies: REQ-1, REQ-2, REQ-3_
-- [ ] **N7** [Nx] Pacchetti ghcr.io resi pubblici (documentare i passi manuali) e verifica `cosign verify`. _Satisfies: REQ-1_
+- [x] **N4** [Nx] Release Please: `release-please-config.json` e `.release-please-manifest.json` con componenti `app` (apps/api, apps/web, libs/api-*, libs/ui, libs/shared, deploy) e `landing` (apps/landing), tag `app-v*`/`landing-v*`, changelog; regola pre-1.0 documentata; workflow `release-please.yml` con token di GitHub App/PAT (non `GITHUB_TOKEN`). _Satisfies: REQ-2, REQ-11_
+- [x] **N5** [Nx] Workflow `publish-edge.yml` (merge su `main`): immagini `api`/`web`/`landing` solo se toccate, tag `edge` + `sha-*`, multi-arch amd64/arm64, SBOM, cosign keyless, mai `latest`. _Satisfies: REQ-1, REQ-3_
+- [x] **N6** [Nx] Workflow `release-app.yml` (tag `app-v*`): test, immagini `api`/`web` con tag `X.Y.Z`, `X.Y`, `X`, `latest`, push chart OCI, firma, avanzamento del branch `stable` solo dopo e2e verde (N12); `release-landing.yml` (tag `landing-v*`) per l'immagine landing. Versione iniettata come build-arg/`InformationalVersion`. _Satisfies: REQ-1, REQ-2, REQ-3_
+- [x] **N7** [Nx] Pacchetti ghcr.io resi pubblici (documentare i passi manuali) e verifica `cosign verify`. _Satisfies: REQ-1_
 
 ## Fase 3: Helm chart
 
