@@ -28,6 +28,8 @@ Stato: requisiti APPROVATI. Task in attesa di approvazione. Owner: `[Nx]` = infr
 ### Frontend
 - [x] **F1** [Frontend] Versione installata nel piè della sidebar e avviso discreto "Disponibile vX.Y.Z" (link note di rilascio + comando `micromes upgrade` copiabile), dismiss per versione; nessun pulsante di aggiornamento; solo client generato. _Satisfies: REQ-2, REQ-6_
 
+- [x] **N18** [Nx] Coverage su Codecov: workflow `coverage.yml` (push a `main` e pull_request) che esegue i test backend con `dotnet test --collect:"XPlat Code Coverage"` (cobertura, un file per progetto di test: ApiTests e ApiTests.Integration; l'integrazione richiede Docker) e carica con `codecov/codecov-action@v5` (`token: ${{ secrets.CODECOV_TOKEN }}`, `files`, `flags: backend`, `fail_ci_if_error: false`); `codecov.yml` (flag backend con `carryforward`, soglie informative, ignorare `Migrations/`, `*.Designer.cs`, `obj/`, generated); permessi minimi; documentazione in `doc/release.md` demandata a N15. _Satisfies: REQ-3_
+
 ## Fase 2: Versioning e pubblicazione
 
 - [ ] **N4** [Nx] Release Please: `release-please-config.json` e `.release-please-manifest.json` con componenti `app` (apps/api, apps/web, libs/api-*, libs/ui, libs/shared, deploy) e `landing` (apps/landing), tag `app-v*`/`landing-v*`, changelog; regola pre-1.0 documentata; workflow `release-please.yml` con token di GitHub App/PAT (non `GITHUB_TOKEN`). _Satisfies: REQ-2, REQ-11_
@@ -57,4 +59,4 @@ Stato: requisiti APPROVATI. Task in attesa di approvazione. Owner: `[Nx]` = infr
 
 - [ ] **N16** [Nx] `CONTRIBUTING.md` (setup, branching trunk-based, quando usare rebase o squash merge, Conventional Commits, test, licenza AGPL e decisione DCO/CLA), `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/CODEOWNERS`, template PR e issue, `dependabot.yml` (NuGet, npm, github-actions, docker). _Satisfies: REQ-11_
 - [ ] **N17** [Nx] `deploy/github/apply-settings.sh` (gh api, idempotente): squash e rebase merge (merge commit disattivato), commitlint su ogni commit come check obbligatorio, auto-delete head branches, ruleset `main`/`stable`/tag (check richiesto: `ci-ok`; approvazione code owner attivabile quando ci sono altri contributori), Actions in sola lettura e approvazione dei workflow dei nuovi contributori, secret scanning, Discussions; istruzioni per GitHub App di Release Please. _Satisfies: REQ-11_
-- [ ] **O1** [Owner] Eseguire `apply-settings.sh` con `gh auth` da amministratore, creare il GitHub App/PAT del bot di release, rendere pubblici i pacchetti ghcr.io, scegliere DCO o CLA. _Satisfies: REQ-11, REQ-1_
+- [ ] **O1** [Owner] Eseguire `apply-settings.sh` con `gh auth` da amministratore, creare il GitHub App/PAT del bot di release, rendere pubblici i pacchetti ghcr.io, scegliere DCO o CLA, aggiungere il secret `CODECOV_TOKEN` (Settings > Secrets > Actions) e rendere i check `codecov/*` obbligatori solo se lo desideri. _Satisfies: REQ-11, REQ-1_
