@@ -60,6 +60,21 @@
         "cwd": "{workspaceRoot}",
         "command": "docker compose down"
       }
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "rm -rf dist/apps/api && dotnet publish apps/api -c Release -o dist/apps/api -p:OpenApiGenerateDocuments=false -p:InformationalVersion=\"${VERSION:-0.0.0-dev}\""
+      }
+    },
+    "docker": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["publish"],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker build -f apps/api/Dockerfile -t micromes-api:local --build-arg VERSION=\"${VERSION:-0.0.0-dev}\" --build-arg COMMIT=\"${COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo unknown)}\" --build-arg BUILD_DATE=\"${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}\" ."
+      }
     }
   }
 }

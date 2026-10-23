@@ -86,6 +86,14 @@
         "staticFilePath": "dist/apps/landing/browser",
         "spa": true
       }
+    },
+    "docker": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker build -f apps/landing/Dockerfile -t micromes-landing:local --build-arg VERSION=\"${VERSION:-0.0.0-dev}\" --build-arg COMMIT=\"${COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo unknown)}\" --build-arg BUILD_DATE=\"${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}\" ."
+      }
     }
   }
 }

@@ -1,0 +1,12 @@
+node_modules
+.git
+.nx
+.angular
+**/bin
+**/obj
+tmp
+.idea
+.vscode
+.opencode
+.agents
+doc
