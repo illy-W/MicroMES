@@ -17,6 +17,25 @@ public static class DatabaseStartup
         scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
     }
 
+    public static int PendingMigrations(IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.GetPendingMigrations().Count();
+    }
+
+    /// <summary>
+    /// Startup work of the host: migrations (unless Database:AutoMigrate=false) and then, in Development or with
+    /// Demo:Seed=true, the sample data (only on an empty database, only when no migration is pending).
+    /// </summary>
+    public static void Startup(IServiceProvider services, IConfiguration configuration, bool isDevelopment)
+    {
+        if (configuration.GetValue("Database:AutoMigrate", true))
+            Migrate(services);
+
+        if ((isDevelopment || configuration.GetValue("Demo:Seed", false)) && PendingMigrations(services) == 0)
+            SeedSampleData(services);
+    }
+
     /// <summary>CLI command "migrate": returns the process exit code (0 ok, 1 error) and writes a clear message.</summary>
     public static int MigrateCommand(IServiceProvider services)
     {

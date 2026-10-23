@@ -104,28 +104,18 @@ builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
+// Migrations (and, in Development or with Demo:Seed=true, the sample data) are applied at startup in every
+// environment before the host takes traffic; never during OpenAPI document generation.
+// Database:AutoMigrate=false skips them (readiness then stays 503 while migrations are pending).
+builder.Services.AddSingleton<DatabaseStartupState>();
+if (!isOpenApiEnabled)
+    builder.Services.AddHostedService<DatabaseStartupService>();
+
 var app = builder.Build();
 
 // "Api.dll migrate": applies the pending migrations and exits (0 ok, 1 failure) without starting the web host.
 if (args.FirstOrDefault() == "migrate")
     return DatabaseStartup.MigrateCommand(app.Services);
-
-// Development applies the migrations and the sample data; elsewhere only the explicit Demo:Seed=true
-// seeds the sample data (migrations are applied by "migrate"), and only on an empty database.
-// Never during OpenAPI document generation.
-if (!isOpenApiEnabled)
-{
-    if (app.Environment.IsDevelopment())
-    {
-        DatabaseStartup.Migrate(app.Services);
-        DatabaseStartup.SeedSampleData(app.Services);
-    }
-    else if (app.Configuration.GetValue("Demo:Seed", false))
-    {
-        DatabaseStartup.Migrate(app.Services);
-        DatabaseStartup.SeedSampleData(app.Services);
-    }
-}
 
 // Configure the HTTP request pipeline.
 
