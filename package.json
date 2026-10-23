@@ -12,6 +12,8 @@
     "@angular/cli": "~22.1.0",
     "@angular/compiler-cli": "~22.1.0",
     "@angular/language-service": "~22.1.0",
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
     "@eslint/js": "^9.8.0",
     "@nx/angular": "23.3.0",
     "@nx/dotnet": "23.3.0",

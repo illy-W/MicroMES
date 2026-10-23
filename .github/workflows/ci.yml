@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+
+# Nessun secret usato nei job di PR; permessi minimi di default.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NX_NO_CLOUD: 'true'
+
+jobs:
+  # lint + build (budget bundle di web e landing inclusi) + test unitari.
+  # I test di integrazione (Docker/Testcontainers) girano solo se il backend e' toccato (nx affected).
+  affected:
+    name: Lint, build, test (affected)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: nrwl/nx-set-shas@v4
+      - uses: ./.github/actions/setup
+      - run: npx nx affected -t lint build unit-test --parallel=3
+
+  commitlint:
+    name: Commitlint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          dotnet: 'false'
+      - name: Commitlint su ogni commit della PR
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+  pr-title:
+    name: PR title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    steps:
+      # Third party: pinnata a SHA (v6.1.1).
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  contract:
+    name: API contract up to date
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # --skip-nx-cache: la cache Nx puo' restituire un openapi/Api.json vecchio.
+      - run: npx nx run api-client:generate-api --skip-nx-cache
+      - name: Verifica nessuna differenza (inclusi file nuovi)
+        run: |
+          if [ -n "$(git status --porcelain -- openapi libs/shared)" ]; then
+            git status --porcelain -- openapi libs/shared
+            git diff -- openapi libs/shared | head -200
+            echo "::error::Contratto API non aggiornato: eseguire 'npx nx run api-client:generate-api' e committare."
+            exit 1
+          fi
+
+  migrations:
+    name: No pending EF migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          restore-tools: 'true'
+      - run: dotnet ef migrations has-pending-model-changes --project libs/api-core --startup-project apps/api
+
+  # Non bloccante finche' il repository non e' interamente formattato:
+  # prettier controlla solo i file toccati dalla PR; dotnet format riporta le violazioni esistenti.
+  format:
+    name: Formatting (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: nrwl/nx-set-shas@v4
+      - uses: ./.github/actions/setup
+      - name: Prettier (file modificati)
+        run: |
+          git diff --name-only --diff-filter=d "$NX_BASE" "$NX_HEAD" -- . \
+            | xargs -r npx prettier --check --ignore-unknown
+      - name: dotnet format
+        run: dotnet format MicroMES.Backend.sln --verify-no-changes
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        run: docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.7 -color
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Third party: pinnata a SHA (v2.3.9).
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          # Progetto AGPL-3.0: vietate licenze incompatibili o non libere.
+          deny-licenses: GPL-2.0-only, SSPL-1.0, BUSL-1.1, CC-BY-NC-4.0, CC-BY-NC-SA-4.0
+
+  # Build delle immagini toccate, senza push (riusa i target Nx `docker`).
+  docker:
+    name: Docker build (affected, no push)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: nrwl/nx-set-shas@v4
+      - uses: ./.github/actions/setup
+      - run: npx nx affected -t docker --parallel=1
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs:
+      - affected
+      - commitlint
+      - pr-title
+      - contract
+      - migrations
+      - format
+      - actionlint
+      - gitleaks
+      - dependency-review
+      - docker
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      # Unico check richiesto: fallisce se un job e' fallito o annullato; "skipped" conta come successo.
+      - name: Verifica esito dei job
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if echo "$NEEDS" | jq -e 'any(.[]; .result == "failure" or .result == "cancelled")' >/dev/null; then
+            echo "::error::Uno o piu' job sono falliti o annullati"
+            exit 1
+          fi
