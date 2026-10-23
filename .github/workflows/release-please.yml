@@ -1,0 +1,36 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+# Un solo run alla volta: la Release PR viene aggiornata in modo sequenziale.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  release-please:
+    name: Release PR / tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Il token dell'App vive solo in questo job e nessun codice del repository viene eseguito.
+    permissions:
+      contents: read
+    steps:
+      # Token di GitHub App (non GITHUB_TOKEN): le PR e i tag creati con GITHUB_TOKEN
+      # non avviano altri workflow (CI sulla Release PR, release-app/release-landing sui tag).
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      # Third party: pinnata a SHA (v5.0.0).
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
