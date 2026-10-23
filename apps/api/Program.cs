@@ -18,10 +18,20 @@ using MicroMES.ApiFeatures.ProductionOrderFeature.Seeding;
 using MicroMES.ApiFeatures.RoutingFeature;
 using MicroMES.ApiFeatures.ScrapFeature;
 using MicroMES.ApiFeatures.SampleDataFeature;
+using MicroMES.ApiFeatures.VersionFeature;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Outside Development the logs go to stdout as JSON (one line per entry, ready for log collectors).
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole();
+}
 
 // True only when the build runs with -p:OpenApiGenerateDocuments=true (document emission).
 var isOpenApiEnabled = string.Equals(
@@ -87,26 +97,34 @@ builder.Services.AddRoutingFeature();
 builder.Services.AddProductionOrderFeature();
 builder.Services.AddPlanningFeature();
 builder.Services.AddSampleDataFeature();
+builder.Services.AddVersionFeature();
+
+// Liveness: the process answers. Readiness: the database answers too.
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
+    .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
 var app = builder.Build();
 
-// Apply migrations only in Development, never during OpenAPI document generation.
-if (app.Environment.IsDevelopment() && !isOpenApiEnabled)
+// "Api.dll migrate": applies the pending migrations and exits (0 ok, 1 failure) without starting the web host.
+if (args.FirstOrDefault() == "migrate")
+    return DatabaseStartup.MigrateCommand(app.Services);
+
+// Development applies the migrations and the sample data; elsewhere only the explicit Demo:Seed=true
+// seeds the sample data (migrations are applied by "migrate"), and only on an empty database.
+// Never during OpenAPI document generation.
+if (!isOpenApiEnabled)
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-    scope.ServiceProvider.GetRequiredService<MasterDataDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
-    // The unit of work cannot reopen a transaction within the same scope: the calendar seeder gets its own.
-    using (var calendarScope = app.Services.CreateScope())
-        calendarScope.ServiceProvider.GetRequiredService<CalendarDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
-    // Before the order seeder: on a fresh database the released orders take the tooling snapshots. Own scope (transaction).
-    using (var toolingScope = app.Services.CreateScope())
-        toolingScope.ServiceProvider.GetRequiredService<ToolingDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
-    scope.ServiceProvider.GetRequiredService<ProductionOrderDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
-    // After calendars and orders; own scope (the unit of work cannot reopen a transaction within the same scope).
-    using (var planningScope = app.Services.CreateScope())
-        planningScope.ServiceProvider.GetRequiredService<PlanningDevelopmentSeeder>().SeedAsync().GetAwaiter().GetResult();
+    if (app.Environment.IsDevelopment())
+    {
+        DatabaseStartup.Migrate(app.Services);
+        DatabaseStartup.SeedSampleData(app.Services);
+    }
+    else if (app.Configuration.GetValue("Demo:Seed", false))
+    {
+        DatabaseStartup.Migrate(app.Services);
+        DatabaseStartup.SeedSampleData(app.Services);
+    }
 }
 
 // Configure the HTTP request pipeline.
@@ -142,7 +160,12 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Not part of the public contract: excluded from the OpenAPI document.
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = c => c.Tags.Contains("live") }).ExcludeFromDescription();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") }).ExcludeFromDescription();
+
 app.Run();
+return 0;
 
 // Exposes the entry point to WebApplicationFactory in the integration tests.
 public partial class Program { }

@@ -6,6 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MicroMES.Api</RootNamespace>
     <AssemblyName>MicroMES.Api</AssemblyName>
+    <!-- Overridden by the release build (-p:InformationalVersion=X.Y.Z); no source-revision suffix. -->
+    <InformationalVersion Condition="'$(InformationalVersion)' == ''">0.0.0-dev</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <OpenApiGenerateDocuments>false</OpenApiGenerateDocuments>
     <OpenApiDocumentsDirectory>../../openapi</OpenApiDocumentsDirectory>
   </PropertyGroup>

@@ -8,11 +8,13 @@ namespace MicroMES.ApiTests.Integration.Shared;
 /// The environment decides the startup behaviour: "Development" applies the migrations and the seeders
 /// (the application does that only there), anything else leaves the database to the test fixture.
 /// </summary>
-public sealed class ApiFactory(string connectionString, string environment) : WebApplicationFactory<Program>
+public sealed class ApiFactory(string connectionString, string environment, IReadOnlyDictionary<string, string?>? settings = null) : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(environment);
         builder.UseSetting("ConnectionStrings:Default", connectionString);
+        foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
+            builder.UseSetting(key, value);
     }
 }
