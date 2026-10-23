@@ -165,6 +165,7 @@ export * from './update-tooling-request';
 export * from './update-work-calendar-request';
 export * from './validation-problem-details-errors';
 export * from './validation-problem-details';
+export * from './version-model';
 export * from './work-calendar-model';
 export * from './work-calendar-slot-model';
 export * from './work-calendar-slot-request';

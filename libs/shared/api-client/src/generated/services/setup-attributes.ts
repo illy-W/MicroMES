@@ -351,9 +351,3 @@ export class SetupAttributesService {
   }
 };
 
-export type GetSetupAttributesListClientResult = NonNullable<SetupAttributeModel[]>
-export type CreateSetupAttributeClientResult = NonNullable<SetupAttributeModel>
-export type GetSetupAttributeClientResult = NonNullable<SetupAttributeModel>
-export type UpdateSetupAttributeClientResult = NonNullable<SetupAttributeModel>
-export type DeactivateSetupAttributeClientResult = NonNullable<unknown>
-export type ReactivateSetupAttributeClientResult = NonNullable<SetupAttributeModel>

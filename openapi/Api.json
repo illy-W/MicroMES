@@ -5,6 +5,26 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/version": {
+      "get": {
+        "tags": [
+          "Version"
+        ],
+        "operationId": "GetVersion",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/setup-attributes": {
       "get": {
         "tags": [
@@ -10981,6 +11001,42 @@
           }
         }
       },
+      "VersionModel": {
+        "required": [
+          "version",
+          "updateCheck"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "commit": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "buildDate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "latestVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "updateAvailable": {
+            "type": "boolean"
+          },
+          "updateCheck": {
+            "type": "string"
+          }
+        }
+      },
       "WorkCalendarModel": {
         "required": [
           "id",
@@ -11975,6 +12031,9 @@
     }
   },
   "tags": [
+    {
+      "name": "Version"
+    },
     {
       "name": "SetupAttributes"
     },
