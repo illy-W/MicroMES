@@ -16,7 +16,7 @@ See `AGENTS.md` for the project table and dependency direction.
 - Request/response models are separate from entities, mapped by hand (no AutoMapper, no CQRS/Silverback). Primary keys are always `int`. Deletion is soft (`IsActive`), never `DeleteAsync`.
 - `Program.cs`: `JsonStringEnumConverter`, strict `NumberHandling`, 422 on invalid model state.
 - Domain vocabulary follows ISA-95 in reduced form: see `doc/glossary.md`.
-- Migrations: `dotnet tool restore` (`dotnet-tools.json`, dotnet-ef), then `dotnet ef migrations add <Name> --project libs/api-core --startup-project apps/api --output-dir Persistence/Migrations`. They are applied at startup only in Development (skipped when generating OpenAPI).
+- Migrations: `dotnet tool restore` (`dotnet-tools.json`, dotnet-ef), then `dotnet ef migrations add <Name> --project libs/api-core --startup-project apps/api --output-dir Persistence/Migrations`. They are applied at startup in every environment by `DatabaseStartupService` (`Database:AutoMigrate`, default true; skipped when generating OpenAPI); on failure the host stays up, `/health/ready` answers 503 with the reason and the work is retried every 10 s. Seeders: only Development or `Demo:Seed=true`.
 - Local database: PostgreSQL via `docker-compose.yml` (container `micromes-db`). Start/stop with `npx nx run Api:db-up` / `Api:db-down`. Connection string: `ConnectionStrings:Default` in `appsettings.Development.json`.
 
 ## Frontend patterns

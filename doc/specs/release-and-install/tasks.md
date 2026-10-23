@@ -13,10 +13,11 @@ Stato: requisiti APPROVATI. Task in attesa di approvazione. Owner: `[Nx]` = infr
 ## Fase 1: Backend pronto per la produzione, immagini, CI di base
 
 ### Backend
-- [x] **B1** [Backend] Comando `migrate` (argomento `migrate` di `Api.dll`: applica le migration ed esce 0/1, usa i servizi di avvio esistenti nel rispetto delle regole sul `DbContext`); invariato il comportamento in Development; test d'integrazione (PostgreSQL) del comando su DB vuoto e su DB già migrato. _Satisfies: REQ-9, REQ-4_
+- [x] **B1** [Backend] Comando `migrate` (resta come strumento opzionale; vedi B6) (argomento `migrate` di `Api.dll`: applica le migration ed esce 0/1, usa i servizi di avvio esistenti nel rispetto delle regole sul `DbContext`); invariato il comportamento in Development; test d'integrazione (PostgreSQL) del comando su DB vuoto e su DB già migrato. _Satisfies: REQ-9, REQ-4_
 - [x] **B2** [Backend] Health: `GET /health/live` e `/health/ready` (ready controlla il database), esclusi dal contratto pubblico o documentati; log JSON su stdout fuori da Development; configurazione `ConnectionStrings__Default` da ambiente; test. _Satisfies: REQ-9_
 - [x] **B3** [Backend] `GET /api/version` (versione da `InformationalVersion`, commit, data build; `latest` e `updateAvailable` dalla GitHub Release `app` più recente, cache 24 h, `Updates:Check=false` per disattivare, errori di rete silenziosi con stato `unknown`); feature in `libs/api-features` con service e test (rete simulata). _Satisfies: REQ-2, REQ-6_
 - [x] **B4** [Backend] Seeder demo esplicito: `Demo__Seed=true` esegue i seeder esistenti anche fuori da Development, mai di default, solo su DB vuoto; test. _Satisfies: REQ-5, REQ-9_
+- [x] **B6** [Backend] Migration automatiche all'avvio in ogni ambiente (`Database:AutoMigrate`, predefinita `true`; Development invariato, seeder solo Development o `Demo__Seed`); `/health/ready` 503 finché le migration non sono applicate; test (avvio su DB vuoto, già migrato, AutoMigrate=false, readiness prima/dopo); il comando `migrate` resta. Se cambia il contratto, rigenerarlo. _Satisfies: REQ-9, REQ-4_
 - [x] **B5** [Backend] Rigenerare il contratto (`npx nx run api-client:generate-api`) e riportare le modifiche. _Satisfies: REQ-6_
 
 ### Nx
@@ -36,7 +37,7 @@ Stato: requisiti APPROVATI. Task in attesa di approvazione. Owner: `[Nx]` = infr
 
 ## Fase 3: Helm chart
 
-- [ ] **N8** [Nx] `deploy/helm/micromes`: Deployment/Service api e web (probe, risorse, securityContext), Ingress (`/api` -> api, `/` -> web, `className` configurabile), Secret connection string, job di migration hook `pre-install,pre-upgrade` (`Api.dll migrate`), NetworkPolicy opzionale, `values.yaml` e `values.schema.json` documentati. _Satisfies: REQ-4_
+- [ ] **N8** [Nx] `deploy/helm/micromes`: Deployment/Service api e web (probe, risorse, securityContext), Ingress (`/api` -> api, `/` -> web, `className` configurabile), Secret connection string, nessun job di migration (l'API migra all'avvio; readiness solo a schema aggiornato), NetworkPolicy opzionale, `values.yaml` e `values.schema.json` documentati. _Satisfies: REQ-4_
 - [ ] **N9** [Nx] PostgreSQL integrato (StatefulSet `postgres:17-alpine`, PVC, password generata e conservata nel Secret tra gli upgrade, CronJob `pg_dump` giornaliero con retention) e modalità `external` (existingSecret/connectionString, pre-flight di connessione, versione >= 17, permessi DDL, messaggi chiari). _Satisfies: REQ-4, REQ-7_
 - [ ] **N10** [Nx] Test del chart: `helm lint`, `helm template` (modalità bundled/external/demo) in CI come job di `ci-ok`, `version == appVersion`, nessun subchart di terze parti. _Satisfies: REQ-4, REQ-3_
 

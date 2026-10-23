@@ -10,7 +10,7 @@ Oggi MicroMES si avvia solo da sviluppatore (`docker compose up -d` avvia soltan
 Punti di partenza verificati:
 
 - Riferimento `ptconnect-nx`: workflow unico `build.yml` con GitVersion (versione dai messaggi di commit), job `version` -> `build` (test affected + publish) -> tre job `publish-*` (immagini su ghcr.io, tag `semver` + `latest`, firma cosign keyless) -> `update-env` che scrive il nuovo tag in un repo separato (`ptconnect-env`, kustomize, overlay `prod`). Funziona ma ha limiti per MicroMES: ogni push su `main` pubblica una versione (nessun concetto di "release" per l'utente), la versione dipende da token nei commit (`+semver:`), le tre immagini escono sempre insieme anche se cambia solo la landing, nessun changelog, solo `amd64`, e il deploy è un repo GitOps per un solo ambiente (non adatto a installazioni dei clienti).
-- Backend: `Program.cs` applica le migration **solo in Development** e i seeder girano solo in Development; in produzione il database resterebbe vuoto/senza schema. La connection string è `ConnectionStrings:Default` (sovrascrivibile da variabile d'ambiente `ConnectionStrings__Default`). `apps/web` è una SPA (`outputPath dist/apps/web`) che oggi usa il proxy di sviluppo per `/api`.
+- Backend: `Program.cs` applica le migration **solo in Development** (come i seeder); in produzione il database resterebbe senza schema. Decisione: le migration si applicano **automaticamente all'avvio in ogni ambiente**, come in `ptconnect-nx` (`DatabaseMigrationService`). La connection string è `ConnectionStrings:Default` (sovrascrivibile da variabile d'ambiente `ConnectionStrings__Default`). `apps/web` è una SPA (`outputPath dist/apps/web`) che oggi usa il proxy di sviluppo per `/api`.
 - **Autenticazione non implementata** (`doc/product.md`): un'istanza raggiungibile in rete è aperta a chiunque. Va gestito esplicitamente (vedi REQ-9 e decisioni aperte).
 
 ### Proposta di design (da approvare)
@@ -19,7 +19,7 @@ Punti di partenza verificati:
 |---|---|---|
 | Versioning | **Release Please** (manifest mode) con Conventional Commits (già usati: `feat(web)`, `fix(api)`...). Due componenti indipendenti: **`app`** (backend + frontend, path `apps/api`, `apps/web`, `libs/api-*`, `libs/ui`, `libs/shared`, `deploy/`) e **`landing`** (path `apps/landing`). Tag `app-vX.Y.Z` e `landing-vX.Y.Z`. | La release è un atto esplicito (si fonde la "Release PR", che contiene il changelog); BE e FE hanno una sola versione per costruzione; la landing non fa salire la versione dell'app; nessun token nei commit; niente repo GitOps. Alternativa scartata: GitVersion (come ptconnect) = versione implicita a ogni push, nessun changelog. Alternativa: `nx release` (nativo Nx, conventional commits, gruppi di progetti): valida, ma meno standard per GitHub Releases e Release PR. |
 | Immagini | `micromes-api` e `micromes-web` con **stessa versione** (release `app`), `micromes-landing` con la propria. Tag: `X.Y.Z`, `X.Y`, `X`, `latest` solo alle release stabili; `edge` e `sha-<corto>` a ogni merge su `main` (per consulenti/test). Multi-arch `linux/amd64` + `linux/arm64`, SBOM, firma cosign keyless, pacchetti pubblici su ghcr.io. | `arm64` serve per mini PC/Raspberry in piccole officine; `edge` separa test da produzione. |
-| Chart | Un solo **Helm chart `micromes`** (api + web + postgres opzionale + job di migration + ingress), con `version == appVersion`, pubblicato come OCI su `ghcr.io/illy-w/charts/micromes`. | L'unità di rilascio è il chart: un comando installa/aggiorna/torna indietro; usabile anche da chi ha già k8s/Argo/Flux. |
+| Chart | Un solo **Helm chart `micromes`** (api + web + postgres opzionale + ingress), con `version == appVersion`, pubblicato come OCI su `ghcr.io/illy-w/charts/micromes`. | L'unità di rilascio è il chart: un comando installa/aggiorna/torna indietro; usabile anche da chi ha già k8s/Argo/Flux. |
 | Installer | `install.sh` POSIX (shellcheck-clean) nel repo in `deploy/install/`, scaricato **direttamente da GitHub** (nessun dominio): ultima stabile `https://raw.githubusercontent.com/illy-W/MicroMES/stable/deploy/install/install.sh` (il branch/tag mobile `stable` avanza a ogni release `app`), versione fissa `.../app-vX.Y.Z/deploy/install/install.sh`. Installa **k3s** se manca un cluster, **helm**, poi `helm upgrade --install`. Idempotente: rilanciarlo = aggiornare. Installa anche il comando `micromes`. | Un solo punto d'ingresso per utenti e consulenti; k3s include Traefik e storage locale, perfetti per un nodo singolo. |
 | Aggiornamenti | **Fase 1 (questa spec)**: nessun auto-update; l'app mostra un avviso "Disponibile vX.Y.Z" (con note di rilascio e il comando da lanciare) controllando le GitHub Release; l'aggiornamento si fa con `micromes upgrade` (o rilanciando lo script), con backup automatico prima della migration. **Pulsante "Aggiorna" nell'app: rinviato** a dopo l'autenticazione. | Un pulsante nell'app richiede che l'API possa modificare il cluster (permessi RBAC molto estesi) e, senza login, chiunque in LAN potrebbe usarlo. Notificare è sicuro e sufficiente ora. |
 | DB esterno | **Sì**: `postgresql.mode: bundled` (default, StatefulSet `postgres:17-alpine` con PVC e backup giornaliero) oppure `external` (connection string da Secret). Installer: `--db-url` o `--db-secret`. Test di connessione prima di installare. | Molti consulenti hanno già un PostgreSQL gestito/da backuppare; separare il dato dal cluster semplifica backup e ripristino. |
@@ -62,9 +62,9 @@ Punti di partenza verificati:
 ### REQ-4: Helm chart `micromes`
 - **User Story**: As a consulente, I want un chart unico so that installare, aggiornare e tornare indietro sia un comando.
 - **Acceptance Criteria**:
-  - [ ] `deploy/helm/micromes` con: Deployment api e web (probe di liveness/readiness, risorse e `securityContext` restrittivi), Service, Ingress (path `/api` -> api, `/` -> web), job di migration come hook `pre-install,pre-upgrade`, Secret per la connection string, NetworkPolicy opzionale, `values.yaml` documentato.
+  - [ ] `deploy/helm/micromes` con: Deployment api e web (probe di liveness/readiness, risorse e `securityContext` restrittivi), Service, Ingress (path `/api` -> api, `/` -> web), Secret per la connection string, NetworkPolicy opzionale, `values.yaml` documentato.
   - [ ] PostgreSQL incluso (StatefulSet `postgres:17-alpine`, PVC, password generata, CronJob `pg_dump` giornaliero con retention) oppure esterno (REQ-7).
-  - [ ] `helm upgrade` con immagini della nuova versione applica prima la migration; se la migration fallisce l'upgrade si ferma e la versione precedente resta in esecuzione; `helm rollback` ripristina i manifest (il dato si ripristina con `micromes restore`).
+  - [ ] Le migration sono applicate dall'API all'avvio (nessun Job né hook). `helm upgrade` fa un rolling update: se la migration della nuova versione fallisce il nuovo pod non diventa pronto e i pod della versione precedente restano in servizio; `helm rollback` ripristina i manifest (il dato si ripristina con `micromes restore`).
   - [ ] Funziona su k3s (Traefik, local-path) e su un k8s generico (`ingress.className` configurabile).
 - **Technical Constraints**: nessuna dipendenza da chart di terze parti (evitare subchart Bitnami); `version == appVersion` del release `app`; sicurezza: pod non root, filesystem in sola lettura dove possibile.
 
@@ -96,7 +96,7 @@ Punti di partenza verificati:
   - [ ] Pre-flight: job/comando che verifica raggiungibilità, credenziali, versione >= 17 e permessi DDL, con messaggio chiaro in italiano in caso di errore.
   - [ ] Con DB esterno non viene creato lo StatefulSet né il CronJob di backup; `micromes backup` esegue `pg_dump` verso un percorso locale e avvisa che il backup completo è responsabilità del DB.
   - [ ] Documentati requisiti (versione, estensioni: nessuna richiesta, SSL, utente con diritto di creare tabelle) e passaggio da bundled a esterno (dump/restore).
-- **Technical Constraints**: la connection string è passata come `ConnectionStrings__Default` da Secret; stesso Secret per API e job di migration.
+- **Technical Constraints**: la connection string è passata come `ConnectionStrings__Default` da Secret; l'API migra con la stessa connessione (utente con diritti DDL).
 
 ### REQ-8: Flusso semplice per utenti e consulenti
 - **User Story**: As a consulente, I want strumenti uniformi so that installo e assisto molti clienti con lo stesso metodo; as a utente, I want pochi passi e messaggi chiari.
@@ -110,13 +110,13 @@ Punti di partenza verificati:
 ### REQ-9: Prontezza del backend per la produzione
 - **User Story**: As a consulente, I want che l'API funzioni in produzione so that l'installazione non dipenda da trucchi manuali.
 - **Acceptance Criteria**:
-  - [ ] Comando `Api.dll migrate` (o argomento equivalente) che applica le migration ed esce con codice 0/1; usato dal job del chart; in Development resta il comportamento attuale.
+  - [ ] **Migration automatiche all'avvio in ogni ambiente** (chiave `Database:AutoMigrate`, predefinita `true`; disattivabile). I seeder restano solo Development o `Demo__Seed`. `GET /health/ready` risponde 503 finché le migration non sono applicate (non solo finché il database risponde). Il comando `Api.dll migrate` resta **opzionale** (consulenti con DB esterno e utente senza diritti DDL, pre-flight); il chart non lo usa.
   - [ ] Endpoint `GET /health/live` e `/health/ready` (ready controlla il database); `GET /api/version` (REQ-2/6); log su stdout in formato JSON in produzione.
   - [ ] I seeder restano solo Development; `--demo-data` (opzionale) esegue un seeder dedicato esplicitamente richiesto (variabile `Demo__Seed=true`), mai di default.
 
   - [ ] **Nessuna autenticazione per ora** (decisione): l'installer e la documentazione avvisano che l'istanza va tenuta su rete fidata (LAN/VPN); l'ingress espone di default le porte del nodo, con opzione `--basic-auth` (disattivata) per chi vuole una protezione temporanea.
   - [ ] Nessuna dipendenza da file locali: tutto lo stato è nel database.
-- **Technical Constraints**: pattern backend di `doc/structure.md` (nessun `DbContext` nel codice di prodotto: il comando `migrate` usa il servizio di avvio esistente o `IUnitOfWork`/factory consentita); nuovi endpoint documentati e contratto OpenAPI rigenerato (`npx nx run api-client:generate-api`).
+- **Technical Constraints**: pattern backend di `doc/structure.md` (nessun `DbContext` nel codice di prodotto: il codice di migration all'avvio e il comando `migrate` condividono lo stesso componente di avvio previsto dalle regole); nuovi endpoint documentati e contratto OpenAPI rigenerato (`npx nx run api-client:generate-api`).
 
 ### REQ-10: Allineamento landing e documentazione
 - **User Story**: As a visitatore, I want istruzioni vere so that il comando mostrato nella landing funzioni.
@@ -138,7 +138,7 @@ Punti di partenza verificati:
 
 ## 3. Layers impacted
 
-- **Backend**: comando `migrate`, health check, `GET /api/version` con controllo aggiornamenti, log JSON, seeder demo esplicito, ricostruzione del contratto OpenAPI.
+- **Backend**: migration automatiche all'avvio (comando `migrate` opzionale), health check, `GET /api/version` con controllo aggiornamenti, log JSON, seeder demo esplicito, ricostruzione del contratto OpenAPI.
 - **Web**: versione nel piè della sidebar, avviso "aggiornamento disponibile" (nessun pulsante di aggiornamento); eventuale pagina informazioni.
 - **Repository GitHub**: ruleset, CODEOWNERS, template, Dependabot, documentazione per i contributori (REQ-11).
 - **Nx workspace / infrastruttura**: Dockerfile api/web, target Nx `docker`, workflow GitHub Actions, Release Please, chart Helm, `install.sh` e CLI `micromes`, test e2e dell'installazione, aggiornamenti a `landing` (link allo script, docs), `AGENTS.md`/`doc/`. (Lavoro d'infrastruttura assegnato a `[Nx]` in assenza di un agente DevOps dedicato.)
