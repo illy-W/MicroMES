@@ -1,0 +1,91 @@
+{
+  "name": "landing",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "prefix": "app",
+  "sourceRoot": "apps/landing/src",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@angular/build:application",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "dist/apps/landing",
+        "browser": "apps/landing/src/main.ts",
+        "tsConfig": "apps/landing/tsconfig.app.json",
+        "inlineStyleLanguage": "scss",
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "apps/landing/public"
+          },
+          {
+            "glob": "**/*",
+            "input": "apps/landing/src/assets",
+            "output": "assets"
+          }
+        ],
+        "styles": ["apps/landing/src/styles.scss"],
+        "server": "apps/landing/src/main.server.ts",
+        "ssr": {
+          "entry": "apps/landing/src/server.ts"
+        },
+        "outputMode": "static",
+        "security": {
+          "allowedHosts": []
+        }
+      },
+      "configurations": {
+        "production": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "650kb",
+              "maximumError": "1mb"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "14kb",
+              "maximumError": "20kb"
+            }
+          ],
+          "outputHashing": "all"
+        },
+        "development": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true
+        }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@angular/build:dev-server",
+      "defaultConfiguration": "development",
+      "configurations": {
+        "production": {
+          "buildTarget": "landing:build:production"
+        },
+        "development": {
+          "buildTarget": "landing:build:development"
+        }
+      },
+      "options": {
+        "port": 4400
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "serve-static": {
+      "continuous": true,
+      "executor": "@nx/web:file-server",
+      "options": {
+        "buildTarget": "landing:build",
+        "staticFilePath": "dist/apps/landing/browser",
+        "spa": true
+      }
+    }
+  }
+}

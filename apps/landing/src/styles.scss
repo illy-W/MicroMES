@@ -1,0 +1,139 @@
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+@import 'tailwindcss/utilities.css';
+
+@import '@spartan-ng/brain/hlm-tailwind-preset.css';
+
+/* Tema chiaro neutro (stessi token di apps/web): contrasto e gerarchia da inchiostro, tipografia e layout. */
+:root {
+  color-scheme: light;
+
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.5 0 0); /* web: 0.556; scurito per AA anche su --muted */
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  /* Unico accento: blu acciaio/segnale (hue 250). Mai arancio/giallo/ambra (arancio = marchio ptconnect).
+     Contrasti: --signal su bianco 6.5:1, su --muted 6.0:1; bianco su --signal 6.5:1;
+     --signal-light su inchiostro (--primary) 9.0:1; --ring su bianco 3.9:1 e su inchiostro 4.0:1. */
+  --signal: oklch(0.48 0.14 250);
+  --signal-foreground: oklch(0.985 0 0);
+  --signal-light: oklch(0.78 0.11 250);
+  --ring: oklch(0.6 0.14 250);
+  --running: oklch(0.85 0.09 150);
+  --running-foreground: oklch(0.27 0.06 150);
+}
+
+@theme inline {
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-signal-light: var(--signal-light);
+  --color-running: var(--running);
+  --color-running-foreground: var(--running-foreground);
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 4.5rem;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+  button {
+    @apply cursor-pointer;
+  }
+  :focus-visible {
+    @apply outline-ring outline-2 outline-offset-2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+h1 {
+  @apply text-4xl leading-[1.05] font-extrabold tracking-tight text-balance sm:text-5xl lg:text-6xl;
+}
+
+h2 {
+  @apply scroll-m-20 text-3xl leading-tight font-bold tracking-tight text-balance sm:text-4xl;
+}
+
+h3 {
+  @apply text-lg font-semibold tracking-tight;
+}
+
+p {
+  @apply leading-7;
+}
+
+/* Etichetta tecnica in stile cartiglio di disegno: "01 / FUNZIONI". */
+.tag {
+  @apply text-muted-foreground font-mono text-xs font-semibold tracking-[0.18em] uppercase;
+}
+
+/* Fascia a strisce diagonali neutre, solo decorativa. */
+.hazard {
+  height: 0.5rem;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--border) 0 0.75rem,
+    var(--signal) 0.75rem 1.5rem
+  );
+}
+
+/* Etichetta tecnica su fondo inchiostro. */
+.tag-inv {
+  color: color-mix(in oklch, var(--primary-foreground) 72%, transparent);
+}
+
+/* Target di tocco >= 44 px su mobile per l'accordion (componente generato: regola a livello di pagina). */
+@media (max-width: 639px) {
+  [data-slot='accordion-trigger'] {
+    min-height: 2.75rem;
+  }
+}
+
+/* Animazione di altezza dell'accordion disattivata con prefers-reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='accordion-content'],
+  [data-slot='accordion-trigger'] {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Testo dei comandi non ancora disponibili: non selezionabile (non va copiato). */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* I componenti spartan tolgono l'outline: focus visibile (>= 3:1) e coerente su tutti i bottoni/link. */
+[data-slot='button']:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

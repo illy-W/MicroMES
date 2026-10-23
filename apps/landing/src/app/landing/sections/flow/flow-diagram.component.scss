@@ -1,0 +1,39 @@
+/* Stili caricati solo con il chunk differito del diagramma (ViewEncapsulation.None). */
+@import 'ng-diagram/styles.css';
+
+/* ng-diagram: mappa le variabili --ngd-* sui token semantici. */
+:root {
+  --ngd-diagram-background-color: var(--card);
+  --ngd-txt-primary-default: var(--foreground);
+  --ngd-node-bg-primary-default: var(--card);
+  --ngd-node-stroke-primary-default: var(--border);
+  --ngd-node-stroke-primary-hover: var(--ring);
+  --ngd-node-port-fill-default: var(--card);
+  --ngd-node-port-fill-active: var(--primary);
+  --ngd-node-port-stroke-default: var(--muted-foreground);
+  --ngd-node-port-stroke-active: var(--card);
+  --ngd-default-edge-stroke: var(--muted-foreground);
+  --ngd-default-edge-stroke-hover: var(--foreground);
+  --ngd-default-edge-stroke-selected: var(--signal);
+  --ngd-default-edge-label-bg-primary-default: var(--card);
+  --ngd-ui-bg-primary-default: var(--card);
+  --ngd-ui-bg-tertiary-default: var(--muted);
+  --ngd-ui-border-color: var(--border);
+  --ngd-background-dot-color: var(--border);
+  --ngd-background-line-minor-color: var(--border);
+  --ngd-background-line-major-color: var(--border);
+  --ngd-focus-ring-node-active: color-mix(in oklch, var(--ring) 40%, transparent);
+}
+
+
+/* ng-diagram imposta touch-action:none sul proprio host; il diagramma è statico, quindi si ripristina
+   lo scorrimento della pagina al tocco, solo su quell'elemento (non su `*`). */
+app-flow-diagram ng-diagram {
+  touch-action: pan-x pan-y !important;
+}
+
+app-flow-diagram {
+  display: block;
+  width: 1100px;
+  height: 440px;
+}

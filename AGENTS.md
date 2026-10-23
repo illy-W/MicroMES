@@ -8,6 +8,7 @@ Monorepo Nx (pnpm) con frontend Angular e backend .NET.
 |---|---|---|
 | `apps/web` | `web` | Frontend Angular (SCSS) |
 | `apps/api` | `Api` | API ASP.NET Core (`MicroMES.Api`) |
+| `apps/landing` | `landing` | Landing page pubblica Angular (SSR + prerender, Tailwind, porta 4400) |
 | `libs/api-features` | `ApiFeatures` | Lib .NET con le feature (`MicroMES.ApiFeatures`) |
 | `libs/api-core` | `ApiCore` | Lib .NET con il core (`MicroMES.ApiCore`) |
 | `libs/api-tests` | `ApiTests` | Test unitari .NET (xUnit, `MicroMES.ApiTests`) |
@@ -33,6 +34,7 @@ Node: usa la versione di `.nvmrc`.
 - `npx nx build <progetto>` / `npx nx run-many -t build`
 - `npx nx affected -t build`
 - `npx nx serve web`: avvia il frontend
+- `npx nx serve landing`: avvia la landing (porta 4400); `npx nx build landing`: build con prerender
 - `dotnet run --project apps/api`: avvia l'API
 - `npx nx run api-client:generate-api`: rigenera `openapi/Api.json` e il client Angular (`generate-api:no-build` salta la build dell'API)
 - `npx nx run ApiTests:unit-test`: test unitari backend; `npx nx run ApiTests.Integration:unit-test`: test di integrazione (richiede Docker)

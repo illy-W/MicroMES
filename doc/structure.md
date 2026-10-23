@@ -138,6 +138,16 @@ See `AGENTS.md` for the project table and dependency direction.
 - Read-only aggregation, no new entities: `GET /api/equipment/{id}/overview` (state now, running, queue of 20, mounted state from `MachineStartingState`, load today/7/30 via `TimelineService`, machine alerts) and `GET /api/equipment/{id}/history?days=7|30|90&page=&pageSize=` (summary with utilization = worked minutes / calendar available minutes, scrap % and by reason, paged sessions by the session's machine). Both live in `PlanningFeature` (`EquipmentOverview*`, `EquipmentHistory*`) to avoid cycles between Equipment, Tooling and Planning; `GET /api/equipment/{id}` gains `compatibleTooling[]`/`universalTooling[]` through `IEquipmentDetailEnricher`. Utilization is not OEE (no downtime reasons).
 - Web: `/equipment/:id` (lazy) with tabs `?tab=panoramica|fasi|calendario|pianificazione|storico`; the old side panel of the list is gone. The planning timeline is embedded in the Pianificazione tab through the `TIMELINE_EMBED` token (fixed machine filter, no URL state); the weekly shifts summary is shared (`calendar-weekly-summary`). Links to the page from timeline rows, work panel, tooling detail, order and work order tables and alerts.
 
+### Landing page (specs/landing-page)
+
+- `apps/landing` (`landing`): separate public site (Angular, static output with prerender, Tailwind v4, spartan helm, no API dependency, Italian text, no cookies/trackers). `npx nx serve landing` (port 4400; `web` uses 4300), `npx nx build landing` -> `dist/apps/landing/browser`.
+- Structure: `src/app/landing/sections/*` (one OnPush component per section), `landing-links.ts` is the only place with URLs and placeholders (repo, install script `get.micromes.example`, contact email): replace them, plus the canonical URL in `index.html`, `robots.txt` and `sitemap.xml` (`micromes.example`), when publishing.
+- Product diagram: ng-diagram read-only with static data in `sections/flow/*`, inside `@defer (on viewport)` (lazy chunk); no ELK, positions are fixed. Screenshots in `src/assets/images/product/` (WebP 960/1600) captured from `web` with the Development seed data.
+- Look: neutral spartan tokens (same as `web`) plus one industrial steel-blue accent `--signal` (no orange/amber: orange is the ptconnect brand). Product images open in a lazy lightbox (`product-lightbox`, helm dialog). The ng-diagram CSS lives in `flow-diagram.component.scss` (loaded with the deferred chunk).
+- Install section reflects reality: `docker compose up -d` starts only PostgreSQL; the app runs with `pnpm install && npx nx serve web` (no one-command stack yet; the `curl | bash` script is a placeholder).
+- Container: `Dockerfile` (nginx static, CSP hashes computed by `scripts/generate-csp.mjs`), `nginx.conf`, `security-headers.conf`. No CI/CD yet.
+- License: AGPL-3.0 (`LICENSE`, `package.json` `AGPL-3.0-only`).
+
 ### Backend data access rules
 
 - Never use `AppDbContext`/`DbContext` in product code. It appears only in repository constructors (`GenericRepository<T, int, AppDbContext>`), DbContext registration (interceptors) and migrations/design-time factory. Services, planners, seeders and controllers use repositories or `IUnitOfWork`.
