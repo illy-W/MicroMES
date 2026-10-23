@@ -1,0 +1,60 @@
+name: Release landing
+
+# Tag `landing-vX.Y.Z` (creato da Release Please): pubblica l'immagine landing con tag X.Y.Z e latest.
+on:
+  push:
+    tags: ['landing-v*']
+
+permissions: {}
+
+concurrency:
+  group: release-landing
+  cancel-in-progress: false
+
+jobs:
+  meta:
+    name: Version from tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      date: ${{ steps.v.outputs.date }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate tag and derive version
+        id: v
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! echo "$TAG" | grep -Eq '^landing-v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag non valido: $TAG (atteso landing-vX.Y.Z)"; exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Il tag $TAG non punta a un commit di main"; exit 1
+          fi
+          {
+            echo "version=${TAG#landing-v}"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+
+  landing:
+    name: landing
+    needs: meta
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/_publish-image.yml
+    with:
+      image: landing
+      version: ${{ needs.meta.outputs.version }}
+      commit: ${{ github.sha }}
+      build-date: ${{ needs.meta.outputs.date }}
+      tags: |
+        ghcr.io/illy-w/micromes/landing:${{ needs.meta.outputs.version }}
+        ghcr.io/illy-w/micromes/landing:latest

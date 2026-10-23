@@ -1,0 +1,124 @@
+name: Publish edge
+
+# Ogni merge su main pubblica SOLO le immagini toccate con tag `edge` e `sha-<short>`.
+# Mai `latest`, mai tag semver (quelli li pubblicano release-app/release-landing).
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: publish-edge
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+      landing: ${{ steps.filter.outputs.landing }}
+      short: ${{ steps.meta.outputs.short }}
+      date: ${{ steps.meta.outputs.date }}
+      base: ${{ steps.meta.outputs.base }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # Third party: pinnata a SHA (v4.0.3).
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+              - 'libs/api-core/**'
+              - 'libs/api-features/**'
+              - 'global.json'
+              - 'Directory.*'
+              - 'NuGet.Config'
+              - '.github/workflows/publish-edge.yml'
+              - '.github/workflows/_publish-image.yml'
+            web:
+              - 'apps/web/**'
+              - 'libs/ui/**'
+              - 'libs/shared/**'
+              - 'openapi/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig.base.json'
+              - '.github/workflows/publish-edge.yml'
+              - '.github/workflows/_publish-image.yml'
+            landing:
+              - 'apps/landing/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig.base.json'
+              - '.github/workflows/publish-edge.yml'
+              - '.github/workflows/_publish-image.yml'
+      - id: meta
+        run: |
+          {
+            echo "short=$(git rev-parse --short=7 HEAD)"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "base=$(cat version.txt)"
+          } >> "$GITHUB_OUTPUT"
+
+  api:
+    name: api
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/_publish-image.yml
+    with:
+      image: api
+      version: ${{ needs.changes.outputs.base }}-edge.${{ needs.changes.outputs.short }}
+      commit: ${{ github.sha }}
+      build-date: ${{ needs.changes.outputs.date }}
+      tags: |
+        ghcr.io/illy-w/micromes/api:edge
+        ghcr.io/illy-w/micromes/api:sha-${{ needs.changes.outputs.short }}
+
+  web:
+    name: web
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/_publish-image.yml
+    with:
+      image: web
+      version: ${{ needs.changes.outputs.base }}-edge.${{ needs.changes.outputs.short }}
+      commit: ${{ github.sha }}
+      build-date: ${{ needs.changes.outputs.date }}
+      tags: |
+        ghcr.io/illy-w/micromes/web:edge
+        ghcr.io/illy-w/micromes/web:sha-${{ needs.changes.outputs.short }}
+
+  landing:
+    name: landing
+    needs: changes
+    if: needs.changes.outputs.landing == 'true'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/_publish-image.yml
+    with:
+      image: landing
+      version: ${{ needs.changes.outputs.base }}-edge.${{ needs.changes.outputs.short }}
+      commit: ${{ github.sha }}
+      build-date: ${{ needs.changes.outputs.date }}
+      tags: |
+        ghcr.io/illy-w/micromes/landing:edge
+        ghcr.io/illy-w/micromes/landing:sha-${{ needs.changes.outputs.short }}

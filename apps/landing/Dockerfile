@@ -3,7 +3,8 @@
 # In alternativa: npx nx run landing:docker
 
 # Stadio 1: calcola gli hash CSP degli script inline dell'HTML prerenderizzato.
-FROM node:24-alpine AS csp
+# Eseguito sempre sulla piattaforma del builder (l'output e' indipendente dall'architettura): niente emulazione QEMU nel build multi-arch.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS csp
 WORKDIR /build
 COPY apps/landing/scripts/generate-csp.mjs ./
 COPY dist/apps/landing/browser ./browser
@@ -11,6 +12,18 @@ RUN node generate-csp.mjs ./browser ./csp.conf
 
 # Stadio 2: sito statico servito da nginx.
 FROM nginxinc/nginx-unprivileged:1.27-alpine
+
+ARG VERSION=0.0.0-dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.title="MicroMES Landing" \
+      org.opencontainers.image.description="MicroMES public landing page" \
+      org.opencontainers.image.source="https://github.com/illy-w/micromes" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${COMMIT}" \
+      org.opencontainers.image.created="${BUILD_DATE}"
 
 COPY apps/landing/nginx.conf /etc/nginx/nginx.conf
 COPY apps/landing/security-headers.conf /etc/nginx/security-headers.conf

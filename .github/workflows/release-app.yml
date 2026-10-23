@@ -1,0 +1,199 @@
+name: Release app
+
+# Tag `app-vX.Y.Z` (creato da Release Please con il token dell'App): test, immagini api/web
+# (stessa versione, sempre insieme), chart Helm OCI, poi avanzamento del branch `stable`.
+on:
+  push:
+    tags: ['app-v*']
+
+permissions: {}
+
+concurrency:
+  group: release-app
+  cancel-in-progress: false
+
+env:
+  NX_NO_CLOUD: 'true'
+
+jobs:
+  meta:
+    name: Version from tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      minor: ${{ steps.v.outputs.minor }}
+      major: ${{ steps.v.outputs.major }}
+      date: ${{ steps.v.outputs.date }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate tag and derive versions
+        id: v
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! echo "$TAG" | grep -Eq '^app-v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag non valido: $TAG (atteso app-vX.Y.Z)"; exit 1
+          fi
+          # Il tag deve puntare a un commit di main.
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Il tag $TAG non punta a un commit di main"; exit 1
+          fi
+          v="${TAG#app-v}"
+          {
+            echo "version=$v"
+            echo "minor=${v%.*}"
+            echo "major=${v%%.*}"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Unit + integration tests
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: npx nx run ApiTests:unit-test
+      # Richiede Docker (Testcontainers), disponibile su ubuntu-latest.
+      - run: npx nx run ApiTests.Integration:unit-test
+
+  api:
+    name: api
+    needs: [meta, test]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/_publish-image.yml
+    with:
+      image: api
+      version: ${{ needs.meta.outputs.version }}
+      commit: ${{ github.sha }}
+      build-date: ${{ needs.meta.outputs.date }}
+      tags: |
+        ghcr.io/illy-w/micromes/api:${{ needs.meta.outputs.version }}
+        ghcr.io/illy-w/micromes/api:${{ needs.meta.outputs.minor }}
+        ghcr.io/illy-w/micromes/api:${{ needs.meta.outputs.major }}
+        ghcr.io/illy-w/micromes/api:latest
+
+  web:
+    name: web
+    needs: [meta, test]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/_publish-image.yml
+    with:
+      image: web
+      version: ${{ needs.meta.outputs.version }}
+      commit: ${{ github.sha }}
+      build-date: ${{ needs.meta.outputs.date }}
+      tags: |
+        ghcr.io/illy-w/micromes/web:${{ needs.meta.outputs.version }}
+        ghcr.io/illy-w/micromes/web:${{ needs.meta.outputs.minor }}
+        ghcr.io/illy-w/micromes/web:${{ needs.meta.outputs.major }}
+        ghcr.io/illy-w/micromes/web:latest
+
+  chart:
+    name: Helm chart (OCI)
+    needs: [meta, api, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # TODO (fase 3, N8): il chart non esiste ancora; gli step sono no-op finche' manca deploy/helm/micromes.
+      - name: Check chart presence
+        id: has
+        run: |
+          if [ -f deploy/helm/micromes/Chart.yaml ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "::notice::deploy/helm/micromes assente: chart non pubblicato"; echo "present=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        if: steps.has.outputs.present == 'true'
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        if: steps.has.outputs.present == 'true'
+      - name: Package, push and sign
+        if: steps.has.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          helm package deploy/helm/micromes --version "$VERSION" --app-version "$VERSION" -d "$RUNNER_TEMP"
+          out=$(helm push "$RUNNER_TEMP/micromes-${VERSION}.tgz" oci://ghcr.io/illy-w/charts 2>&1 | tee /dev/stderr)
+          digest=$(echo "$out" | sed -n 's/^Digest: //p')
+          [ -n "$digest" ] || { echo "::error::digest del chart non trovato"; exit 1; }
+          cosign sign --yes "ghcr.io/illy-w/charts/micromes@${digest}"
+          {
+            echo "### Chart ghcr.io/illy-w/charts/micromes"
+            echo "- Versione: \`${VERSION}\`"
+            echo "- Digest: \`${digest}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Segnaposto: in fase 4 (N13) sostituire con `uses: ./.github/workflows/e2e-install.yml`
+  # (workflow_call, installazione delle immagini appena pubblicate). Solo se verde si avanza `stable`.
+  e2e-install:
+    name: e2e-install (gate)
+    needs: [meta, chart]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Gate
+        run: |
+          if [ -f .github/workflows/e2e-install.yml ]; then
+            echo "::warning::e2e-install.yml presente ma non ancora collegato: collegarlo qui (TODO N13)"
+          else
+            echo "::notice::e2e-install non ancora disponibile (fase 4): gate saltato"
+          fi
+
+  stable:
+    name: Advance stable
+    needs: [meta, api, web, chart, e2e-install]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Force-update stable to the tagged commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git fetch origin stable 2>/dev/null || true
+          # Non arretrare mai `stable` (es. ri-esecuzione di un tag vecchio).
+          if git rev-parse -q --verify origin/stable >/dev/null && ! git merge-base --is-ancestor origin/stable "$GITHUB_SHA"; then
+            echo "::warning::stable non e' antenato di $TAG: nessun avanzamento"; exit 0
+          fi
+          git push --force origin "${GITHUB_SHA}:refs/heads/stable"
+          echo "### stable -> \`${TAG}\` (\`${GITHUB_SHA}\`)" >> "$GITHUB_STEP_SUMMARY"
