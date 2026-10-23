@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { HlmSidebarImports } from '@spartan-ng/helm/sidebar';
 import { NavSection } from '../../models/nav-item.model';
+import { VersionInfoComponent } from '../version-info/version-info.component';
 import { NavMainComponent } from '../nav-main/nav-main.component';
 
 @Component({
   selector: 'app-sidebar',
-  imports: [HlmSidebarImports, NavMainComponent],
+  imports: [HlmSidebarImports, NavMainComponent, VersionInfoComponent],
   host: { class: 'block' },
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -17,6 +18,9 @@ import { NavMainComponent } from '../nav-main/nav-main.component';
         <hlm-sidebar-content>
           <app-nav-main [sections]="sections()" />
         </hlm-sidebar-content>
+        <hlm-sidebar-footer>
+          <app-version-info />
+        </hlm-sidebar-footer>
       </hlm-sidebar>
       <ng-content />
     </div>
