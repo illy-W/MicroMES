@@ -14,13 +14,13 @@ Prima versione (fase 2 di `doc/specs/release-and-install`). Sarà completata da 
 
 Conventional Commits (verificati da commitlint su ogni commit e sul titolo della PR).
 
-| Commit | Prima della 1.0 (ora) | Dopo la 1.0 |
-|---|---|---|
-| `fix:` / `perf:` | patch | patch |
-| `feat:` | minor | minor |
-| `feat!:` / `BREAKING CHANGE:` | **minor** | major |
+| Commit                        | Prima della 1.0 (ora) | Dopo la 1.0 |
+| ----------------------------- | --------------------- | ----------- |
+| `fix:` / `perf:`              | patch                 | patch       |
+| `feat:`                       | minor                 | minor       |
+| `feat!:` / `BREAKING CHANGE:` | **minor**             | major       |
 
-Configurazione: `bump-minor-pre-major: true`, `bump-patch-for-minor-pre-major: false`. Si parte da `0.0.0`: il primo `feat` produce `0.1.0`. `docs`, `refactor`, `test`, `build`, `ci`, `chore` non fanno rilasciare e sono nascosti dal changelog.
+Configurazione: `bump-minor-pre-major: true`, `bump-patch-for-minor-pre-major: false`. `initial-version: "0.1.0"`: la prima release di ogni componente (nessun tag precedente) è `0.1.0`, qualunque sia il tipo di commit (senza, Release Please proporrebbe `1.0.0`). Il manifest resta a `0.0.0` (placeholder: viene aggiornato dalla prima Release PR). `docs`, `refactor`, `test`, `build`, `ci`, `chore` non fanno rilasciare e sono nascosti dal changelog.
 
 ## Flusso di rilascio
 
